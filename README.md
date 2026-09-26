@@ -101,7 +101,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 50 offline tests
+npm test                                                               # 53 offline tests
 ```
 
 ## If Google blocks you

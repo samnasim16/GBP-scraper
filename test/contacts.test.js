@@ -5,7 +5,7 @@ import http from 'node:http';
 import path from 'node:path';
 
 import {
-    extractEmails, rankEmails, deobfuscate, decodeCfEmail, extractContactName, extractContactRole,
+    extractEmails, rankEmails, deobfuscate, decodeCfEmail, extractContactName, extractContact,
     greetingFor, findContactLinks, guessContactUrls, findSocialLinks, registrableDomain, ContactEnricher,
 } from '../src/contacts.js';
 import { createHttpClient } from '../src/http.js';
@@ -47,7 +47,7 @@ test('registrable domain handles subdomains and co.uk', () => {
 test('the Impressum names the person, not the company or the next field', () => {
     const text = stripHtml(read('impressum.html'));
     assert.equal(extractContactName(text), 'Frau Dr. Miriam Rosenthal');
-    assert.equal(extractContactRole(text), 'Geschäftsführerin');
+    assert.equal(extractContact(text).role, 'Geschäftsführerin');
 
     assert.equal(extractContactName('Inhaber: David Levi Fasanenstraße 5 10623 Berlin'), 'David Levi');
     assert.equal(extractContactName('Geschäftsführer: Max von Weizsäcker, Anna Beispiel'), 'Max von Weizsäcker');
@@ -120,4 +120,24 @@ test('a site that is down still completes the lead', async () => {
 test("a web agency's footer address loses even without a domain to match", () => {
     assert.equal(rankEmails(['hello@pixelagentur.de', 'shop@judaica-haus.de'], '', '')[0], 'shop@judaica-haus.de');
     assert.equal(rankEmails(['hello@pixelagentur.de', 'shop@judaica-haus.de'], 'http://127.0.0.1:8080/', 'Judaica Haus')[0], 'shop@judaica-haus.de');
+});
+
+test('real run: a job title before the name and a sentence after it are not the name', () => {
+    // Jewish Museum Berlin's Impressum produced "Dear Direktorin Hetty Berg Die".
+    const c = extractContact('Vertreten durch: Direktorin Hetty Berg Die Stiftung Jüdisches Museum Berlin ist eine Stiftung');
+    assert.deepEqual(c, { name: 'Hetty Berg', role: 'Direktorin' });
+    assert.equal(greetingFor({ contact_name: c.name, contact_role: c.role }), 'Dear Ms. Berg');
+});
+
+test('real run: a street is not a person', () => {
+    // Jewish Community of Berlin produced "Dear Oranienburger Str".
+    assert.equal(extractContactName('Vertreten durch: Oranienburger Str. 28-31 10117 Berlin'), '');
+    assert.equal(extractContactName('Vertreten durch: Oranienburger Str 28'), '');
+    assert.equal(extractContactName('Inhaber: David Levi Oranienburger Str. 5'), 'David Levi');
+});
+
+test('real run: phone digits glued onto an address are removed', () => {
+    // Jewish Museum Berlin produced "300info@jmberlin.de".
+    assert.deepEqual(extractEmails('<p>Tel. +49 30 25993 300info@jmberlin.de</p><a href="mailto:info@jmberlin.de">x</a>'), ['info@jmberlin.de']);
+    assert.deepEqual(extractEmails('<p>24h: 24hshop@x.de</p>'), ['24hshop@x.de'], 'digits that are not a known prefix stay');
 });
