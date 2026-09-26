@@ -60,6 +60,8 @@ To change the email text, edit **`templates/partnership-email.txt`**. The first 
 
 ### Relevance: which shops are targets
 
+**Only businesses you can sell to are kept.** Synagogues, Chabad houses, Jewish communities (Gemeinde), registered non-profits (e.V.), foundations, associations, institutes, schools, universities, libraries, museums, memorials and embassies are skipped, based on their Maps category and their name. They aren't opened, their websites aren't read, and they don't appear in the output. A shop run by a community still counts if Maps lists it as a store (for example Chabad's "Judaica-Laden", a *Judaica Store*). To keep the organisations anyway, set `"keepNonProfits": true`.
+
 Maps search is fuzzy. A search for `koscher` also returns kosher restaurants, and `Judaica` also returns synagogues. So each place is scored on the words in its name, category, Maps description and its own website, then put in a tier:
 
 | Tier | Meaning | On the Outreach sheet? |
@@ -67,13 +69,12 @@ Maps search is fuzzy. A search for `koscher` also returns kosher restaurants, an
 | **Judaica seller** | Name or website mentions Judaica, Menora, Mesusa, Kiddusch-Becher, Sederteller… | ✅ |
 | **Jewish / Israeli retail** | A shop (book, gift, grocery, museum shop) with Jewish or Israeli context | ✅ |
 | Glass & gift shop | Sells glass or gifts, with no Jewish context found | opt-in |
-| Community / synagogue | Gemeinde, synagogue, Chabad. Some run a shop. | opt-in |
 | Unrelated / Not a retailer | Restaurants, cafés, cemeteries, glaziers… | ❌ |
 
 The **Why it matched** column shows which words caused the match. To include more tiers, set:
 
 ```json
-"includeTiers": ["Judaica seller", "Jewish / Israeli retail", "Glass & gift shop", "Community / synagogue"]
+"includeTiers": ["Judaica seller", "Jewish / Israeli retail", "Glass & gift shop"]
 ```
 
 ## 4. Configuration (`input.json`)
@@ -87,6 +88,7 @@ All fields are optional.
 | `cities` | built-in list | An explicit list of cities, which replaces the built-in one. |
 | `districts` | `true` | Also search the Jewish districts of Berlin, Munich, Frankfurt and Hamburg. |
 | `searchCategories` | 10 German terms | Replaces the search terms (see `src/config.js`). |
+| `keepNonProfits` | `false` | Keep synagogues, communities, e.V.s, schools, museums etc. (they are dropped by default). |
 | `includeTiers` | Judaica + Jewish/Israeli retail | Which relevance tiers go on the Outreach sheet and into the mail merge. |
 | `maxLeads` | `5000` | Stop after this many places. |
 | `maxResultsPerQuery` | `60` | How many places to open per search. |
@@ -101,7 +103,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 53 offline tests
+npm test                                                               # 56 offline tests
 ```
 
 ## If Google blocks you
@@ -119,7 +121,6 @@ Cold email to businesses in Germany is regulated by **§ 7 UWG** and the GDPR. B
 
 - Send individually or in small batches, not as a bulk blast.
 - Give a clear way to opt out and honour it at once.
-- Don't email the Community / synagogue tier unless you have a specific reason.
 - Keep the scraped data only as long as you need it for this outreach.
 
 This is not legal advice. If you plan a large campaign, check with someone who knows German marketing law.

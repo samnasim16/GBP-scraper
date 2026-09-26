@@ -17,7 +17,7 @@ npm run smoke                        # Berlin, 2 terms, 10 places, visible brows
 npm start                            # all of Germany → output/
 npm run contacts -- --probe https://shop.de "Shop Name"
 npm run contacts -- output/leads.json
-npm test                             # 53 tests, offline; browser tests skip without Chrome
+npm test                             # 56 tests, offline; browser tests skip without Chrome
 ```
 
 Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silently in cmd.exe.
@@ -48,6 +48,7 @@ test/               node:test + jsdom; fixtures/ has Maps markup and a fake Germ
 - **Phones are international.** `normPhone` in `dom-extract.js` turns `030 …` into `+4930…`, keeps anything that already has `+`/`00`, and never rewrites an Austrian or Swiss number as German.
 - **Foreign results are dropped** by address suffix (`FOREIGN_ADDRESS` in `maps.js`). Border-city searches return Austrian, Swiss, French and Dutch shops.
 - **Relevance matches at word starts only** (`countHits` in `relevance.js`). A bare substring test finds "tora" in "Restaurierung". Glass words match anywhere because of compounds like "Kunstglas" and "Bleiglas". A category in `NON_RETAIL_CATEGORY` (restaurant, café, cemetery, glazier…) caps the score unless the *name* carries a strong Judaica word.
+- **Only sellable businesses are kept** (`isSellable` in `relevance.js`). A non-profit / religious Maps category (synagogue, community, non-profit, institute, school, library, museum…) or name (e.V., Gemeinde, Chabad, Stiftung, Verein…) drops the place at the feed stage and again on the detail page, before its website is read. A retail category (store, shop, gallery…) overrides a non-profit-sounding name, so a Chabad-run Judaica store survives. A Judaica word in the name overrides a wrong non-profit category ("Judaica Direct" filed as *Public Library*). Retail evidence for the tiers comes from the listing only, never the website, because every community site links to a shop page. `keepNonProfits: true` turns the filter off.
 - **Email ranking** (`rankEmails`): +40 for the site's own domain, +20 when the domain spells the business name, +15 for freemail, +10 for info/kontakt/shop prefixes, −30 for datenschutz/noreply/jobs, −25 for agency-looking domains. Web designers put their own address in the footer, and it must never win.
 - **Greeting gender only from evidence** (`greetingFor`): Frau/Herr or Inhaberin/Inhaber/Geschäftsführerin. Otherwise use the full name. Never guess gender from a first name.
 - **Impressum name extraction** stops at the first word that is a company form, a street (compound suffix `…straße`), a digit or the next field label. A company alone (`Vertreten durch: X GmbH`) yields no name, which is correct.

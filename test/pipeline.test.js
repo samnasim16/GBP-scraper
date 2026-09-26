@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { scoreRelevance, isTarget } from '../src/relevance.js';
+import { scoreRelevance, isTarget, isSellable } from '../src/relevance.js';
 import { resolveLocations, buildQueryMatrix, GERMAN_CITIES } from '../src/config.js';
 import { loadTemplate, renderEmail } from '../src/email-template.js';
 import { prepareLeads, buildMailMerge, buildCSV, createSaver } from '../src/output.js';
@@ -13,7 +13,7 @@ import { mapsSearchUrl, placeKey } from '../src/maps.js';
 test('relevance: a Judaica shop, a kosher restaurant, a synagogue, a restorer', () => {
     assert.equal(scoreRelevance({ business_name: 'Judaica Haus', category: 'Gift shop' }).tier, 'Judaica seller');
     assert.equal(scoreRelevance({ business_name: 'Restaurant Tel Aviv', category: 'Israeli restaurant' }).tier, 'Not a retailer');
-    assert.equal(scoreRelevance({ business_name: 'Synagoge Rykestraße', category: 'Synagogue' }).tier, 'Community / synagogue');
+    assert.equal(scoreRelevance({ business_name: 'Synagoge Rykestraße', category: 'Synagogue' }).tier, 'Non-profit / religious');
     // "Restaurierung" contains "tora" — must not read as Torah.
     assert.equal(scoreRelevance({ business_name: 'Restaurierung Schmidt', category: 'Furniture store' }).tier, 'Unrelated');
 });
@@ -107,4 +107,46 @@ test('saver writes every deliverable', async () => {
 
 test('place ids are read from Maps URLs', () => {
     assert.equal(placeKey('https://www.google.com/maps/place/A/data=!4m7!3m6!1s0x47a851:0x2f0c!8m2'), '0x47a851:0x2f0c');
+});
+
+test('real run: synagogues, communities, institutes and museums are not sellable', () => {
+    // Every one of these came back from "Judaica Hamburg/Bremen/Berlin".
+    const noSale = [
+        ['Chabad of Hamburg', 'Synagogue'],
+        ['Jüdische Gemeinde in Hamburg', 'Community Center'],
+        ['Liberal Jewish Community Hamburg', 'Reform Synagogue'],
+        ['Institut für die Geschichte der deutschen Juden', 'Research Institute'],
+        ['Jewish community in the land of Bremen', 'Religious Institution'],
+        ['Precious Kassim', 'Synagogue'],
+        ['Chabad Lubawitsch Bremen', 'Non-profit Organization'],
+        ['New Synagogue Berlin - Centrum Judaicum', 'Museum'],
+        ['Jewish Museum Berlin', 'History Museum'],
+        ['Deutsch-Israelische Gesellschaft Bremen e.V.', ''],
+        ['Freundeskreis Israel e. V.', 'Association'],
+    ];
+    for (const [business_name, category] of noSale) {
+        assert.equal(isSellable({ business_name, category }).ok, false, business_name);
+        assert.ok(!isTarget(scoreRelevance({ business_name, category }, 'Shop Menora Kiddusch Jüdisch Israel')), business_name);
+    }
+});
+
+test('real run: shops stay, even when run by a community or miscategorised', () => {
+    const shops = [
+        ['Judaica-Laden in Berlin יודאיקה בברלין', 'Judaica Store'],
+        ['Chabad Judaica Shop', 'Gift shop'],
+        ['Judaica Direct', 'Public Library'],        // Maps' category is wrong
+        ['KOSHER DAILY MARKT', 'Kosher Grocery Store'],
+        ['Felix Jud', 'Book Store'],
+    ];
+    for (const [business_name, category] of shops) {
+        assert.equal(isSellable({ business_name, category }).ok, true, business_name);
+    }
+    assert.equal(scoreRelevance({ business_name: 'Judaica Direct', category: 'Public Library' }).tier, 'Judaica seller');
+});
+
+test('a "Shop" link on a website does not make an organisation a retailer', () => {
+    // The Bremen community and the Hamburg institute were rated retail
+    // because their websites link to a shop page.
+    const r = scoreRelevance({ business_name: 'Kulturforum Mitte', category: 'Event venue' }, 'Jüdisch Israel Shop Spenden');
+    assert.equal(r.tier, 'Unrelated');
 });
