@@ -1,0 +1,24 @@
+Subject: Handcrafted Kosher Glass Judaica from Israel – Partnership Inquiry
+
+{{greeting}},
+
+My name is {{sender_name}}, and I am reaching out on behalf of Jaffa Glass, an Israeli manufacturer of handcrafted kosher glass products, finished with paints made from 24-karat gold, created especially for the boutique Judaica market.
+
+We currently export our products throughout Europe, and we noticed that your store also offers Judaica items. We believe our collection could be a wonderful addition to your range.
+
+If this is of interest, we would be delighted to schedule a brief meeting or call at your convenience to introduce our products.
+
+Our facilities:
+- 39 HaMelacha St., Holon – Glassblowing and glass painting workshop
+- 24 HaKonchiya St., Rishon LeZion – Glass casting and painting workshop
+- 11 Socrates St., Tel Aviv-Jaffa – Product showroom and warehouse
+
+Phone / WhatsApp: +972 53-302-3636
+Email: JaffaVintageMarket@gmail.com
+
+Thank you for your time, and we look forward to hearing from you.
+
+Warm regards,
+{{sender_name}}
+{{sender_title}}
+Jaffa Glass

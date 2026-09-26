@@ -1,0 +1,123 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+
+import {
+    extractEmails, rankEmails, deobfuscate, decodeCfEmail, extractContactName, extractContactRole,
+    greetingFor, findContactLinks, guessContactUrls, findSocialLinks, registrableDomain, ContactEnricher,
+} from '../src/contacts.js';
+import { createHttpClient } from '../src/http.js';
+import { stripHtml } from '../src/util.js';
+
+const SHOP = path.join(import.meta.dirname, 'fixtures', 'shop');
+const read = (f) => fs.readFileSync(path.join(SHOP, f), 'utf8');
+
+test('Cloudflare-protected addresses are decoded', () => {
+    assert.equal(decodeCfEmail('5a2932352a1a302f3e3b33393b77323b2f29743e3f'), 'shop@judaica-haus.de');
+    assert.ok(extractEmails(read('impressum.html')).includes('shop@judaica-haus.de'));
+});
+
+test('human obfuscations are undone', () => {
+    assert.equal(deobfuscate('info [at] laden [dot] de'), 'info@laden.de');
+    assert.equal(deobfuscate('info(at)laden.de'), 'info@laden.de');
+    assert.equal(deobfuscate('info {ät} laden (punkt) de'), 'info@laden.de');
+    assert.equal(deobfuscate('kontakt at judaica-shop dot de'), 'kontakt@judaica-shop.de');
+});
+
+test('image filenames and placeholder addresses are not emails', () => {
+    const got = extractEmails('<img src="logo@2x.png"> max.mustermann@example.com name@domain.de <a href="mailto:Info@Shop.de?subject=x">x</a>');
+    assert.deepEqual(got, ['info@shop.de']);
+});
+
+test("the shop's own domain beats the web agency and privacy inbox", () => {
+    const ranked = rankEmails(
+        ['hello@pixelagentur.de', 'datenschutz@judaica-haus.de', 'shop@judaica-haus.de', 'owner@gmail.com'],
+        'https://www.judaica-haus.de/');
+    assert.equal(ranked[0], 'shop@judaica-haus.de');
+    assert.equal(ranked[ranked.length - 1], 'hello@pixelagentur.de');
+});
+
+test('registrable domain handles subdomains and co.uk', () => {
+    assert.equal(registrableDomain('shop.judaica-haus.de'), 'judaica-haus.de');
+    assert.equal(registrableDomain('www.example.co.uk'), 'example.co.uk');
+});
+
+test('the Impressum names the person, not the company or the next field', () => {
+    const text = stripHtml(read('impressum.html'));
+    assert.equal(extractContactName(text), 'Frau Dr. Miriam Rosenthal');
+    assert.equal(extractContactRole(text), 'Geschäftsführerin');
+
+    assert.equal(extractContactName('Inhaber: David Levi Fasanenstraße 5 10623 Berlin'), 'David Levi');
+    assert.equal(extractContactName('Geschäftsführer: Max von Weizsäcker, Anna Beispiel'), 'Max von Weizsäcker');
+    assert.equal(extractContactName('Inh. Sarah Cohen Telefon 030 123'), 'Sarah Cohen');
+    assert.equal(extractContactName('Vertreten durch: Judaica GmbH'), '', 'a company is not a person');
+    assert.equal(extractContactName('Impressum Kontakt Telefon'), '');
+});
+
+test('greeting uses a gendered form only when the site said so', () => {
+    assert.equal(greetingFor({ contact_name: 'Frau Dr. Miriam Rosenthal' }), 'Dear Ms. Dr. Rosenthal');
+    assert.equal(greetingFor({ contact_name: 'Herr Max von Weizsäcker' }), 'Dear Mr. von Weizsäcker');
+    assert.equal(greetingFor({ contact_name: 'David Levi', contact_role: 'Inhaber' }), 'Dear Mr. Levi');
+    assert.equal(greetingFor({ contact_name: 'Sarah Cohen' }), 'Dear Sarah Cohen');
+    assert.equal(greetingFor({ business_name: 'Judaica Haus Berlin' }), 'Dear Judaica Haus Berlin Team');
+    assert.equal(greetingFor({}), 'Dear Sir or Madam');
+});
+
+test('contact links stay on the site and the Impressum comes first', () => {
+    const links = findContactLinks(read('index.html'), 'https://www.judaica-haus.de/');
+    assert.equal(links[0], 'https://www.judaica-haus.de/impressum');
+    assert.ok(links.includes('https://www.judaica-haus.de/kontakt'));
+    assert.ok(!links.some(u => u.includes('agentur')), 'followed the web agency');
+    assert.deepEqual(guessContactUrls('https://x.de/shop/abc').slice(0, 2), ['https://x.de/impressum', 'https://x.de/kontakt']);
+});
+
+test('social links skip share buttons', () => {
+    assert.deepEqual(findSocialLinks(read('index.html')), {
+        facebook: 'https://www.facebook.com/JudaicaHausBerlin', instagram: '',
+    });
+});
+
+test('end to end: homepage → Impressum gives email, person and site text', async (t) => {
+    const server = http.createServer((req, res) => {
+        const file = { '/': 'index.html', '/impressum': 'impressum.html' }[req.url];
+        if (!file) { res.writeHead(404); res.end('nope'); return; }
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(read(file));
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    t.after(() => server.close());
+    const base = `http://127.0.0.1:${server.address().port}/`;
+
+    const enricher = new ContactEnricher({
+        http: createHttpClient({ transport: 'local' }),
+        config: { delayMs: 0 },
+        log: () => {},
+    });
+    const lead = { business_name: 'Judaica Haus Berlin', website: base };
+    await enricher.enqueue(lead);
+    await enricher.drain();
+
+    // 127.0.0.1 is not the shop's domain, so ranking falls back to prefixes.
+    assert.equal(lead.email, 'shop@judaica-haus.de');
+    assert.equal(lead.contact_name, 'Frau Dr. Miriam Rosenthal');
+    assert.equal(lead.facebook_url, 'https://www.facebook.com/JudaicaHausBerlin');
+    assert.match(lead._siteText, /Kiddusch-Becher/);
+    assert.ok(!lead.email.includes('pixelagentur'));
+});
+
+test('a site that is down still completes the lead', async () => {
+    const enricher = new ContactEnricher({
+        http: createHttpClient({ transport: 'local', timeoutMs: 2000 }),
+        config: { delayMs: 0 }, log: () => {},
+    });
+    const lead = { business_name: 'Gone', website: 'http://127.0.0.1:9/', email: '' };
+    await enricher.enqueue(lead);
+    assert.equal(lead.email, '');
+});
+
+test("a web agency's footer address loses even without a domain to match", () => {
+    assert.equal(rankEmails(['hello@pixelagentur.de', 'shop@judaica-haus.de'], '', '')[0], 'shop@judaica-haus.de');
+    assert.equal(rankEmails(['hello@pixelagentur.de', 'shop@judaica-haus.de'], 'http://127.0.0.1:8080/', 'Judaica Haus')[0], 'shop@judaica-haus.de');
+});

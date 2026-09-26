@@ -1,0 +1,11 @@
+node_modules/
+output/
+.env
+*.log
+input.json
+.cache/
+debug-html/
+# Throwaway analysis scripts. These belong in a scratch directory, not the
+# repo — two of them reached a commit via `git add -A`.
+/.*.mjs
+output-smoke/
