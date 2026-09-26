@@ -39,12 +39,46 @@ const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'blattgold', 'gold leaf',
 
 /**
  * Categories that are never a buyer, however Jewish the context: a restaurant
- * serving kosher food, a cemetery, a school. Checked against the Maps category.
+ * serving kosher food, a glazier, a lawyer. Checked against the Maps category.
  */
-export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|friedhof|cemetery|schule|school|kindergarten|kita|rechtsanwalt|anwalt|lawyer|arzt|doctor|praxis|clinic|klinik|botschaft|embassy|konsulat|consulate|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|denkmal|memorial|gedenkstätte|haltestelle|bus stop|station)\b/i;
+export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei)\b/i;
 
-/** Places of worship and communities — not a shop, but some run one. */
-export const COMMUNITY_CATEGORY = /\b(synagog\w*|jüdische gemeinde|jewish community|gemeindezentrum|community cent(er|re)|religious organi[sz]ation|chabad)\b/i;
+/**
+ * Organisations we cannot sell to: places of worship, communities, charities,
+ * foundations, schools, libraries, museums, institutes, public bodies. They
+ * buy nothing wholesale, so they are dropped before any time is spent on them.
+ * Matched against the Maps category…
+ */
+export const NON_PROFIT_CATEGORY = /\b(synagog\w*|religious|place of worship|church|kirche|mosque|moschee|temple|chabad|non-?profit|charity|foundation|stiftung|association|verein|society|community|gemeinde|cultural cent(er|re)|kulturzentrum|research|institut\w*|university|universität|college|hochschule|school|schule|gymnasium|kindergarten|kita|preschool|daycare|library|bibliothek|archive|archiv|museum|memorial|gedenkstätte|monument|denkmal|cemetery|friedhof|embassy|botschaft|consulate|konsulat|government|city hall|rathaus|political|youth|jugend|social services|nursing|hospital|seminary|yeshiva)\b/i;
+
+/** …and against the business name. "e.V." is a registered non-profit. */
+export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b)/i;
+
+/**
+ * Categories that say "this is a business that sells things". A retail
+ * category overrides a non-profit-sounding name: the Chabad-run
+ * "Judaica-Laden" is a Judaica Store, and it buys stock.
+ */
+export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|supermarket|grocery|seller|dealer|wholesaler|händler|laden|geschäft|kiosk|jewel\w*|antique\w*|souvenir|gift|craft|glass|glas|art studio|atelier|manufacturer|importer|exporter|distributor|mail order|versand)\b/i;
+
+/**
+ * Can Jaffa Glass sell to this place at all?
+ * @returns {{ ok: boolean, reason: string }}
+ */
+export function isSellable(lead) {
+    const category = clean(lead.category);
+    const name = clean(lead.business_name);
+    const retailCategory = RETAIL_CATEGORY.test(category);
+    if (!retailCategory && NON_PROFIT_CATEGORY.test(category)) {
+        // A Judaica name under a wrong category (Maps files some shops as
+        // "Public Library") still gets through — unless the name itself says
+        // it is an organisation.
+        if (countHits(name.toLowerCase(), JUDAICA_STRONG).length && !NON_PROFIT_NAME.test(name)) return { ok: true, reason: '' };
+        return { ok: false, reason: `non-profit / religious (${category})` };
+    }
+    if (!retailCategory && NON_PROFIT_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (name)' };
+    return { ok: true, reason: '' };
+}
 
 const escape = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const patternCache = new Map();
@@ -81,7 +115,10 @@ export function scoreRelevance(lead, siteText = '') {
     const strongSite = countHits(site, JUDAICA_STRONG);
     const contextListing = countHits(listing, JEWISH_CONTEXT);
     const contextSite = countHits(site, JEWISH_CONTEXT);
-    const retail = countHits(listing + ' ' + site, RETAIL);
+    // Retail must show in the LISTING. Every community and institute website
+    // has a "Shop" or "Spenden-Shop" link somewhere, which made them retailers.
+    const retail = countHits(listing, RETAIL);
+    const retailCategory = RETAIL_CATEGORY.test(clean(lead.category));
     const glass = countHits(listing + ' ' + site, GLASS, { anywhere: true });
 
     let score = 0;
@@ -89,22 +126,24 @@ export function scoreRelevance(lead, siteText = '') {
     score += Math.min(strongSite.length, 4) * 10;
     score += Math.min(contextListing.length, 2) * 12;
     score += Math.min(contextSite.length, 3) * 4;
-    if (retail.length) score += 10;
+    if (retail.length || retailCategory) score += 10;
     if (glass.length) score += 5;
 
     const category = clean(lead.category);
+    const sellable = isSellable(lead);
+    const isRetail = retailCategory || retail.length > 0;
     let tier;
-    if (NON_RETAIL_CATEGORY.test(category) && strongListing.length === 0) {
+    if (!sellable.ok) {
+        tier = 'Non-profit / religious';
+        score = Math.min(score, 10);
+    } else if (NON_RETAIL_CATEGORY.test(category) && strongListing.length === 0) {
         tier = 'Not a retailer';
         score = Math.min(score, 15);
-    } else if (COMMUNITY_CATEGORY.test(category) || (COMMUNITY_CATEGORY.test(lead.business_name || '') && strongListing.length === 0 && retail.length === 0)) {
-        tier = 'Community / synagogue';
-        score = Math.min(score, 45);
-    } else if (strongListing.length || strongSite.length >= 2) {
+    } else if (strongListing.length || (strongSite.length >= 2 && isRetail)) {
         tier = 'Judaica seller';
-    } else if ((contextListing.length || contextSite.length >= 2) && retail.length) {
+    } else if ((contextListing.length || contextSite.length >= 2) && isRetail) {
         tier = 'Jewish / Israeli retail';
-    } else if (glass.length && retail.length) {
+    } else if (glass.length && isRetail) {
         tier = 'Glass & gift shop';
     } else {
         tier = 'Unrelated';
@@ -116,7 +155,7 @@ export function scoreRelevance(lead, siteText = '') {
 }
 
 /** Tiers worth emailing, best first. */
-export const TARGET_TIERS = ['Judaica seller', 'Jewish / Israeli retail', 'Glass & gift shop', 'Community / synagogue'];
+export const TARGET_TIERS = ['Judaica seller', 'Jewish / Israeli retail', 'Glass & gift shop'];
 
 /**
  * Should this row go on the outreach sheet?

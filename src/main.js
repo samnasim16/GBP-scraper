@@ -40,6 +40,7 @@ const {
     maxLeads             = 5000,
     delayBetweenQueries  = 4000,
     delayBetweenListings = 1800,
+    keepNonProfits       = false,
     contacts             = {},
     includeTiers         = TARGET_TIERS.slice(0, 2),
     sender               = {},
@@ -115,7 +116,7 @@ async function main() {
         console.log(`   Contact lookup: ${enricher.enabled ? 'on (website + Impressum)' : 'off'}`);
         console.log(`   Outreach tiers: ${includeTiers.join(', ')}\n`);
 
-        const opts = { maxResultsPerQuery, maxScrolls, minReviews, maxLeads, delayBetweenListings };
+        const opts = { maxResultsPerQuery, maxScrolls, minReviews, maxLeads, delayBetweenListings, keepNonProfits };
         const REFRESH_EVERY = factory.mode === 'brightdata' ? 15 : 40;
         const SAVE_EVERY = 10;
 
@@ -195,7 +196,7 @@ async function main() {
 
     console.log('\n📊 DONE');
     console.log(`   Places scraped: ${rows.length}`);
-    for (const t of [...TARGET_TIERS, 'Unrelated', 'Not a retailer']) console.log(`     ${t}: ${byTier(t)}`);
+    for (const t of [...TARGET_TIERS, 'Unrelated', 'Not a retailer', 'Non-profit / religious']) console.log(`     ${t}: ${byTier(t)}`);
     console.log(`   Outreach targets: ${targets.length} — ${targets.filter(r => r.email).length} with email, ${targets.filter(r => r.contact_name).length} with a named contact`);
     const s = enricher.stats;
     console.log(`   Websites read: ${s.sites} (${s.pages} pages)`);

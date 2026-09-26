@@ -14,7 +14,7 @@
 import { sleep, clean, titleCase } from './util.js';
 import { extractFeedCards, extractDetail } from './dom-extract.js';
 import { isSessionDead } from './browser.js';
-import { NON_RETAIL_CATEGORY, scoreRelevance } from './relevance.js';
+import { NON_RETAIL_CATEGORY, scoreRelevance, isSellable } from './relevance.js';
 
 /** Results from across the border are not German leads. */
 const FOREIGN_ADDRESS = /,\s*(Austria|Österreich|Switzerland|Schweiz|Suisse|France|Frankreich|Netherlands|Niederlande|Nederland|Belgium|Belgien|Poland|Polen|Czechia|Czech Republic|Tschechien|Denmark|Dänemark|Luxembourg|Luxemburg|Italy|Italien|Israel|United Kingdom|UK|USA|United States)\s*$/i;
@@ -116,13 +116,17 @@ export async function scrapeQuery(page, query, ctx, opts) {
     }
 
     const window = cards.slice(0, opts.maxResultsPerQuery);
-    const drop = { closed: 0, notRetail: 0, dup: 0, reviews: 0 };
+    const drop = { closed: 0, notRetail: 0, nonProfit: 0, dup: 0, reviews: 0 };
     const survivors = [];
     for (const c of window) {
         if (c.closedFlag) { drop.closed++; continue; }
         const pk = placeKey(c.href);
         const nk = nameKey(c.name, query.city);
         if ((pk && seen.has(pk)) || (c.name && seen.has(nk))) { drop.dup++; continue; }
+        // Synagogues, communities, e.V.s, schools, museums: nobody to sell to.
+        if (!opts.keepNonProfits && !isSellable({ business_name: c.name, category: c.category }).ok) {
+            drop.nonProfit++; continue;
+        }
         // Cheap pre-screen: a kosher restaurant is not a buyer. Only drop when
         // the name carries no Judaica word at all.
         if (c.category && NON_RETAIL_CATEGORY.test(c.category) && scoreRelevance({ business_name: c.name }).tier !== 'Judaica seller') {
@@ -131,7 +135,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
         if (opts.minReviews > 0 && c.reviewCount > 0 && c.reviewCount < opts.minReviews) { drop.reviews++; continue; }
         survivors.push({ ...c, pk, nk });
     }
-    log(`  Feed: ${cards.length} places | new: ${survivors.length} | dropped — dup:${drop.dup} not-retail:${drop.notRetail} closed:${drop.closed}${drop.reviews ? ` reviews:${drop.reviews}` : ''}`);
+    log(`  Feed: ${cards.length} places | new: ${survivors.length} | dropped — dup:${drop.dup} non-profit:${drop.nonProfit} not-retail:${drop.notRetail} closed:${drop.closed}${drop.reviews ? ` reviews:${drop.reviews}` : ''}`);
 
     for (const c of survivors) {
         if (allLeads.length >= opts.maxLeads) return;
@@ -196,6 +200,12 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 source_query:       query.text,
                 observed_date:      new Date().toISOString().split('T')[0],
             };
+            // The feed card may have had no category; the detail page does.
+            const sellable = isSellable(lead);
+            if (!sellable.ok && !opts.keepNonProfits) {
+                log(`    ✗ Can't sell to: ${lead.business_name} — ${sellable.reason}`);
+                continue;
+            }
             // Listing-only score now; it is rescored once the website is read.
             Object.assign(lead, relevanceFields(lead));
 
