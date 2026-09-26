@@ -59,7 +59,11 @@ export function deobfuscate(text) {
 export function extractEmails(html) {
     const found = [];
     const add = (e) => {
-        const v = clean(decodeURIComponentSafe(e)).toLowerCase().replace(/^mailto:/, '').replace(/[.,;:]+$/, '');
+        let v = clean(decodeURIComponentSafe(e)).toLowerCase().replace(/^mailto:/, '').replace(/[.,;:]+$/, '');
+        // "Tel. 030 25993 300info@jmberlin.de": the phone's last digits run
+        // straight into the address once markup is stripped.
+        const glued = v.match(/^\d+([a-z][^@]*@.*)$/);
+        if (glued && GOOD_PREFIX.test(glued[1])) v = glued[1];
         if (!v || !v.includes('@') || v.length > 80) return;
         if (JUNK_EMAIL.some(re => re.test(v))) return;
         if (!found.includes(v)) found.push(v);
@@ -146,35 +150,69 @@ const ROLE_LABELS = [
 /** Words that look like names but are really the next label or a company. */
 const NOT_A_NAME = /\b(GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich)\b/i;
 
-/** "Fasanenstraße" is a compound, so \\bStraße misses it. */
-const STREET_WORD = /(straße|strasse|str\.|platz|allee|gasse|weg)[,.]?$/i;
+/** "Fasanenstraße" is a compound, so \\bStraße misses it; "Str" may lose its dot. */
+const STREET_WORD = /((straße|strasse|str\.|platz|allee|gasse|weg)[,.]?|^str[,.]?)$/i;
 
-/** The GmbH or the person? "Geschäftsführer: Max Muster, Anna Beispiel" → first person. */
-export function extractContactName(text) {
-    const t = clean(String(text || '').replace(/ /g, ' '));
+/**
+ * Job titles that sit in front of the name ("Direktorin Hetty Berg"). They are
+ * stripped from the name and kept as the role, which also tells us the form
+ * of address: "-in" titles are feminine.
+ */
+const TITLE_WORD = /^(Direktorin|Direktor|Leiterin|Leiter|Geschäftsführerin|Geschäftsführer|Inhaberin|Inhaber|Präsidentin|Präsident|Vorsitzender?|Vorständin|Vorstand|Gesellschafterin|Gesellschafter|Intendantin|Intendant|Kuratorin|Kurator|Rabbinerin|Rabbiner|Rabbi|Owner|Director|Chairman|Chair)$/;
+
+/**
+ * Capitalised German function words. NAME_WORD happily matches "Die" in
+ * "…Hetty Berg Die Stiftung…" — a sentence starting straight after the name,
+ * once the markup between them is stripped.
+ */
+const FUNCTION_WORD = /^(Die|Der|Das|Den|Dem|Des|Ein|Eine|Einen|Und|Oder|Sowie|Sie|Wir|Ihr|Es|Er|Im|In|Am|An|Auf|Aus|Zum|Zur|Für|Mit|Bei|Nach|Über|Unter|Als|Alle|Diese|Dieser|The|And|Of|For)$/;
+
+/** Roles that say which form of address to use. */
+const FEMALE_ROLE = /(Inhaberin|Geschäftsführerin|Direktorin|Leiterin|Präsidentin|Vorständin|Gesellschafterin|Intendantin|Kuratorin|Rabbinerin)$/;
+const MALE_ROLE = /^(Inhaber|Geschäftsführer|Direktor|Leiter|Präsident|Gesellschafter|Intendant|Kurator|Rabbiner)$/;
+
+/**
+ * The person named in an Impressum, and the role they were named under.
+ * "Geschäftsführer: Max Muster, Anna Beispiel" → first person.
+ * @returns {{ name: string, role: string }}
+ */
+export function extractContact(text) {
+    const t = clean(String(text || '').replace(/\u00a0/g, ' '));
     for (const label of ROLE_LABELS) {
-        const re = new RegExp(`(?:^|[\\s.;,|])${label}\\s*(?:\\(in\\))?\\s*[:\\-–]?\\s*(${NAME})`, 'u');
+        const re = new RegExp(`(?:^|[\\s.;,|])(${label})\\s*(?:\\(in\\))?\\s*[:\\-–]?\\s*(${NAME})`, 'u');
         const m = t.match(re);
         if (!m) continue;
-        const name = tidyName(m[1]);
-        if (name) return name;
+        const { name, title } = tidyName(m[m.length - 1]);
+        if (!name) continue;
+        const fromLabel = (m[1].match(/(Inhaberin|Inhaber|Geschäftsführerin|Geschäftsführer)/) || [''])[0];
+        return { name, role: title || fromLabel };
     }
-    return '';
+    return { name: '', role: '' };
+}
+
+export function extractContactName(text) {
+    return extractContact(text).name;
 }
 
 function tidyName(raw) {
-    let n = clean(raw);
-    // Stop at the first word that is clearly the next field.
-    const words = n.split(' ');
+    const words = clean(raw).split(' ');
+    let title = '';
+    // A job title in front is the role, not part of the name.
+    while (words.length && TITLE_WORD.test(words[0])) title = words.shift();
     const kept = [];
     for (const w of words) {
-        if (NOT_A_NAME.test(w) || STREET_WORD.test(w) || /\d/.test(w)) break;
+        if (STREET_WORD.test(w)) {
+            // "Oranienburger Str" — the word before a street is its name.
+            if (kept.length && /er$/.test(kept[kept.length - 1])) kept.pop();
+            break;
+        }
+        if (NOT_A_NAME.test(w) || FUNCTION_WORD.test(w) || TITLE_WORD.test(w) || /\d/.test(w)) break;
         kept.push(w);
     }
-    n = kept.join(' ');
-    const core = n.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?)\s+/i, '').replace(/^((Dr|Prof)\.?\s+)+/i, '');
-    if (core.split(' ').filter(Boolean).length < 2) return '';
-    return n;
+    const name = kept.join(' ');
+    const core = name.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?)\s+/i, '').replace(/^((Dr|Prof)\.?\s+)+/i, '');
+    if (core.split(' ').filter(Boolean).length < 2) return { name: '', title: '' };
+    return { name, title };
 }
 
 /**
@@ -188,8 +226,8 @@ function tidyName(raw) {
 export function greetingFor({ contact_name: name = '', contact_role: role = '', business_name: biz = '' } = {}) {
     const n = clean(name);
     if (!n) return clean(biz) ? `Dear ${clean(biz)} Team` : 'Dear Sir or Madam';
-    const female = /^(Frau|Fr\.|Mrs?\.?|Ms\.?)\s/i.test(n) || /(Inhaberin|Geschäftsführerin)/.test(role);
-    const male = /^(Herr|Hr\.|Mr\.?)\s/i.test(n) || (/^(Inhaber|Geschäftsführer)$/.test(role));
+    const female = /^(Frau|Fr\.|Mrs?\.?|Ms\.?)\s/i.test(n) || FEMALE_ROLE.test(role);
+    const male = /^(Herr|Hr\.|Mr\.?)\s/i.test(n) || MALE_ROLE.test(role);
     const bare = n.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?)\s+/i, '');
     const title = (bare.match(/^((?:Dr|Prof)\.?\s+)+/i) || [''])[0];
     const parts = bare.replace(/^((?:Dr|Prof)\.?\s+)+/i, '').split(' ');
@@ -369,8 +407,9 @@ export class ContactEnricher {
         for (const e of extractEmails(html)) if (!result.emails.includes(e)) result.emails.push(e);
         if (!result.contactName) {
             const text = stripHtml(html);
-            result.contactName = extractContactName(text);
-            if (result.contactName) result.contactRole = extractContactRole(text);
+            const c = extractContact(text);
+            result.contactName = c.name;
+            result.contactRole = c.role;
         }
     }
 }
