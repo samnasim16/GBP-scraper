@@ -1,0 +1,15 @@
+{
+    "cities": ["Berlin"],
+    "districts": false,
+    "searchCategories": ["Judaica", "jüdische Geschenke"],
+    "maxLeads": 10,
+    "outputDir": "output-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}

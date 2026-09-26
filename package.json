@@ -1,0 +1,22 @@
+{
+    "name": "germany-judaica-scraper",
+    "version": "1.0.0",
+    "description": "Finds Judaica retailers across Germany on Google Maps, pulls email and owner name from each shop's website and Impressum, and writes a mail-merge sheet for Jaffa Glass outreach.",
+    "type": "module",
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "start": "node src/main.js",
+        "smoke": "node src/main.js --input ./input.smoke.json",
+        "contacts": "node src/contacts-cli.js",
+        "test": "node --test test/*.test.js"
+    },
+    "dependencies": {
+        "puppeteer-core": "^22.0.0",
+        "exceljs": "^4.4.0"
+    },
+    "devDependencies": {
+        "jsdom": "^24.1.0"
+    }
+}
