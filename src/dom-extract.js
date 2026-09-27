@@ -239,10 +239,12 @@ export function extractDetail() {
     if (!category) {
         const catLink = Array.from(panel.querySelectorAll('button, a'))
             .find(el => /^[A-Za-z][A-Za-z /&\-']{2,40}$/.test(clean(el.textContent))
-                && !/^(directions|save|nearby|send|share|call|website|order|book|reviews?|overview|about|photos?|updates|menu)$/i.test(clean(el.textContent)));
+                && !/^(directions|save|nearby|send|share|call|website|order|book|reviews?|overview|about|photos?|updates|menu|learn more|more|see more|more info|claim this business|suggest an edit|write a review|sponsored)$/i.test(clean(el.textContent)));
         if (catLink) category = clean(catLink.textContent);
     }
     category = category.replace(/(Open|Closed|Closes|Opens)(\s|⋅|24|$).*$/i, '').trim();
+    // A button label ("Learn More" on sponsored listings) is not a category.
+    if (/^(learn more|more|see more|more info|sponsored|website|directions)$/i.test(category)) category = '';
 
     // ── Phone ─────────────────────────────────────────────────────────────
     // International, German-first. Maps gives "phone:tel:+4930123456" on most

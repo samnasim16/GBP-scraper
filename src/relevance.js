@@ -62,6 +62,30 @@ export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\
 export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|supermarket|grocery|seller|dealer|wholesaler|händler|laden|geschäft|kiosk|jewel\w*|antique\w*|souvenir|gift|craft|glass|glas|art studio|atelier|manufacturer|importer|exporter|distributor|mail order|versand)\b/i;
 
 /**
+ * Websites and inboxes of public bodies: stadt-koeln.de, speyer.de,
+ * stadt-oldenburg.de, *.rlp.de. A city library or municipal gallery is not a
+ * customer, even when Maps files it as an "Art Gallery".
+ */
+const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$/;
+
+const slug = (s) => clean(s).toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/\s*\(.*\)$/, '').replace(/ am main| im breisgau| am neckar| am rhein| an der .*/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+const CITY_ALIASES = { muenchen: ['muenchen', 'munich'], koeln: ['koeln', 'cologne'], 'frankfurt': ['frankfurt'], nuernberg: ['nuernberg', 'nuremberg'] };
+
+/** Is this the website or inbox of a city, district or state government? */
+export function isPublicBody(lead) {
+    const hosts = [];
+    try { hosts.push(new URL(lead.website).hostname.replace(/^www\./, '')); } catch { /* no website */ }
+    if (lead.email && lead.email.includes('@')) hosts.push(lead.email.split('@')[1]);
+    const city = slug(lead.city);
+    const cityHosts = new Set((CITY_ALIASES[city] || [city]).filter(Boolean).map(c => `${c}.de`));
+    return hosts.some(h => GOV_DOMAIN.test(h) || cityHosts.has(h));
+}
+
+/**
  * Can Jaffa Glass sell to this place at all?
  * @returns {{ ok: boolean, reason: string }}
  */
@@ -69,6 +93,8 @@ export function isSellable(lead) {
     const category = clean(lead.category);
     const name = clean(lead.business_name);
     const retailCategory = RETAIL_CATEGORY.test(category);
+    // Checked first: a city library called "Germania Judaica" is still the city.
+    if (isPublicBody(lead)) return { ok: false, reason: 'public body (city / state website)' };
     if (!retailCategory && NON_PROFIT_CATEGORY.test(category)) {
         // A Judaica name under a wrong category (Maps files some shops as
         // "Public Library") still gets through — unless the name itself says
@@ -141,7 +167,11 @@ export function scoreRelevance(lead, siteText = '') {
         score = Math.min(score, 15);
     } else if (strongListing.length || (strongSite.length >= 2 && isRetail)) {
         tier = 'Judaica seller';
-    } else if ((contextListing.length || contextSite.length >= 2) && isRetail) {
+    } else if ((contextListing.length || (strongSite.length >= 1 && contextSite.length >= 1)) && isRetail) {
+        // Website context alone is not enough: "Israel" appears on any
+        // bookshop or gallery site that stocks one Israeli author or artist.
+        // It needs the listing itself to be Jewish/Israeli, or a Judaica
+        // object named on the site.
         tier = 'Jewish / Israeli retail';
     } else if (glass.length && isRetail) {
         tier = 'Glass & gift shop';

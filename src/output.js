@@ -79,7 +79,10 @@ export function prepareLeads(leads, { template = null, sender = {} } = {}) {
     const seen = new Set();
     const out = [];
     for (const l of sorted) {
-        const keys = [placeKey(l.maps_url), l.phone && `tel:${l.phone}`].filter(Boolean);
+        // Name + city catches the same place reached through two Maps URLs
+        // (a sponsored and an organic listing) with no phone to match on.
+        const nameCity = `nc:${String(l.business_name || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')}|${String(l.city || '').toLowerCase()}`;
+        const keys = [placeKey(l.maps_url), l.phone && `tel:${l.phone}`, l.business_name && nameCity].filter(Boolean);
         if (keys.some(k => seen.has(k))) continue;
         keys.forEach(k => seen.add(k));
         const row = { ...l };

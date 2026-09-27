@@ -9,3 +9,4 @@ debug-html/
 # repo — two of them reached a commit via `git add -A`.
 /.*.mjs
 output-smoke/
+outreach/

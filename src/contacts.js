@@ -64,8 +64,10 @@ export function extractEmails(html) {
         // straight into the address once markup is stripped.
         const glued = v.match(/^\d+([a-z][^@]*@.*)$/);
         if (glued && GOOD_PREFIX.test(glued[1])) v = glued[1];
+        v = repairTld(v);
         if (!v || !v.includes('@') || v.length > 80) return;
         if (JUNK_EMAIL.some(re => re.test(v))) return;
+        if (PLATFORM_DOMAIN.test(v.split('@')[1] || '')) return;
         if (!found.includes(v)) found.push(v);
     };
 
@@ -78,8 +80,44 @@ export function extractEmails(html) {
     for (const m of text.matchAll(EMAIL_RE)) add(m[0]);
     // Also scan raw markup: some sites keep the address only in a JSON-LD
     // block or a data attribute that stripHtml throws away.
-    for (const m of decodeEntities(src).matchAll(EMAIL_RE)) add(m[0]);
-    return found;
+    // Escapes inside scripts ("\\ninfo@…") are unescaped first, or the "n"
+    // becomes part of the address.
+    const raw = decodeEntities(src)
+        .replace(/\\u00([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+        .replace(/\\[nrt]/g, ' ');
+    for (const m of raw.matchAll(EMAIL_RE)) add(m[0]);
+    return dropGlued(found);
+}
+
+/** Top-level domains an address can plausibly end in. Any 2-letter code is a country. */
+const COMMON_TLD = /^(com|net|org|info|biz|shop|store|online|art|email|berlin|hamburg|koeln|cologne|bayern|nrw|ruhr|saarland|jetzt|gmbh|team|design|gallery|eu|app|io|co|me)$/;
+
+/**
+ * "info@israelladen.deein", "buchladen@neuer-weg.comtel": the next word ran
+ * into the domain once markup was stripped. Trim back to the real TLD, or
+ * drop the address when no real TLD is left.
+ */
+export function repairTld(email) {
+    const at = email.lastIndexOf('@');
+    if (at < 0) return email;
+    const domain = email.slice(at + 1);
+    const dot = domain.lastIndexOf('.');
+    if (dot < 0) return '';
+    const tld = domain.slice(dot + 1);
+    if (tld.length === 2 || COMMON_TLD.test(tld)) return email;
+    for (const t of ['de', 'com', 'net', 'org', 'info', 'eu', 'at', 'ch', 'shop', 'art']) {
+        if (tld.startsWith(t)) return email.slice(0, at + 1) + domain.slice(0, dot + 1) + t;
+    }
+    return '';
+}
+
+/**
+ * "ninfo@kosherstar.de" next to "info@kosherstar.de": the longer one is the
+ * shorter with a stray character glued on. Keep the clean one.
+ */
+function dropGlued(emails) {
+    return emails.filter(x => !emails.some(y => y !== x && y.length < x.length
+        && x.endsWith(y) && x.length - y.length <= 3));
 }
 
 function decodeURIComponentSafe(s) {
@@ -93,6 +131,13 @@ export function registrableDomain(host) {
     const twoLevel = /^(co|com|org|net|gov|ac)$/.test(parts[parts.length - 2]);
     return parts.slice(twoLevel ? -3 : -2).join('.');
 }
+
+/**
+ * Marketplaces and platforms. A shop whose "website" is its page on one of
+ * these has no Impressum of its own — crawling it yields the platform's
+ * legal inbox (behoerdenanfragen@kleinanzeigen.de), never the shop's.
+ */
+export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen)\.[a-z.]+$/;
 
 const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service|bestellung|order|verkauf|sales|laden|store|post|team)@/;
 const BAD_PREFIX = /^(no-?reply|donotreply|datenschutz|privacy|dsgvo|abuse|postmaster|hostmaster|webmaster|bewerbung|jobs|karriere|presse|press|newsletter|rechnung|invoice|buchhaltung)@/;
@@ -110,19 +155,34 @@ export function rankEmails(emails, websiteUrl = '', businessName = '') {
     try { siteDomain = registrableDomain(new URL(websiteUrl).hostname); } catch { /* no website */ }
     if (/^[\d.]+$|^localhost$/.test(siteDomain)) siteDomain = '';
     const nameWords = nameTokens(businessName).filter(t => t.length >= 4);
+    // A deep page on someone else's domain ("chabad-duesseldorf.de/…/aid/3860766"
+    // for Kosher King) belongs to an umbrella organisation. Its info@ is the
+    // umbrella's inbox, not the shop's.
+    let ownSite = !!siteDomain;
+    try {
+        const u = new URL(websiteUrl);
+        const depth = u.pathname.split('/').filter(Boolean).length;
+        const spellsName = nameWords.some(w => siteDomain.replace(/[^a-z0-9]/g, '').includes(w));
+        ownSite = !!siteDomain && (depth <= 1 || spellsName);
+    } catch { /* no website */ }
 
     const score = (e) => {
         const domain = registrableDomain(e.split('@')[1] || '');
         const squashed = domain.replace(/[^a-z0-9]/g, '');
         let s = 0;
-        if (siteDomain && domain === siteDomain) s += 40;
+        const local = (e.split('@')[0] || '').replace(/[^a-z0-9]/g, '');
+        if (siteDomain && domain === siteDomain) s += ownSite ? 40 : 0;
         else if (FREEMAIL.test(e)) s += 15;
         else if (siteDomain) s -= 5;   // someone else's domain: usually the web agency
         if (domain !== siteDomain && AGENCY_DOMAIN.test(domain)) s -= 25;
         // A domain that spells the business name is the business's own.
         if (!FREEMAIL.test(e) && nameWords.some(w => squashed.includes(w))) s += 20;
+        // "israelladen@mail.bgkorntal.de" for Israelladen: the shop's own inbox
+        // on its parent organisation's server.
+        if (nameWords.some(w => w.length >= 5 && local.includes(w))) s += 25;
         if (GOOD_PREFIX.test(e)) s += 10;
         if (BAD_PREFIX.test(e)) s -= 30;
+        if (/^(pfarramt|sekretariat|verwaltung|poststelle|stadtverwaltung|buergerservice|servicecenter)@/.test(e)) s -= 15;
         return s;
     };
     return [...emails]
@@ -148,10 +208,14 @@ const ROLE_LABELS = [
 ];
 
 /** Words that look like names but are really the next label or a company. */
-const NOT_A_NAME = /\b(GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich)\b/i;
+const NOT_A_NAME = /\b(Sitz|Kontaktformular|Anrede|Plattform|Online|Redaktion|Leitung|Postanschrift|Hausanschrift|Postfach|Mobil|Handy|Web|Internet|Website|Webseite|Homepage|Hinweis|Datenschutz|Konzept|Gestaltung|Umsetzung|Kontaktdaten|Firma|Name|Vorname|Nachname|Evangelische|Katholische|Jüdische|Bibliothek|GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich)\b/i;
 
 /** "Fasanenstraße" is a compound, so \\bStraße misses it; "Str" may lose its dot. */
-const STREET_WORD = /((straße|strasse|str\.|platz|allee|gasse|weg)[,.]?|^str[,.]?)$/i;
+const STREET_WORD = /(straße|strasse|str\.?|platz|allee|gasse|weg)[,.]?$/i;
+/** Street suffixes that are also surname endings, trusted only from the third word on. */
+const LATE_STREET_WORD = /(ring|damm|ufer|chaussee|steig|pfad|markt)[,.]?$/i;
+/** Compounds naming an organisation: "Brüdergemeinde", "Literaturhandlung". */
+const ORG_WORD = /(gemeinde|verein|verband|gesellschaft|stiftung|kirche|bibliothek|museum|verlag|handlung|zentrum|institut|amt|schule|galerie|laden|shop)[,.]?$/i;
 
 /**
  * Job titles that sit in front of the name ("Direktorin Hetty Berg"). They are
@@ -169,7 +233,6 @@ const FUNCTION_WORD = /^(Die|Der|Das|Den|Dem|Des|Ein|Eine|Einen|Und|Oder|Sowie|S
 
 /** Roles that say which form of address to use. */
 const FEMALE_ROLE = /(Inhaberin|Geschäftsführerin|Direktorin|Leiterin|Präsidentin|Vorständin|Gesellschafterin|Intendantin|Kuratorin|Rabbinerin)$/;
-const MALE_ROLE = /^(Inhaber|Geschäftsführer|Direktor|Leiter|Präsident|Gesellschafter|Intendant|Kurator|Rabbiner)$/;
 
 /**
  * The person named in an Impressum, and the role they were named under.
@@ -201,12 +264,13 @@ function tidyName(raw) {
     while (words.length && TITLE_WORD.test(words[0])) title = words.shift();
     const kept = [];
     for (const w of words) {
-        if (STREET_WORD.test(w)) {
+        if (STREET_WORD.test(w) || (kept.length >= 2 && LATE_STREET_WORD.test(w))) {
             // "Oranienburger Str" — the word before a street is its name.
             if (kept.length && /er$/.test(kept[kept.length - 1])) kept.pop();
             break;
         }
-        if (NOT_A_NAME.test(w) || FUNCTION_WORD.test(w) || TITLE_WORD.test(w) || /\d/.test(w)) break;
+        // "Online-" is the first half of "Online-Redaktion" on the next line.
+        if (NOT_A_NAME.test(w) || ORG_WORD.test(w) || FUNCTION_WORD.test(w) || TITLE_WORD.test(w) || /\d/.test(w) || /-$/.test(w)) break;
         kept.push(w);
     }
     const name = kept.join(' ');
@@ -225,10 +289,13 @@ function tidyName(raw) {
  */
 export function greetingFor({ contact_name: name = '', contact_role: role = '', business_name: biz = '' } = {}) {
     const n = clean(name);
-    if (!n) return clean(biz) ? `Dear ${clean(biz)} Team` : 'Dear Sir or Madam';
+    if (!n) return shortBusinessName(biz) ? `Dear ${shortBusinessName(biz)} Team` : 'Dear Sir or Madam';
     const female = /^(Frau|Fr\.|Mrs?\.?|Ms\.?)\s/i.test(n) || FEMALE_ROLE.test(role);
-    const male = /^(Herr|Hr\.|Mr\.?)\s/i.test(n) || MALE_ROLE.test(role);
-    const bare = n.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?)\s+/i, '');
+    // "Inhaber: Irene Jaworski" — the masculine form is used generically, so
+    // only an explicit Herr makes it "Mr.". The feminine forms are specific.
+    const male = /^(Herr|Hr\.|Mr\.?)\s/i.test(n);
+    const bare = n.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?)\s+/i, '')
+        .replace(/(^|\s)(Dipl\.-?\s?[\wäöü]+\.?|M\.\s?A\.|B\.\s?A\.|Mag\.)(?=\s)/g, ' ').trim();
     const title = (bare.match(/^((?:Dr|Prof)\.?\s+)+/i) || [''])[0];
     const parts = bare.replace(/^((?:Dr|Prof)\.?\s+)+/i, '').split(' ');
     // Keep particles with the surname: "von Weizsäcker".
@@ -238,6 +305,22 @@ export function greetingFor({ contact_name: name = '', contact_role: role = '', 
     if (female) return `Dear Ms. ${title}${surname}`.replace(/\s+/g, ' ');
     if (male) return `Dear Mr. ${title}${surname}`.replace(/\s+/g, ' ');
     return `Dear ${bare}`;
+}
+
+/**
+ * The name a person would use for the shop, not its Maps SEO title:
+ *   "Israel Spezialitäten | Die besten Medjoul Datteln | Dieterich" → "Israel Spezialitäten"
+ *   "MIO GIO Therapy Cosmetics I Kosher Food I Judaica"          → "MIO GIO Therapy Cosmetics"
+ *   "KosherStar GbR" → "KosherStar",  "JEWERIA® - Jewish jewelry" → "JEWERIA"
+ */
+export function shortBusinessName(name) {
+    let n = clean(name)
+        .replace(/[®™©]/g, '')
+        // A Hebrew (or other non-Latin) word standing on its own is a translation of the name.
+        .replace(/(^|\s)[\p{Script=Hebrew}\p{Script=Cyrillic}\p{Script=Arabic}\u200e\u200f\s]+$/u, '');
+    n = n.split(/\s+[|–—]\s+|\s+-\s+|\s+I\s+|\s*\|\s*/)[0];
+    n = n.replace(/[,\s]+(GmbH\s*&\s*Co\.?\s*KG|GmbH|GbR|UG(\s*\(haftungsbeschränkt\))?|AG|KG|OHG|e\.\s?K\.?|Inh\..*)$/i, '');
+    return clean(n);
 }
 
 /** Which role label the name was found under — used to infer the salutation. */
@@ -367,7 +450,9 @@ export class ContactEnricher {
         const result = { emails: [], contactName: '', contactRole: '', siteText: '', social: {} };
         if (lead.email) result.emails.push(lead.email);
 
-        if (site && /^https?:\/\//i.test(site) && !/(facebook|instagram)\.com/i.test(site)) {
+        let host = '';
+        try { host = new URL(site).hostname.replace(/^www\./, ''); } catch { /* no website */ }
+        if (site && /^https?:\/\//i.test(site) && !PLATFORM_DOMAIN.test(host)) {
             this.stats.sites++;
             const home = await this._get(site);
             const pages = [];
