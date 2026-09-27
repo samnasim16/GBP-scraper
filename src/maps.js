@@ -6,7 +6,7 @@
  * authority for website, phone, address, rating and category — feed markup is
  * denser and easier to misattribute between neighbouring cards.
  *
- * Maps is loaded with `hl=en&gl=de`: German results, English UI. The in-page
+ * Maps is loaded with `hl=en&gl=<country>`: local results, English UI. The in-page
  * extractors in dom-extract.js read English labels ("stars", "reviews"), and
  * one UI language is far easier to keep working than two.
  */
@@ -16,11 +16,13 @@ import { extractFeedCards, extractDetail } from './dom-extract.js';
 import { isSessionDead } from './browser.js';
 import { NON_RETAIL_CATEGORY, scoreRelevance, isSellable } from './relevance.js';
 
-/** Results from across the border are not German leads. */
-const FOREIGN_ADDRESS = /,\s*(Austria|Österreich|Switzerland|Schweiz|Suisse|France|Frankreich|Netherlands|Niederlande|Nederland|Belgium|Belgien|Poland|Polen|Czechia|Czech Republic|Tschechien|Denmark|Dänemark|Luxembourg|Luxemburg|Italy|Italien|Israel|United Kingdom|UK|USA|United States)\s*$/i;
+import { COUNTRIES } from './config.js';
 
-export function mapsSearchUrl(text) {
-    return `https://www.google.com/maps/search/${encodeURIComponent(text)}?hl=en&gl=de`;
+/** Results from across the border are not leads for this market. */
+const DEFAULT_COUNTRY = { code: 'DE', ...COUNTRIES.DE };
+
+export function mapsSearchUrl(text, gl = 'de') {
+    return `https://www.google.com/maps/search/${encodeURIComponent(text)}?hl=en&gl=${gl}`;
 }
 
 /** Stable place identifier from a Maps URL, for deduping across queries. */
@@ -59,10 +61,11 @@ export async function passConsent(page, log = () => {}) {
 
 export async function scrapeQuery(page, query, ctx, opts) {
     const { seen, allLeads, log = console.log, onLead } = ctx;
+    const country = opts.country || DEFAULT_COUNTRY;
     log(`\n🔍 ${query.text}`);
 
     try {
-        await page.goto(mapsSearchUrl(query.text), { waitUntil: 'domcontentloaded', timeout: 45000 });
+        await page.goto(mapsSearchUrl(query.text, country.gl), { waitUntil: 'domcontentloaded', timeout: 45000 });
     } catch (navErr) {
         if (isSessionDead(navErr)) throw navErr;
         log(`  ⚠️  Could not load Google Maps: ${navErr.message.split('\n')[0]} — skipping`);
@@ -72,7 +75,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
     await passConsent(page, log);
     if (/consent\.google\./i.test(page.url() || '')) {
         // Still on the consent page: try the search once more now it is answered.
-        try { await page.goto(mapsSearchUrl(query.text), { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch { /* reported below */ }
+        try { await page.goto(mapsSearchUrl(query.text, country.gl), { waitUntil: 'domcontentloaded', timeout: 45000 }); } catch { /* reported below */ }
     }
 
     const block = await detectBlockPage(page);
@@ -144,7 +147,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 let opened = false;
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     try {
-                        const url = c.href + (c.href.includes('?') ? '&' : '?') + 'hl=en&gl=de';
+                        const url = c.href + (c.href.includes('?') ? '&' : '?') + `hl=en&gl=${country.gl}`;
                         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 40000 });
                         opened = true;
                         break;
@@ -159,11 +162,11 @@ export async function scrapeQuery(page, query, ctx, opts) {
             }
             try { await page.waitForSelector('h1.DUwDvf', { timeout: 8000 }); } catch { /* panel may render late */ }
 
-            const d = await page.evaluate(extractDetail);
+            const d = await page.evaluate(extractDetail, country.phoneCode);
             const name = clean(d.name) || c.name;
             if (!name) continue;
             const address = clean(d.address);
-            if (FOREIGN_ADDRESS.test(address)) { log(`    ✗ Outside Germany: ${name} (${address})`); continue; }
+            if (country.foreign.test(address)) { log(`    ✗ Outside ${country.name}: ${name} (${address})`); continue; }
 
             const pk = c.pk || placeKey(page.url());
             const nk = nameKey(name, query.city);
@@ -198,6 +201,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 hours_summary:      clean(d.hoursSummary),
                 maps_url:           c.href || page.url(),
                 source_query:       query.text,
+                country:            country.code,
                 observed_date:      new Date().toISOString().split('T')[0],
             };
             // The feed card may have had no category; the detail page does.

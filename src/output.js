@@ -169,7 +169,7 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
             }
             if (!quiet) {
                 const t = rows.filter(r => isTarget(r, includeTiers));
-                log(`   💾 Saved ${rows.length} places (${t.length} targets, ${t.filter(r => r.email).length} with email) → output/`);
+                log(`   💾 Saved ${rows.length} places (${t.length} targets, ${t.filter(r => r.email).length} with email) → ${path.basename(outputDir)}/`);
             }
         } catch (e) {
             console.error(`   ⚠️  Save failed: ${e.message}`);

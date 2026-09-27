@@ -88,6 +88,99 @@ export const DEFAULT_CATEGORIES = [
 export const HIGH_YIELD = ['Judaica', 'Judaica Geschäft', 'jüdische Geschenke', 'Israel Geschenke'];
 
 /**
+ * English cities, grouped by region.
+ *
+ * As in Germany, Judaica retail follows the communities: North-West London
+ * and Hertfordshire (Borehamwood, Radlett, Bushey), North Manchester
+ * (Prestwich, Whitefield, Broughton Park), Leeds, Gateshead, and the seaside
+ * communities (Brighton & Hove, Bournemouth, Southend/Westcliff).
+ */
+export const ENGLAND_CITIES = {
+    LDN: ['London'],
+    EE:  ['Borehamwood', 'Radlett', 'Bushey', 'Watford', 'St Albans', 'Southend-on-Sea', 'Westcliff-on-Sea',
+          'Chelmsford', 'Colchester', 'Cambridge', 'Norwich', 'Ipswich', 'Luton', 'Peterborough'],
+    SE:  ['Brighton', 'Hove', 'Southampton', 'Portsmouth', 'Reading', 'Milton Keynes', 'Oxford',
+          'Canterbury', 'Guildford', 'Windsor', 'Maidstone', 'Tunbridge Wells', 'Winchester'],
+    NW:  ['Manchester', 'Salford', 'Bury', 'Stockport', 'Altrincham', 'Liverpool', 'Southport',
+          'Chester', 'Preston', 'Blackpool', 'Lancaster'],
+    NE:  ['Newcastle upon Tyne', 'Gateshead', 'Sunderland', 'Durham', 'Middlesbrough'],
+    YH:  ['Leeds', 'Sheffield', 'Bradford', 'York', 'Harrogate', 'Hull'],
+    WM:  ['Birmingham', 'Solihull', 'Coventry', 'Wolverhampton', 'Stratford-upon-Avon'],
+    EM:  ['Nottingham', 'Leicester', 'Derby', 'Northampton', 'Lincoln'],
+    SW:  ['Bristol', 'Bath', 'Bournemouth', 'Exeter', 'Plymouth', 'Cheltenham', 'Gloucester', 'Salisbury'],
+};
+
+export const ENGLAND_DISTRICTS = {
+    London: ['Golders Green', 'Hendon', 'Temple Fortune', 'Finchley', 'Stamford Hill', 'Edgware', 'Stanmore',
+             'Mill Hill', 'Hampstead', "St John's Wood", 'Swiss Cottage', 'Highgate', 'Ilford', 'Woodford',
+             'Pinner', 'Kensington', 'Mayfair', 'Covent Garden', 'Camden'],
+    Manchester: ['Prestwich', 'Whitefield', 'Broughton Park', 'Cheetham Hill', 'Didsbury', 'Hale'],
+};
+
+export const ENGLAND_CATEGORIES = [
+    'Judaica',
+    'Judaica shop',
+    'Jewish gift shop',
+    'Jewish bookshop',
+    'Israeli products',
+    'Jewish museum shop',
+    'kosher shop',
+    'kosher deli',
+    'Menorah',
+    'art glass gallery',
+];
+
+/**
+ * Everything that differs between the markets. `gl` sets the country Maps
+ * searches in; `phoneCode` is what a national number starting with 0 gets;
+ * `foreign` drops cross-border results.
+ */
+export const COUNTRIES = {
+    DE: {
+        name: 'Germany',
+        gl: 'de',
+        phoneCode: '49',
+        regionLabel: 'Bundesland',
+        regions: GERMAN_CITIES,
+        districts: CITY_DISTRICTS,
+        categories: DEFAULT_CATEGORIES,
+        highYield: HIGH_YIELD,
+        acceptLanguage: 'de-DE,de;q=0.9,en;q=0.8',
+        contactKeyPage: 'impressum|imprint|legal',
+        contactPaths: ['/impressum', '/kontakt', '/impressum/', '/pages/impressum', '/imprint'],
+        outputDir: 'output',
+        foreign: /,\s*(Austria|Österreich|Switzerland|Schweiz|Suisse|France|Frankreich|Netherlands|Niederlande|Nederland|Belgium|Belgien|Poland|Polen|Czechia|Czech Republic|Tschechien|Denmark|Dänemark|Luxembourg|Luxemburg|Italy|Italien|Israel|United Kingdom|UK|USA|United States)\s*$/i,
+    },
+    UK: {
+        name: 'England',
+        gl: 'uk',
+        phoneCode: '44',
+        regionLabel: 'region',
+        regions: ENGLAND_CITIES,
+        districts: ENGLAND_DISTRICTS,
+        categories: ENGLAND_CATEGORIES,
+        highYield: ['Judaica', 'Judaica shop', 'Jewish gift shop', 'Jewish bookshop'],
+        acceptLanguage: 'en-GB,en;q=0.9',
+        // No Impressum in the UK: the contact page carries the address.
+        contactKeyPage: 'contact',
+        contactPaths: ['/contact', '/contact-us', '/pages/contact', '/about', '/about-us'],
+        outputDir: 'output-uk',
+        // The Republic of Ireland and the Continent; Scotland, Wales and
+        // Northern Ireland are the UK and stay.
+        foreign: /,\s*(Ireland|Éire|Co\.\s*\w+|France|Netherlands|Belgium|Germany|Deutschland|Spain|Israel|USA|United States)\s*$/i,
+    },
+};
+
+/** "DE", "UK", "GB", "England" → a COUNTRIES entry (default Germany). */
+export function resolveCountry(input = {}) {
+    const raw = String(input.country || 'DE').trim().toUpperCase();
+    const code = { GB: 'UK', ENGLAND: 'UK', 'UNITED KINGDOM': 'UK', GERMANY: 'DE', DEUTSCHLAND: 'DE' }[raw] || raw;
+    const c = COUNTRIES[code];
+    if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);
+    return { code, ...c };
+}
+
+/**
  * Which config file to read.
  * `--input <path>` works identically on every platform; `INPUT_FILE=...` is a
  * bash-ism that silently fails in cmd.exe, so the flag is the documented way.
@@ -129,7 +222,11 @@ export function loadInput(log = console.log) {
  *   cities: ["Worms"]    — an explicit list, which replaces the built-in one
  *   districts: true      — also search the big cities district by district
  */
-export function resolveLocations({ states = [], cities = [], districts = true } = {}, log = console.log) {
+export function resolveLocations(input = {}, log = console.log) {
+    const { states = [], cities = [], districts = true } = input;
+    const country = resolveCountry(input);
+    const REGIONS = country.regions;
+    const DISTRICTS = country.districts;
     const out = [];
     const push = (state, city) => out.push({ state, city });
 
@@ -141,27 +238,27 @@ export function resolveLocations({ states = [], cities = [], districts = true } 
     } else {
         const wanted = (Array.isArray(states) && states.length > 0)
             ? states.map(s => String(s).trim().toUpperCase())
-            : Object.keys(GERMAN_CITIES);
+            : Object.keys(REGIONS);
         for (const code of wanted) {
-            const list = GERMAN_CITIES[code];
-            if (!list) { log(`⚠️  Unknown Bundesland "${code}" — skipping. Known: ${Object.keys(GERMAN_CITIES).join(', ')}`); continue; }
+            const list = REGIONS[code];
+            if (!list) { log(`⚠️  Unknown ${country.regionLabel} "${code}" — skipping. Known: ${Object.keys(REGIONS).join(', ')}`); continue; }
             for (const city of list) push(code, city);
         }
     }
 
     if (districts) {
         for (const loc of [...out]) {
-            for (const d of CITY_DISTRICTS[loc.city] || []) push(loc.state, `${d}, ${loc.city}`);
+            for (const d of DISTRICTS[loc.city] || []) push(loc.state, `${d}, ${loc.city}`);
         }
     }
     return out;
 }
 
 /** Build the query matrix, high-yield terms first across every location. */
-export function buildQueryMatrix(locations, categories) {
+export function buildQueryMatrix(locations, categories, highYield = HIGH_YIELD) {
     const rank = (cat) => {
-        const i = HIGH_YIELD.indexOf(cat);
-        return i === -1 ? HIGH_YIELD.length : i;
+        const i = highYield.indexOf(cat);
+        return i === -1 ? highYield.length : i;
     };
     const queries = [];
     for (const loc of locations) {

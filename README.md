@@ -1,6 +1,6 @@
-# German Judaica Retailer Scraper — Jaffa Glass
+# Judaica Retailer Scraper (Germany & England) — Jaffa Glass
 
-Finds every Google Business Profile in Germany that sells **Judaica**, plus the Jewish and Israeli gift, book and museum shops around them. It reads each shop's website and **Impressum** to get an **email address** and the **owner's name**, then writes a spreadsheet and a mail-merge file with the Jaffa Glass partnership email already filled in for each shop.
+Finds every Google Business Profile in **Germany** or **England** that sells **Judaica**, plus the Jewish and Israeli gift, book and museum shops around them. It reads each shop's website (the **Impressum** in Germany, the **Contact** page in England) to get an **email address** and the **owner's name**, then writes a spreadsheet and a mail-merge file with the Jaffa Glass partnership email already filled in for each shop.
 
 It runs on your own computer with Node and your own Chrome. No accounts, no API keys, and no cost per lead.
 
@@ -33,7 +33,39 @@ The smoke test writes to `output-smoke/`. Open `judaica-leads.xlsx` there and ch
 
 The full run covers **101 cities in all 16 Bundesländer**, and searches the Jewish districts of Berlin, Munich, Frankfurt and Hamburg separately. It uses 10 German search terms, from `Judaica` and `jüdische Geschenke` to `Jüdisches Museum Shop` and `Glaskunst Geschenke`. That comes to about 1,200 Maps searches, which takes several hours. Stop at any time with **Ctrl-C**: results are saved to disk every 10 shops and again on exit.
 
-## 3. What you get (in `output/`)
+## England
+
+England has its own config, so Germany and England never overwrite each other:
+
+```bash
+npm run smoke:england    # London only, 2 search terms, 10 shops → output-uk-smoke/
+npm run england          # all of England → output-uk/
+```
+
+Put your name and title in `"sender"` in **`input.england.json`**. It is a separate file from `input.json`.
+
+The England run covers **68 towns and cities in 9 regions** and searches the Jewish neighbourhoods of London and Manchester separately:
+- **London:** Golders Green, Hendon, Stamford Hill, Edgware, Stanmore, Finchley and more.
+- **Manchester:** Prestwich, Whitefield, Broughton Park and more.
+
+It uses 10 English search terms, from `Judaica` and `Jewish gift shop` to `kosher deli` and `art glass gallery`, for about 930 Maps searches.
+
+To run only some regions, set `"states"` in `input.england.json` to any of `LDN EE SE NW NE YH WM EM SW`. For example, `["LDN", "EE"]` covers London plus Hertfordshire and Essex (Borehamwood, Radlett, Bushey, Southend, Westcliff).
+
+What changes for England:
+- **Phone numbers** become `+44`.
+- **Irish and Continental results** are dropped.
+- **Contact details** come from the **Contact / About** pages, because UK sites have no Impressum.
+- **Organisations** are filtered the same way as in Germany: synagogues, Chabad, charities, community centres (JW3 and similar), museums and councils (`.gov.uk`).
+- **Named contacts** will be rarer than in Germany. UK sites aren't required to name the owner, so more emails will open with "Dear <Shop> Team".
+
+The same `npm run contacts` command works on an England export:
+
+```bash
+npm run contacts -- output-uk/leads.json --input input.england.json
+```
+
+## 3. What you get (in `output/`, or `output-uk/` for England)
 
 | File | What it's for |
 |---|---|
@@ -86,6 +118,7 @@ All fields are optional.
 
 | Field | Default | Meaning |
 |---|---|---|
+| `country` | `"DE"` | `"DE"` for Germany or `"UK"` for England. It sets the city list, search terms, phone code and output folder. |
 | `sender` | – | `{ "name", "title" }` for the email signature. |
 | `states` | all | Bundesland codes to limit the run, e.g. `["BE","BY","HE"]`. Codes: BE HH HB BY BW HE NW NI RP SL SH MV BB SN ST TH. |
 | `cities` | built-in list | An explicit list of cities, which replaces the built-in one. |
@@ -106,7 +139,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 63 offline tests
+npm test                                                               # 69 offline tests
 ```
 
 ## If Google blocks you
@@ -117,6 +150,10 @@ npm test                                                               # 63 offl
 4. Use a proxy (`browser.proxyServer`) or a Bright Data browser (`BRIGHTDATA_WSS` in `.env`, which costs money).
 
 The scraper detects Google's "unusual traffic" page and says so, rather than reporting an empty search. It also answers the EU cookie-consent page (consent.google.com) automatically.
+
+## A note on sending (England)
+
+In the UK, **PECR** and **UK GDPR** apply. You may email a *company* (Ltd, LLP, plc) without prior consent if the message is relevant to its business and offers an easy opt-out. **Sole traders and partnerships** count as individuals, and they need consent first. Many small Judaica shops are sole traders, so treat "Ltd" in the Impressum/footer as the signal. As in Germany: send individually, honour opt-outs at once, and this isn't legal advice.
 
 ## A note on sending (Germany)
 

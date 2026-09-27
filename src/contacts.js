@@ -128,7 +128,7 @@ function decodeURIComponentSafe(s) {
 export function registrableDomain(host) {
     const parts = String(host || '').toLowerCase().replace(/^www\./, '').split('.').filter(Boolean);
     if (parts.length <= 2) return parts.join('.');
-    const twoLevel = /^(co|com|org|net|gov|ac)$/.test(parts[parts.length - 2]);
+    const twoLevel = /^(co|com|org|net|gov|ac|ltd|plc|me|sch|nhs)$/.test(parts[parts.length - 2]);
     return parts.slice(twoLevel ? -3 : -2).join('.');
 }
 
@@ -139,11 +139,11 @@ export function registrableDomain(host) {
  */
 export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen)\.[a-z.]+$/;
 
-const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service|bestellung|order|verkauf|sales|laden|store|post|team)@/;
+const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service|bestellung|order|orders|verkauf|sales|laden|store|post|team|enquiries|enquiry|admin)@/;
 const BAD_PREFIX = /^(no-?reply|donotreply|datenschutz|privacy|dsgvo|abuse|postmaster|hostmaster|webmaster|bewerbung|jobs|karriere|presse|press|newsletter|rechnung|invoice|buchhaltung)@/;
 /** "Made by pixelagentur.de" — the site's builder, not the shop. */
 const AGENCY_DOMAIN = /(agentur|agency|webdesign|design|werbung|media|medien|digital|marketing|hosting|studio|webservice|internet|-it\.|software|wix|jimdo|shopify|strato|ionos)/;
-const FREEMAIL = /@(gmail|googlemail|gmx|web|t-online|yahoo|hotmail|outlook|icloud|aol|freenet|posteo|mail|arcor|live|me)\./;
+const FREEMAIL = /@(gmail|googlemail|gmx|web|t-online|yahoo|hotmail|outlook|icloud|aol|freenet|posteo|mail|arcor|live|me|btinternet|btopenworld|sky|virginmedia|talktalk|blueyonder|ntlworld|tiscali)\./;
 
 /**
  * Rank addresses and return the best one first.
@@ -195,20 +195,20 @@ export function rankEmails(emails, websiteUrl = '', businessName = '') {
 
 const NAME_WORD = "[A-ZÄÖÜ][a-zäöüßéèáàíóúñç'’\\-]+";
 const PARTICLE = '(?:von|van|der|den|de|zu|del|da|di|ben|bat|el|al)';
-const NAME = `(?:(?:Frau|Herr|Fr\\.|Hr\\.|Mrs?\\.?|Ms\\.?)\\s+)?(?:(?:Dr|Prof|Dipl\\.-\\w+)\\.?\\s+)*${NAME_WORD}(?:\\s+(?:${PARTICLE}\\s+)?${NAME_WORD}){1,3}`;
+const NAME = `(?:(?:Frau|Herr|Fr\\.|Hr\\.|Mrs?\\.?|Ms\\.?|Miss)\\s+)?(?:(?:Dr|Prof|Dipl\\.-\\w+)\\.?\\s+)*${NAME_WORD}(?:\\s+(?:${PARTICLE}\\s+)?${NAME_WORD}){1,3}`;
 
 /** Labels, in order of how directly they name the person to address. */
 const ROLE_LABELS = [
     'Inhaberin', 'Inhaber', 'Inh\\.', 'Geschäftsführerin', 'Geschäftsführer', 'Geschäftsführung',
     'Vertreten durch(?: die| den)?(?: Geschäftsführer(?:in)?| Inhaber(?:in)?)?',
     'Vertretungsberechtigte[rn]? (?:Geschäftsführer(?:in)?|Gesellschafter(?:in)?|Person)',
-    'Owner', 'Proprietor', 'Managing Director', 'CEO', 'Represented by',
+    'Owner', 'Proprietor', 'Managing Director', 'Director', 'Co-?[Ff]ounder', 'Founder', 'CEO', 'Represented by',
     'Verantwortlich(?: für den Inhalt)?(?: nach| gemäß| gem\\.| i\\.S\\.d\\.)?(?: §+ ?\\d+[^:]{0,30})?',
     'V\\.i\\.S\\.d\\.P\\.', 'Ansprechpartner(?:in)?', 'Kontaktperson',
 ];
 
 /** Words that look like names but are really the next label or a company. */
-const NOT_A_NAME = /\b(Sitz|Kontaktformular|Anrede|Plattform|Online|Redaktion|Leitung|Postanschrift|Hausanschrift|Postfach|Mobil|Handy|Web|Internet|Website|Webseite|Homepage|Hinweis|Datenschutz|Konzept|Gestaltung|Umsetzung|Kontaktdaten|Firma|Name|Vorname|Nachname|Evangelische|Katholische|Jüdische|Bibliothek|GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich)\b/i;
+const NOT_A_NAME = /\b(Ltd|Limited|Registered|Company|Director|Founder|England|Wales|London|VAT|Sitz|Kontaktformular|Anrede|Plattform|Online|Redaktion|Leitung|Postanschrift|Hausanschrift|Postfach|Mobil|Handy|Web|Internet|Website|Webseite|Homepage|Hinweis|Datenschutz|Konzept|Gestaltung|Umsetzung|Kontaktdaten|Firma|Name|Vorname|Nachname|Evangelische|Katholische|Jüdische|Bibliothek|GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich)\b/i;
 
 /** "Fasanenstraße" is a compound, so \\bStraße misses it; "Str" may lose its dot. */
 const STREET_WORD = /(straße|strasse|str\.?|platz|allee|gasse|weg)[,.]?$/i;
@@ -274,7 +274,7 @@ function tidyName(raw) {
         kept.push(w);
     }
     const name = kept.join(' ');
-    const core = name.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?)\s+/i, '').replace(/^((Dr|Prof)\.?\s+)+/i, '');
+    const core = name.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?|Miss)\s+/i, '').replace(/^((Dr|Prof)\.?\s+)+/i, '');
     if (core.split(' ').filter(Boolean).length < 2) return { name: '', title: '' };
     return { name, title };
 }
@@ -290,11 +290,11 @@ function tidyName(raw) {
 export function greetingFor({ contact_name: name = '', contact_role: role = '', business_name: biz = '' } = {}) {
     const n = clean(name);
     if (!n) return shortBusinessName(biz) ? `Dear ${shortBusinessName(biz)} Team` : 'Dear Sir or Madam';
-    const female = /^(Frau|Fr\.|Mrs?\.?|Ms\.?)\s/i.test(n) || FEMALE_ROLE.test(role);
+    const female = /^(Frau|Fr\.|Mrs\.?|Ms\.?|Miss)\s/i.test(n) || FEMALE_ROLE.test(role);
     // "Inhaber: Irene Jaworski" — the masculine form is used generically, so
     // only an explicit Herr makes it "Mr.". The feminine forms are specific.
     const male = /^(Herr|Hr\.|Mr\.?)\s/i.test(n);
-    const bare = n.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?)\s+/i, '')
+    const bare = n.replace(/^(Frau|Herr|Fr\.|Hr\.|Mrs?\.?|Ms\.?|Miss)\s+/i, '')
         .replace(/(^|\s)(Dipl\.-?\s?[\wäöü]+\.?|M\.\s?A\.|B\.\s?A\.|Mag\.)(?=\s)/g, ' ').trim();
     const title = (bare.match(/^((?:Dr|Prof)\.?\s+)+/i) || [''])[0];
     const parts = bare.replace(/^((?:Dr|Prof)\.?\s+)+/i, '').split(' ');
@@ -359,10 +359,14 @@ export function findContactLinks(html, baseUrl, { max = 4 } = {}) {
 }
 
 /** Where German sites keep the Impressum when the homepage doesn't link it. */
-export function guessContactUrls(baseUrl) {
+export const GERMAN_CONTACT_PATHS = ['/impressum', '/kontakt', '/impressum/', '/pages/impressum', '/imprint'];
+/** UK sites have no Impressum; the address lives on the contact page. */
+export const ENGLISH_CONTACT_PATHS = ['/contact', '/contact-us', '/pages/contact', '/about', '/about-us'];
+
+export function guessContactUrls(baseUrl, paths = GERMAN_CONTACT_PATHS) {
     try {
         const o = new URL(baseUrl).origin;
-        return [`${o}/impressum`, `${o}/kontakt`, `${o}/impressum/`, `${o}/pages/impressum`, `${o}/imprint`];
+        return paths.map(p => `${o}${p}`);
     } catch {
         return [];
     }
@@ -383,6 +387,10 @@ export function findSocialLinks(html) {
 // ─── The worker pool ──────────────────────────────────────────────────────
 
 export const DEFAULT_CONTACTS = {
+    acceptLanguage: 'de-DE,de;q=0.9,en;q=0.8',
+    // Which page must be found (linked or guessed) before giving up on a site.
+    keyPage: 'impressum|imprint|legal',
+    guessPaths: GERMAN_CONTACT_PATHS,
     enabled: true,
     concurrency: 3,
     maxPagesPerSite: 4,
@@ -437,7 +445,7 @@ export class ContactEnricher {
     }
 
     async _get(url) {
-        const res = await this.http.fetchText(url, { headers: { 'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8' } });
+        const res = await this.http.fetchText(url, { headers: { 'Accept-Language': this.opts.acceptLanguage } });
         if (this.opts.delayMs) await new Promise(r => setTimeout(r, this.opts.delayMs));
         if (!res.ok || !res.body) return null;
         this.stats.pages++;
@@ -460,8 +468,8 @@ export class ContactEnricher {
                 pages.push(home);
                 this._absorb(home, result);
                 const links = findContactLinks(home, site, { max: this.opts.maxPagesPerSite });
-                const hasImpressum = links.some(u => /impressum|imprint|legal/i.test(u));
-                const guesses = (this.opts.guessImpressum && !hasImpressum) ? guessContactUrls(site).slice(0, 2) : [];
+                const hasKeyPage = links.some(u => new RegExp(this.opts.keyPage, 'i').test(u));
+                const guesses = (this.opts.guessImpressum && !hasKeyPage) ? guessContactUrls(site, this.opts.guessPaths).slice(0, 2) : [];
                 for (const url of [...links, ...guesses].slice(0, this.opts.maxPagesPerSite)) {
                     const body = await this._get(url);
                     if (!body) continue;

@@ -169,7 +169,7 @@ export function extractFeedCards() {
  * "People also search for" cards whose ratings and review counts otherwise leak
  * into the wrong business.
  */
-export function extractDetail() {
+export function extractDetail(phoneCode = '49') {
     const panel = document.querySelector('div[role="main"]') || document.body;
     const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
 
@@ -247,19 +247,19 @@ export function extractDetail() {
     if (/^(learn more|more|see more|more info|sponsored|website|directions)$/i.test(category)) category = '';
 
     // ── Phone ─────────────────────────────────────────────────────────────
-    // International, German-first. Maps gives "phone:tel:+4930123456" on most
-    // listings, but some carry the national form "030 123456" — a leading 0 is
-    // a German trunk prefix and becomes +49. Anything that already has a
-    // country code (+ or 00) is kept as-is, so an Austrian or Swiss shop that
-    // turns up near the border is not rewritten into a German number.
+    // International. Maps gives "phone:tel:+4930123456" on most listings, but
+    // some carry the national form "030 123456" / "020 7946 0000" — a leading 0
+    // is the trunk prefix and becomes +<phoneCode> (49 Germany, 44 UK).
+    // Anything that already has a country code (+ or 00) is kept as-is, so an
+    // Austrian shop near the border is not rewritten into a German number.
     const normPhone = (raw) => {
         const s = String(raw || '').trim();
         let d = s.replace(/\D/g, '');
         if (!d) return null;
         if (/^\+/.test(s)) { /* already international */ }
         else if (d.startsWith('00')) d = d.slice(2);
-        else if (d.startsWith('0')) d = '49' + d.slice(1);
-        else if (d.length === 10 && !d.startsWith('49')) d = '1' + d;   // bare US number
+        else if (d.startsWith('0')) d = phoneCode + d.slice(1);
+        else if (d.length === 10 && !d.startsWith(phoneCode)) d = '1' + d;   // bare US number
         if (d.length < 8 || d.length > 15) return null;
         return '+' + d;
     };

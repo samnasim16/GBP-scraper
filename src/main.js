@@ -17,7 +17,7 @@
 import path from 'node:path';
 import process from 'node:process';
 
-import { loadDotEnv, loadInput, resolveLocations, buildQueryMatrix, DEFAULT_CATEGORIES } from './config.js';
+import { loadDotEnv, loadInput, resolveLocations, buildQueryMatrix, resolveCountry } from './config.js';
 import { createBrowserFactory, isSessionDead } from './browser.js';
 import { createSaver, prepareLeads } from './output.js';
 import { scrapeQuery, relevanceFields } from './maps.js';
@@ -47,7 +47,10 @@ const {
     emailTemplate        = DEFAULT_TEMPLATE_PATH,
 } = input;
 
-const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || 'output');
+const COUNTRY = resolveCountry(input);
+// Each market writes to its own folder, so an England run never overwrites
+// the Germany results.
+const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
 const template = loadTemplate(emailTemplate);
 const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers });
 
@@ -76,7 +79,7 @@ const wssEndpoint = (process.env.BRIGHTDATA_WSS || browserWSEndpoint || '').trim
 const LOCATIONS = resolveLocations(input);
 const CATEGORIES = (Array.isArray(searchCategories) && searchCategories.length > 0)
     ? searchCategories.map(c => String(c).trim()).filter(Boolean)
-    : DEFAULT_CATEGORIES;
+    : COUNTRY.categories;
 
 async function main() {
     const allLeads = [];
@@ -99,7 +102,12 @@ async function main() {
     });
     const enricher = new ContactEnricher({
         http,
-        config: contacts,
+        config: {
+            acceptLanguage: COUNTRY.acceptLanguage,
+            keyPage: COUNTRY.contactKeyPage,
+            guessPaths: COUNTRY.contactPaths,
+            ...contacts,
+        },
         log: console.log,
         onDone: (lead) => {
             Object.assign(lead, relevanceFields(lead, lead._siteText));
@@ -109,14 +117,15 @@ async function main() {
     });
 
     try {
-        console.log('🚀 German Judaica Retailer Scraper — Jaffa Glass');
+        console.log(`🚀 Judaica Retailer Scraper — ${COUNTRY.name} — Jaffa Glass`);
         factory = await createBrowserFactory({ config: browserConfig, wssEndpoint, log: console.log });
-        const queries = buildQueryMatrix(LOCATIONS, CATEGORIES);
+        const queries = buildQueryMatrix(LOCATIONS, CATEGORIES, COUNTRY.highYield);
         console.log(`   ${CATEGORIES.length} search terms × ${LOCATIONS.length} locations = ${queries.length} queries`);
-        console.log(`   Contact lookup: ${enricher.enabled ? 'on (website + Impressum)' : 'off'}`);
+        console.log(`   Contact lookup: ${enricher.enabled ? 'on (website + contact/Impressum pages)' : 'off'}`);
+        console.log(`   Output: ${OUTPUT_DIR}`);
         console.log(`   Outreach tiers: ${includeTiers.join(', ')}\n`);
 
-        const opts = { maxResultsPerQuery, maxScrolls, minReviews, maxLeads, delayBetweenListings, keepNonProfits };
+        const opts = { maxResultsPerQuery, maxScrolls, minReviews, maxLeads, delayBetweenListings, keepNonProfits, country: COUNTRY };
         const REFRESH_EVERY = factory.mode === 'brightdata' ? 15 : 40;
         const SAVE_EVERY = 10;
 
@@ -200,7 +209,7 @@ async function main() {
     console.log(`   Outreach targets: ${targets.length} — ${targets.filter(r => r.email).length} with email, ${targets.filter(r => r.contact_name).length} with a named contact`);
     const s = enricher.stats;
     console.log(`   Websites read: ${s.sites} (${s.pages} pages)`);
-    console.log(`\n📥 Ready — output/judaica-leads.xlsx and output/mail-merge.csv`);
+    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/judaica-leads.xlsx and mail-merge.csv`);
     process.exit(0);
 }
 
