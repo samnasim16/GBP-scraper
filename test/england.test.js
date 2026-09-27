@@ -119,4 +119,6 @@ test('smoke run: a website theme\'s demo inboxes are not the shop\'s', async () 
     assert.deepEqual(extractEmails(html), []);
     assert.deepEqual(extractEmails('<a href="mailto:shop@torahtreasures.co.uk">x</a> royaljudaica.co.uk@gmail.com'),
         ['shop@torahtreasures.co.uk', 'royaljudaica.co.uk@gmail.com']);
+    // mail.com is a real provider, not a placeholder.
+    assert.deepEqual(extractEmails('<p>owner@mail.com</p>'), ['owner@mail.com']);
 });
