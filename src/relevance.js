@@ -17,6 +17,7 @@ const JUDAICA_STRONG = [
     'sederteller', 'seder plate', 'sederplate', 'tallit', 'tallis', 'tefillin', 'kippa', 'kippot', 'kipa',
     'schabbatleuchter', 'shabbat candle', 'challa', 'challah', 'hawdala', 'havdalah', 'davidstern',
     'magen david', 'star of david', 'jüdische kunst', 'jewish art', 'jüdische ritualgegenstände',
+    'hanukkiah', 'hanukiah', 'chanukiah', 'kiddush', 'yarmulke', 'kippah', 'jewish gift', 'shabbat candlestick',
 ];
 
 /** Medium signals — Jewish/Israeli context, but not necessarily a shop. */
@@ -24,7 +25,7 @@ const JEWISH_CONTEXT = [
     'jüdisch', 'juedisch', 'jewish', 'israel', 'israeli', 'hebräisch', 'hebraisch', 'hebrew',
     'koscher', 'kosher', 'schabbat', 'shabbat', 'chanukka', 'hanukkah', 'pessach', 'passover',
     'rosch haschana', 'rosh hashana', 'jerusalem', 'tel aviv', 'jaffa', 'synagoge', 'synagogue',
-    'jüdische gemeinde', 'chabad', 'tora', 'torah', 'jiddisch', 'yiddish',
+    'jüdische gemeinde', 'chabad', 'tora', 'torah', 'jiddisch', 'yiddish', 'judaism', 'sabbath', 'lubavitch',
 ];
 
 /** Retail signals — they sell things to the public. */
@@ -41,7 +42,7 @@ const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'blattgold', 'gold leaf',
  * Categories that are never a buyer, however Jewish the context: a restaurant
  * serving kosher food, a glazier, a lawyer. Checked against the Maps category.
  */
-export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei)\b/i;
+export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei|solicitor|takeaway|dentist|estate agent|funeral|undertaker|bestatter|removals?|plumber|electrician|accountant|steuerberater)\b/i;
 
 /**
  * Organisations we cannot sell to: places of worship, communities, charities,
@@ -52,21 +53,21 @@ export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hot
 export const NON_PROFIT_CATEGORY = /\b(synagog\w*|religious|place of worship|church|kirche|mosque|moschee|temple|chabad|non-?profit|charity|foundation|stiftung|association|verein|society|community|gemeinde|cultural cent(er|re)|kulturzentrum|research|institut\w*|university|universität|college|hochschule|school|schule|gymnasium|kindergarten|kita|preschool|daycare|library|bibliothek|archive|archiv|museum|memorial|gedenkstätte|monument|denkmal|cemetery|friedhof|embassy|botschaft|consulate|konsulat|government|city hall|rathaus|political|youth|jugend|social services|nursing|hospital|seminary|yeshiva)\b/i;
 
 /** …and against the business name. "e.V." is a registered non-profit. */
-export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b)/i;
+export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b)/i;
 
 /**
  * Categories that say "this is a business that sells things". A retail
  * category overrides a non-profit-sounding name: the Chabad-run
  * "Judaica-Laden" is a Judaica Store, and it buys stock.
  */
-export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|supermarket|grocery|seller|dealer|wholesaler|händler|laden|geschäft|kiosk|jewel\w*|antique\w*|souvenir|gift|craft|glass|glas|art studio|atelier|manufacturer|importer|exporter|distributor|mail order|versand)\b/i;
+export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|supermarket|grocery|seller|dealer|wholesaler|händler|laden|geschäft|kiosk|jewel\w*|antique\w*|souvenir|gift|craft|glass|glas|art studio|atelier|manufacturer|importer|exporter|distributor|mail order|versand|bookshop|giftshop|deli|delicatessen)\b/i;
 
 /**
  * Websites and inboxes of public bodies: stadt-koeln.de, speyer.de,
  * stadt-oldenburg.de, *.rlp.de. A city library or municipal gallery is not a
  * customer, even when Maps files it as an "Art Gallery".
  */
-const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$/;
+const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$/;
 
 const slug = (s) => clean(s).toLowerCase()
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')

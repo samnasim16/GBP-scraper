@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A Node.js scraper that finds **Judaica retailers across Germany** on Google Maps for **Jaffa Glass** (Israeli maker of hand-crafted kosher glass Judaica with 24-karat gold paint). For each place, it reads the shop's website and **Impressum** to get an email address and a named contact. It scores how likely the place is to stock Judaica, then writes a spreadsheet and a mail-merge CSV with the partnership email rendered for each shop.
+A Node.js scraper that finds **Judaica retailers across Germany or England** on Google Maps for **Jaffa Glass** (Israeli maker of hand-crafted kosher glass Judaica with 24-karat gold paint). For each place, it reads the shop's website and **Impressum** to get an email address and a named contact. It scores how likely the place is to stock Judaica, then writes a spreadsheet and a mail-merge CSV with the partnership email rendered for each shop.
 
 It is adapted from the archived *no-website lead scraper*, which found US businesses without websites. That project's browser handling (`browser.js`), in-page extractors (`dom-extract.js`) and HTTP transport (`http.js`) were kept, along with their tests. The US social-profile enrichment was replaced with website/Impressum contact extraction. The main difference in purpose: **here we want shops that do have a website**, because the website is where the email comes from.
 
@@ -15,9 +15,11 @@ npm install
 cp input.example.json input.json     # Windows: copy input.example.json input.json
 npm run smoke                        # Berlin, 2 terms, 10 places, visible browser → output-smoke/
 npm start                            # all of Germany → output/
+npm run smoke:england                # London, 2 terms, 10 places → output-uk-smoke/
+npm run england                      # all of England → output-uk/ (input.england.json)
 npm run contacts -- --probe https://shop.de "Shop Name"
 npm run contacts -- output/leads.json
-npm test                             # 63 tests, offline; browser tests skip without Chrome
+npm test                             # 69 tests, offline; browser tests skip without Chrome
 ```
 
 Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silently in cmd.exe.
@@ -27,7 +29,7 @@ Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silen
 ```
 src/
   main.js           orchestration: query loop, session hygiene, saving, summary
-  config.js         GERMAN_CITIES (by Bundesland), CITY_DISTRICTS, DEFAULT_CATEGORIES, query matrix
+  config.js         COUNTRIES (DE, UK): cities by region, districts, search terms, phone code, output dir; query matrix
   maps.js           one Maps query: consent → feed → detail pages → lead rows
   dom-extract.js    functions that run INSIDE the page (self-contained, serialised by puppeteer)
   relevance.js      Judaica keyword scoring → tier
@@ -43,14 +45,16 @@ test/               node:test + jsdom; fixtures/ has Maps markup and a fake Germ
 
 ## Decisions that are load-bearing
 
-- **Maps is loaded with `?hl=en&gl=de`**: German results with an English UI. The extractors read English labels (`stars`, `reviews`, `Add website`). Supporting one UI language is much easier than supporting two. Don't drop `hl=en` without also teaching `dom-extract.js` German labels, and prove it with a fixture.
+- **One codebase, one profile per market** (`COUNTRIES` in `config.js`, chosen by `"country"` in the input file; default `DE`). A profile carries the Maps `gl`, the phone trunk code, the foreign-address filter, the search terms, the contact-page conventions (`contactKeyPage`/`contactPaths`: Impressum in Germany, Contact page in England) and a default output folder, so one market's run never overwrites another's. To add a market, add a profile and test it the way `test/england.test.js` does; don't branch on the country inside the code.
+
+- **Maps is loaded with `?hl=en&gl=<country>`**: local results with an English UI. The extractors read English labels (`stars`, `reviews`, `Add website`). Supporting one UI language is much easier than supporting two. Don't drop `hl=en` without also teaching `dom-extract.js` German labels, and prove it with a fixture.
 - **EU consent redirect.** From an EU IP, Maps first redirects to `consent.google.com`. `passConsent` answers it. `detectBlockPage` must **not** treat consent as a block (the US original did).
-- **Phones are international.** `normPhone` in `dom-extract.js` turns `030 …` into `+4930…`, keeps anything that already has `+`/`00`, and never rewrites an Austrian or Swiss number as German.
-- **Foreign results are dropped** by address suffix (`FOREIGN_ADDRESS` in `maps.js`). Border-city searches return Austrian, Swiss, French and Dutch shops.
+- **Phones are international.** `normPhone` in `dom-extract.js` turns a national `0…` number into `+<phoneCode>…` (`030 …` → `+4930…`, `020 …` → `+4420…`; `extractDetail` takes the code as its argument), keeps anything that already has `+`/`00`, and never rewrites a foreign number.
+- **Foreign results are dropped** by address suffix (the profile's `foreign` regex). Border-city searches return Austrian, Swiss, French and Dutch shops.
 - **Relevance matches at word starts only** (`countHits` in `relevance.js`). A bare substring test finds "tora" in "Restaurierung". Glass words match anywhere because of compounds like "Kunstglas" and "Bleiglas". A category in `NON_RETAIL_CATEGORY` (restaurant, café, cemetery, glazier…) caps the score unless the *name* carries a strong Judaica word.
 - **Only sellable businesses are kept** (`isSellable` in `relevance.js`). A non-profit / religious Maps category (synagogue, community, non-profit, institute, school, library, museum…) or name (e.V., Gemeinde, Chabad, Stiftung, Verein…) drops the place at the feed stage and again on the detail page, before its website is read. A retail category (store, shop, gallery…) overrides a non-profit-sounding name, so a Chabad-run Judaica store survives. A Judaica word in the name overrides a wrong non-profit category ("Judaica Direct" filed as *Public Library*). Retail evidence for the tiers comes from the listing only, never the website, because every community site links to a shop page. A public body — website or email on a government domain (`stadt-*.de`, `*.rlp.de`) or on `<city>.de` — is dropped too, and this check runs before the Judaica-name exception ("Germania Judaica" is Cologne's city library). "Jewish / Israeli retail" needs Jewish/Israeli context in the listing, or a Judaica object named on the site; "Israel" in site text alone matched every bookshop and gallery with one Israeli author. `keepNonProfits: true` turns the filter off.
 - **Email ranking** (`rankEmails`): +40 for the site's own domain, +20 when the domain spells the business name, +25 when the local part does (`israelladen@mail.bgkorntal.de`), +15 for freemail, +10 for info/kontakt/shop prefixes, −30 for datenschutz/noreply/jobs, −25 for agency-looking domains. Web designers put their own address in the footer, and it must never win. The +40 applies only when the site is the shop's own (a homepage, or a domain spelling its name); a deep page on an umbrella organisation's site (`chabad-duesseldorf.de/…/aid/3860766` for Kosher King) gets none, so the umbrella's info@ doesn't win. Marketplace and platform pages (Kleinanzeigen, eBay, Etsy, AbeBooks, Facebook…) are never crawled, and their addresses are discarded. `repairTld` and `dropGlued` undo words glued onto addresses (`…@israelladen.deein`, `ninfo@…`).
-- **Greeting gender only from evidence** (`greetingFor`): Frau/Herr, or a feminine title (Inhaberin, Geschäftsführerin, Direktorin…). Masculine titles are generic in German ("Inhaber: Irene Jaworski" produced "Dear Mr. Plattform"), so they never make it "Mr.". Otherwise use the full name. Never guess gender from a first name. With no name, `shortBusinessName` cuts the Maps SEO title at `|`, ` - ` or ` I ` and drops GmbH/GbR.
+- **Greeting gender only from evidence** (`greetingFor`): Frau/Herr, or a feminine title (Inhaberin, Geschäftsführerin, Direktorin…). `Mrs`/`Miss`/`Ms` give "Ms." and `Mr` gives "Mr." (an old `Mrs?` pattern once read Mr as female). Masculine titles are generic in German ("Inhaber: Irene Jaworski" produced "Dear Mr. Plattform"), so they never make it "Mr.". Otherwise use the full name. Never guess gender from a first name. With no name, `shortBusinessName` cuts the Maps SEO title at `|`, ` - ` or ` I ` and drops GmbH/GbR.
 - **Impressum name extraction** stops at the first word that is a company form, an organisation compound (`…gemeinde`, `…handlung`, `…bibliothek`), a street (`…straße`, `…str`; `…ring`/`…damm` from the third word on), a digit, a word ending in a hyphen (`Online-`) or the next field label (`Sitz`, `Kontaktformular`, `Plattform`…). A company alone (`Vertreten durch: X GmbH`) yields no name, which is correct.
 
 ## Recipes

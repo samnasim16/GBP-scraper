@@ -1,0 +1,21 @@
+{
+    "country": "UK",
+    "cities": [
+        "London"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "Judaica",
+        "Jewish gift shop"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-uk-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}
