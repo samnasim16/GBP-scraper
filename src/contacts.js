@@ -30,6 +30,11 @@ const JUNK_EMAIL = [
     /^(name|vorname\.nachname|ihre?\.?email|your\.?email|email|user|username|max\.mustermann)@/i,
     /@.*\.(local|invalid|lan)$/i,
     /(sentry|wixpress|cloudflare|googleapis|schema\.org|w3\.org)/i,
+    // Demo content of website themes, left on live shops: Torah Treasures'
+    // site carried contact@, career@ and customercare@martfury.com, the
+    // placeholder inboxes of the "Martfury" WooCommerce theme.
+    /@(martfury|envato|themeforest|templatemonster|flatsome|woodmart|porto|electro|shopkeeper|basel|ecomus|kalles|minimog|elessi|yourstore|yourshop|yoursite|yourcompany|mysite|mystore|company|website|store|shop|demo)\.(com|net|org|io)$/i,
+    /@(demo|themes?|template)[.-]/i,
 ];
 
 /** Cloudflare's "email protection" hides addresses as a hex XOR string. */

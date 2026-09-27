@@ -110,3 +110,15 @@ test('end to end: an English shop site gives its contact-page email and director
     assert.equal(greetingFor(lead), 'Dear Ms. Cohen');
     assert.equal(scoreRelevance({ ...lead, category: 'Gift shop' }, lead._siteText).tier, 'Judaica seller');
 });
+
+test('smoke run: a website theme\'s demo inboxes are not the shop\'s', async () => {
+    // Torah Treasures (London) came back as contact@martfury.com.
+    const { extractEmails } = await import('../src/contacts.js');
+    const html = '<p>contact@martfury.com career@martfury.com customercare@martfury.com media@martfury.com</p>'
+        + '<p>info@company.com hello@demo-shop.com sales@yourstore.com</p>';
+    assert.deepEqual(extractEmails(html), []);
+    assert.deepEqual(extractEmails('<a href="mailto:shop@torahtreasures.co.uk">x</a> royaljudaica.co.uk@gmail.com'),
+        ['shop@torahtreasures.co.uk', 'royaljudaica.co.uk@gmail.com']);
+    // mail.com is a real provider, not a placeholder.
+    assert.deepEqual(extractEmails('<p>owner@mail.com</p>'), ['owner@mail.com']);
+});
