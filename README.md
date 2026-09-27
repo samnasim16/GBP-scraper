@@ -48,11 +48,14 @@ German law (§ 5 DDG) requires every commercial website to have an **Impressum**
 | Impressum says | Greeting in the email |
 |---|---|
 | `Geschäftsführerin: Frau Dr. Miriam Rosenthal` | Dear Ms. Dr. Rosenthal, |
-| `Inhaber: David Levi` | Dear Mr. Levi, |
+| `Herr David Levi` | Dear Mr. Levi, |
+| `Inhaber: Irene Jaworski` (masculine label, used generically) | Dear Irene Jaworski, |
 | `Verantwortlich: Sarah Cohen` (no gender given) | Dear Sarah Cohen, |
 | no name found | Dear Judaica Haus Berlin Team, |
 
-It only uses Mr./Ms. when the site itself gives the gender (Frau/Herr, Inhaberin/Inhaber). Otherwise it uses the full name.
+It uses Mr. or Ms. only when the site itself gives the gender: Frau/Herr, or a feminine title such as Inhaberin, Geschäftsführerin or Direktorin. Masculine titles like "Inhaber" don't count, because German uses them for women too. Otherwise it uses the full name.
+
+With no name, it greets the shop by its short name. The long Google Maps title "Israel Spezialitäten | Die besten Medjoul Datteln | Dieterich" becomes "Dear Israel Spezialitäten Team", and GmbH/GbR are dropped.
 
 Emails are also found when they are hidden behind Cloudflare email protection or written as `info [at] shop [dot] de`. They are ranked so that the shop's own address (`info@shop.de`) beats a freemail address, and both beat the web designer's address in the footer or a `datenschutz@` address.
 
@@ -60,7 +63,7 @@ To change the email text, edit **`templates/partnership-email.txt`**. The first 
 
 ### Relevance: which shops are targets
 
-**Only businesses you can sell to are kept.** Synagogues, Chabad houses, Jewish communities (Gemeinde), registered non-profits (e.V.), foundations, associations, institutes, schools, universities, libraries, museums, memorials and embassies are skipped, based on their Maps category and their name. They aren't opened, their websites aren't read, and they don't appear in the output. A shop run by a community still counts if Maps lists it as a store (for example Chabad's "Judaica-Laden", a *Judaica Store*). To keep the organisations anyway, set `"keepNonProfits": true`.
+**Only businesses you can sell to are kept.** Synagogues, Chabad houses, Jewish communities (Gemeinde), registered non-profits (e.V.), foundations, associations, institutes, schools, universities, libraries, museums, memorials and embassies are skipped, based on their Maps category and their name. City and state institutions are skipped as well, recognised by a government website or email (e.g. `stadt-koeln.de`, `speyer.de`). They aren't opened, their websites aren't read, and they don't appear in the output. A shop run by a community still counts if Maps lists it as a store (for example Chabad's "Judaica-Laden", a *Judaica Store*). To keep the organisations anyway, set `"keepNonProfits": true`.
 
 Maps search is fuzzy. A search for `koscher` also returns kosher restaurants, and `Judaica` also returns synagogues. So each place is scored on the words in its name, category, Maps description and its own website, then put in a tier:
 
@@ -103,7 +106,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 56 offline tests
+npm test                                                               # 63 offline tests
 ```
 
 ## If Google blocks you

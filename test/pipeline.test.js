@@ -150,3 +150,33 @@ test('a "Shop" link on a website does not make an organisation a retailer', () =
     const r = scoreRelevance({ business_name: 'Kulturforum Mitte', category: 'Event venue' }, 'Jüdisch Israel Shop Spenden');
     assert.equal(r.tier, 'Unrelated');
 });
+
+test('full run: city-government galleries and libraries are public bodies', () => {
+    for (const lead of [
+        { business_name: 'Germania Judaica', category: 'Library', website: 'https://www.stadt-koeln.de/leben-in-koeln/stadtbibliothek/germania-judaica', city: 'Köln' },
+        { business_name: 'Purrmann house', category: 'Art Gallery', website: 'https://www.speyer.de/de/kultur/purrmann-haus/', city: 'Speyer' },
+        { business_name: 'Artothek Oldenburg', category: 'Art Gallery', website: 'http://www.oldenburg.de/startseite/kultur/artothek', city: 'Oldenburg' },
+        { business_name: 'Kulturhof', category: 'Art Gallery', email: 'poststelle@stadt-speyer.de', city: 'Speyer' },
+    ]) assert.equal(isSellable(lead).ok, false, lead.business_name);
+    assert.equal(isSellable({ business_name: 'Old Abraham GbR', category: 'Judaica Store', website: 'http://www.old-abraham.de/', city: 'Dresden' }).ok, true);
+});
+
+test('full run: "Israel" on a website alone does not make a shop Jewish/Israeli retail', () => {
+    // Each of these reached the Outreach sheet on "israel, israeli" in site text.
+    for (const [business_name, category] of [
+        ['KOSELI - geschenke aus nepal', 'Gift Shop'], ['Buchsalon Ehrenfeld', 'Book Store'],
+        ['YaaYaa - Das kultigbunte Kaufhaus!', 'Gift Shop'], ['FRANK FLUEGEL GALERIE', 'Art Gallery'],
+    ]) assert.ok(!isTarget(scoreRelevance({ business_name, category }, 'Israel israeli Tel Aviv jüdisch')), business_name);
+    // A Judaica object named on the site still qualifies it.
+    assert.equal(scoreRelevance({ business_name: 'Treffpunkt Buchhandlung', category: 'Book Store' }, 'Chanukkia aus Israel, jüdisch').tier, 'Jewish / Israeli retail');
+    // And a Jewish/Israeli listing needs nothing from the site.
+    assert.equal(scoreRelevance({ business_name: 'Israelladen En-Gedi', category: 'Gift Shop' }).tier, 'Jewish / Israeli retail');
+});
+
+test('the same place under two Maps URLs is one row', () => {
+    const rows = prepareLeads([
+        { business_name: 'MIO GIO Therapy Cosmetics', city: 'Hamburg', maps_url: 'https://www.google.com/maps/place/a', relevance_tier: 'Judaica seller' },
+        { business_name: 'MIO GIO Therapy Cosmetics', city: 'Hamburg', maps_url: 'https://www.google.com/maps/place/b', relevance_tier: 'Judaica seller' },
+    ]);
+    assert.equal(rows.length, 1);
+});

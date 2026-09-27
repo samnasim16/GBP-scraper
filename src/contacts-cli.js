@@ -14,7 +14,7 @@ import { createSaver } from './output.js';
 import { relevanceFields } from './maps.js';
 import { loadInput } from './config.js';
 import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
-import { TARGET_TIERS } from './relevance.js';
+import { TARGET_TIERS, isSellable } from './relevance.js';
 
 const probeAt = process.argv.indexOf('--probe');
 
@@ -36,7 +36,11 @@ async function probe(url, name) {
 
 async function refresh(file) {
     const input = loadInput(() => {});
-    const leads = JSON.parse(fs.readFileSync(file, 'utf8'));
+    // Rows scraped before a filter existed are held to today's rules, and
+    // organisations we cannot sell to are not re-crawled at all.
+    const all = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const leads = input.keepNonProfits ? all : all.filter(l => isSellable(l).ok);
+    if (leads.length < all.length) console.log(`Skipping ${all.length - leads.length} non-profit / public / religious rows`);
     const http = createHttpClient({ transport: 'local' });
     const enricher = new ContactEnricher({ http, config: input.contacts || {} });
     let done = 0;

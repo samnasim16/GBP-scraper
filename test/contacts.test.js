@@ -6,7 +6,7 @@ import path from 'node:path';
 
 import {
     extractEmails, rankEmails, deobfuscate, decodeCfEmail, extractContactName, extractContact,
-    greetingFor, findContactLinks, guessContactUrls, findSocialLinks, registrableDomain, ContactEnricher,
+    greetingFor, findContactLinks, repairTld, shortBusinessName, guessContactUrls, findSocialLinks, registrableDomain, ContactEnricher,
 } from '../src/contacts.js';
 import { createHttpClient } from '../src/http.js';
 import { stripHtml } from '../src/util.js';
@@ -59,7 +59,10 @@ test('the Impressum names the person, not the company or the next field', () => 
 test('greeting uses a gendered form only when the site said so', () => {
     assert.equal(greetingFor({ contact_name: 'Frau Dr. Miriam Rosenthal' }), 'Dear Ms. Dr. Rosenthal');
     assert.equal(greetingFor({ contact_name: 'Herr Max von Weizsäcker' }), 'Dear Mr. von Weizsäcker');
-    assert.equal(greetingFor({ contact_name: 'David Levi', contact_role: 'Inhaber' }), 'Dear Mr. Levi');
+    // The masculine label is generic in German ("Inhaber: Irene Jaworski").
+    assert.equal(greetingFor({ contact_name: 'David Levi', contact_role: 'Inhaber' }), 'Dear David Levi');
+    assert.equal(greetingFor({ contact_name: 'Irene Jaworski', contact_role: 'Inhaber' }), 'Dear Irene Jaworski');
+    assert.equal(greetingFor({ contact_name: 'Dipl.-Ing. Avi Chmelnik', contact_role: 'Geschäftsführer' }), 'Dear Avi Chmelnik');
     assert.equal(greetingFor({ contact_name: 'Sarah Cohen' }), 'Dear Sarah Cohen');
     assert.equal(greetingFor({ business_name: 'Judaica Haus Berlin' }), 'Dear Judaica Haus Berlin Team');
     assert.equal(greetingFor({}), 'Dear Sir or Madam');
@@ -140,4 +143,56 @@ test('real run: phone digits glued onto an address are removed', () => {
     // Jewish Museum Berlin produced "300info@jmberlin.de".
     assert.deepEqual(extractEmails('<p>Tel. +49 30 25993 300info@jmberlin.de</p><a href="mailto:info@jmberlin.de">x</a>'), ['info@jmberlin.de']);
     assert.deepEqual(extractEmails('<p>24h: 24hshop@x.de</p>'), ['24hshop@x.de'], 'digits that are not a known prefix stay');
+});
+
+test('full run: trailing junk after an Impressum name is cut', () => {
+    const cases = [
+        ['Geschäftsführerin: Kirsten Roschlaub Sitz der Gesellschaft: Hamburg', 'Kirsten Roschlaub'],
+        ['Inhaber: Irene Jaworski Plattform der EU-Kommission', 'Irene Jaworski'],
+        ['Inhaber: Daniel Opoku Holzstr 12', 'Daniel Opoku'],
+        ['Verantwortlich: Hannah Kubsch Kontaktformular Anrede', 'Hannah Kubsch'],
+        ['Vertreten durch: Prof. Dr. Mirjam Wenzel Online- Redaktion', 'Prof. Dr. Mirjam Wenzel'],
+        ['Inhaber: Martin Koenitz Dittrichring 13', 'Martin Koenitz'],
+        ['Verantwortlich: Dr. Ursula Reuter Bibliothek Germania Judaica', 'Dr. Ursula Reuter'],
+        ['Vertreten durch: Evangelische Brüdergemeinde Korntal', ''],
+    ];
+    for (const [text, want] of cases) assert.equal(extractContactName(text), want, text);
+    assert.equal(greetingFor({ contact_name: 'Kirsten Roschlaub', contact_role: 'Geschäftsführerin' }), 'Dear Ms. Roschlaub');
+});
+
+test('full run: words glued onto an address are trimmed or the copy dropped', () => {
+    assert.equal(repairTld('info@israelladen.deein'), 'info@israelladen.de');
+    assert.equal(repairTld('buchladen@neuer-weg.comtel'), 'buchladen@neuer-weg.com');
+    assert.equal(repairTld('hello@iraja.art'), 'hello@iraja.art');
+    assert.equal(repairTld('x@y.zzzzq'), '');
+    assert.deepEqual(extractEmails('<script>var a="\\ninfo@kosherstar.de"</script><a href="mailto:info@kosherstar.de">x</a>'), ['info@kosherstar.de']);
+    assert.deepEqual(extractEmails('<p>ihello@iraja.art</p><a href="mailto:hello@iraja.art">x</a>'), ['hello@iraja.art']);
+});
+
+test("full run: a platform's or umbrella organisation's inbox loses to the shop's", () => {
+    assert.deepEqual(extractEmails('<p>behoerdenanfragen@kleinanzeigen.de impressum@kleinanzeigen.de</p>'), []);
+    // Kosher King's listing links to a page deep inside Chabad Düsseldorf's site.
+    assert.equal(rankEmails(['info@chabad-duesseldorf.de', 'royal.k.food@gmail.com'],
+        'https://www.chabad-duesseldorf.de/templates/articlecco_cdo/aid/3860766', 'Kosher King')[0], 'royal.k.food@gmail.com');
+    // Israelladen is run by a church parish; its own inbox names the shop.
+    assert.equal(rankEmails(['pfarramt@bruedergemeinde-korntal.de', 'israelladen@mail.bgkorntal.de'],
+        'https://www.bruedergemeinde-korntal.de/innovation/israelladen.html', 'Israelladen "Shalom al Israel"')[0], 'israelladen@mail.bgkorntal.de');
+    // A shop's own homepage still wins as before.
+    assert.equal(rankEmails(['kontakt@doronia.de', 'x@gmail.com'], 'https://www.doronia.de/', 'DORONIA Shipping GmbH')[0], 'kontakt@doronia.de');
+});
+
+test('full run: greetings use the shop\'s real name, not its Maps SEO title', () => {
+    const cases = [
+        ['Israel Spezialitäten | Die besten Medjoul Datteln | Dieterich', 'Israel Spezialitäten'],
+        ['MIO GIO Therapy Cosmetics I Kosher Food I Judaica', 'MIO GIO Therapy Cosmetics'],
+        ['KosherLife - koschere Lebensmittel', 'KosherLife'],
+        ['KosherStar GbR', 'KosherStar'],
+        ['Kosher Market GmbH', 'Kosher Market'],
+        ['JEWERIA® - Jewish jewelry', 'JEWERIA'],
+        ['Judaica-Laden in Berlin יודאיקה בברלין', 'Judaica-Laden in Berlin'],
+        ['Brא\u200euch', 'Brא\u200euch'],
+        ['Old Abraham GbR - Vielfalt aus Israel und der Welt', 'Old Abraham'],
+    ];
+    for (const [name, want] of cases) assert.equal(shortBusinessName(name), want, name);
+    assert.equal(greetingFor({ business_name: 'KosherStar GbR' }), 'Dear KosherStar Team');
 });
