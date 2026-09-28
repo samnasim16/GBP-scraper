@@ -19,7 +19,7 @@ npm run smoke:england                # London, 2 terms, 10 places → output-uk-
 npm run england                      # all of England → output-uk/ (input.england.json)
 npm run contacts -- --probe https://shop.de "Shop Name"
 npm run contacts -- output/leads.json
-npm test                             # 70 tests, offline; browser tests skip without Chrome
+npm test                             # 75 tests, offline; browser tests skip without Chrome
 ```
 
 Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silently in cmd.exe.
@@ -37,6 +37,7 @@ src/
   email-template.js loads templates/partnership-email.txt and fills {{placeholders}}
   output.js         dedupe, sort, xlsx (Outreach / No email found / All results), mail-merge.csv
   contacts-cli.js   re-run contact lookup on an export; --probe one site
+  resume.js         continue a stopped run: load saved places, progress.json, --fresh backup
   browser.js        local Chrome launch / optional Bright Data
   http.js           direct fetch with a browser fallback
 templates/partnership-email.txt   the outreach email (first line "Subject: …")
@@ -47,6 +48,7 @@ test/               node:test + jsdom; fixtures/ has Maps markup and a fake Germ
 
 - **One codebase, one profile per market** (`COUNTRIES` in `config.js`, chosen by `"country"` in the input file; default `DE`). A profile carries the Maps `gl`, the phone trunk code, the foreign-address filter, the search terms, the contact-page conventions (`contactKeyPage`/`contactPaths`: Impressum in Germany, Contact page in England) and a default output folder, so one market's run never overwrites another's. To add a market, add a profile and test it the way `test/england.test.js` does; don't branch on the country inside the code.
 
+- **A restart resumes; it never overwrites** (`resume.js`). Before this, re-running after a crash began at query 1 and its first save replaced the stopped run's files. Now `main.js` loads the output folder's `leads.json`, marks those places seen, re-queues the ones whose website lookup may not have finished (`contacts_checked` is set when a lookup completes), and starts at `progress.json`'s `next`. `progress.json` is written after every query and is trusted only if its country and query count match the current run. Without one, the run resumes at the last query that produced a place. A finished run exits with a hint instead of re-running; `--fresh` moves the old files to `previous-<date>/` first.
 - **Maps is loaded with `?hl=en&gl=<country>`**: local results with an English UI. The extractors read English labels (`stars`, `reviews`, `Add website`). Supporting one UI language is much easier than supporting two. Don't drop `hl=en` without also teaching `dom-extract.js` German labels, and prove it with a fixture.
 - **EU consent redirect.** From an EU IP, Maps first redirects to `consent.google.com`. `passConsent` answers it. `detectBlockPage` must **not** treat consent as a block (the US original did).
 - **Phones are international.** `normPhone` in `dom-extract.js` turns a national `0…` number into `+<phoneCode>…` (`030 …` → `+4930…`, `020 …` → `+4420…`; `extractDetail` takes the code as its argument), keeps anything that already has `+`/`00`, and never rewrites a foreign number.

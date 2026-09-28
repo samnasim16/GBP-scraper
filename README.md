@@ -31,7 +31,7 @@ npm start          # all of Germany
 
 The smoke test writes to `output-smoke/`. Open `judaica-leads.xlsx` there and check that the shops are real Judaica shops and the emails look right. Then start the full run.
 
-The full run covers **101 cities in all 16 Bundesländer**, and searches the Jewish districts of Berlin, Munich, Frankfurt and Hamburg separately. It uses 10 German search terms, from `Judaica` and `jüdische Geschenke` to `Jüdisches Museum Shop` and `Glaskunst Geschenke`. That comes to about 1,200 Maps searches, which takes several hours. Stop at any time with **Ctrl-C**: results are saved to disk every 10 shops and again on exit.
+The full run covers **101 cities in all 16 Bundesländer**, and searches the Jewish districts of Berlin, Munich, Frankfurt and Hamburg separately. It uses 10 German search terms, from `Judaica` and `jüdische Geschenke` to `Jüdisches Museum Shop` and `Glaskunst Geschenke`. That comes to about 1,200 Maps searches, which takes several hours. Stop at any time with **Ctrl-C**: results are saved to disk every 10 shops and again on exit. Running the same command again carries on where it stopped (see *If a run stops* below).
 
 ## England
 
@@ -139,7 +139,22 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 70 offline tests
+npm test                                                               # 75 offline tests
+```
+
+## If a run stops (crash, Ctrl-C, computer switched off)
+
+Just run the same command again (`npm start` or `npm run england`). The new run carries on where the old one stopped:
+- **Places kept:** it loads the places already found and never looks them up twice.
+- **Where it restarts:** it continues from the search it was on, which is recorded in `progress.json` in the output folder.
+- **Websites re-checked:** it re-reads the websites the stopped run hadn't finished reading.
+
+Nothing already saved is overwritten.
+
+If a run already finished, running it again tells you so and stops. To search again from the beginning, add `--fresh`. The old results are moved into a `previous-<date>` folder, not deleted:
+
+```bash
+npm run england -- --fresh
 ```
 
 ## If Google blocks you
