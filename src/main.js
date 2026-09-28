@@ -26,6 +26,7 @@ import { createHttpClient } from './http.js';
 import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { isTarget, TARGET_TIERS } from './relevance.js';
 import { sleep } from './util.js';
+import { loadPrevious, readProgress, writeProgress, resumePoint, seedSeen, needsContactLookup, backupPrevious } from './resume.js';
 
 loadDotEnv();
 
@@ -48,6 +49,7 @@ const {
 } = input;
 
 const COUNTRY = resolveCountry(input);
+const FRESH = process.argv.includes('--fresh');
 // Each market writes to its own folder, so an England run never overwrites
 // the Germany results.
 const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
@@ -110,6 +112,7 @@ async function main() {
         },
         log: console.log,
         onDone: (lead) => {
+            lead.contacts_checked = true;
             Object.assign(lead, relevanceFields(lead, lead._siteText));
             const bits = [lead.email || 'no email', lead.contact_name || null].filter(Boolean).join(' · ');
             console.log(`    📇 ${lead.business_name}: ${bits} — ${lead.relevance_tier}`);
@@ -123,7 +126,38 @@ async function main() {
         console.log(`   ${CATEGORIES.length} search terms × ${LOCATIONS.length} locations = ${queries.length} queries`);
         console.log(`   Contact lookup: ${enricher.enabled ? 'on (website + contact/Impressum pages)' : 'off'}`);
         console.log(`   Output: ${OUTPUT_DIR}`);
-        console.log(`   Outreach tiers: ${includeTiers.join(', ')}\n`);
+        console.log(`   Outreach tiers: ${includeTiers.join(', ')}`);
+
+        // ── Resume ──────────────────────────────────────────────────────
+        // A restart continues where the last run stopped instead of
+        // overwriting its results. --fresh starts over, keeping the old
+        // files in a previous-<date> folder.
+        let startAt = 0;
+        if (FRESH) {
+            const kept = backupPrevious(OUTPUT_DIR);
+            if (kept) console.log(`   🆕 --fresh: previous results moved to ${path.relative(process.cwd(), kept)}`);
+        } else {
+            const previous = loadPrevious(OUTPUT_DIR);
+            const progress = readProgress(OUTPUT_DIR);
+            if (previous.length || progress) {
+                startAt = resumePoint(queries, previous, progress, COUNTRY.code);
+                if (startAt >= queries.length) {
+                    console.log(`   ✅ The previous ${COUNTRY.name} run already finished all ${queries.length} queries (${previous.length} places).`);
+                    console.log('      Nothing to resume. To search again from the start, add --fresh:');
+                    console.log(`        npm run ${COUNTRY.code === 'UK' ? 'england' : 'start'} -- --fresh`);
+                    process.exit(0);
+                }
+                allLeads.push(...previous);
+                seedSeen(seen, previous, queries);
+                console.log(`   ⏯️  Resuming: ${previous.length} places already found, continuing at query ${startAt + 1} of ${queries.length}`);
+                const pending = previous.filter(needsContactLookup);
+                if (pending.length && enricher.enabled) {
+                    console.log(`   📇 Re-checking ${pending.length} websites the last run may not have finished reading`);
+                    for (const lead of pending) enricher.enqueue(lead).catch(() => {});
+                }
+            }
+        }
+        console.log('');
 
         const opts = { maxResultsPerQuery, maxScrolls, minReviews, maxLeads, delayBetweenListings, keepNonProfits, country: COUNTRY };
         const REFRESH_EVERY = factory.mode === 'brightdata' ? 15 : 40;
@@ -131,7 +165,7 @@ async function main() {
 
         session = await factory.open();
         let consecutiveFailures = 0;
-        let lastSavedCount = 0;
+        let lastSavedCount = allLeads.length;
 
         const ctx = {
             seen, allLeads,
@@ -139,10 +173,10 @@ async function main() {
             onLead: (lead) => { enricher.enqueue(lead).catch(() => {}); },
         };
 
-        for (let qi = 0; qi < queries.length; qi++) {
+        for (let qi = startAt; qi < queries.length; qi++) {
             if (allLeads.length >= maxLeads) break;
 
-            if (qi > 0 && qi % REFRESH_EVERY === 0) {
+            if (qi > startAt && qi % REFRESH_EVERY === 0) {
                 console.log(`\n🔄 Refreshing browser session (every ${REFRESH_EVERY} queries)...`);
                 try {
                     session = await factory.refresh(session);
@@ -182,6 +216,7 @@ async function main() {
                 }
             }
 
+            writeProgress(OUTPUT_DIR, { country: COUNTRY.code, queries: queries.length, next: qi + 1, last: queries[qi].text });
             if (allLeads.length - lastSavedCount >= SAVE_EVERY) {
                 await saveResults(allLeads);
                 lastSavedCount = allLeads.length;
