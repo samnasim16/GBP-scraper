@@ -62,6 +62,9 @@ export const NON_PROFIT_CATEGORY = /\b(synagog\w*|religious|place of worship|chu
 /** …and against the business name. "e.V." is a registered non-profit. */
 export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b)/i;
 
+/** A trading company or a bookshop, whatever else its name says. */
+const COMMERCIAL_NAME = /(\bGmbH\b|\bKG\b|\bAG\b|\bUG\b|\bLtd\b|\bplc\b|book ?store|bookshop|buchhandlung|literaturhandlung|buchladen|unibuch)/i;
+
 export const INSTITUTION_NAME = /\b(museum|synagog\w*|school|schule|college|university|universität|library|bibliothek|charity|foundation|stiftung|e\.\s?v\.)(?![\w-])/i;
 
 /**
@@ -89,7 +92,10 @@ const CITY_ALIASES = { muenchen: ['muenchen', 'munich'], koeln: ['koeln', 'colog
 export function isPublicBody(lead) {
     const hosts = [];
     try { hosts.push(new URL(lead.website).hostname.replace(/^www\./, '')); } catch { /* no website */ }
-    if (lead.email && lead.email.includes('@')) hosts.push(lead.email.split('@')[1]);
+    // An address picked up from the shop's own pages can sit on a city
+    // domain (a listing on the city portal); only the website says who runs
+    // the place. The email decides only when there is no website.
+    if (!hosts.length && lead.email && lead.email.includes('@')) hosts.push(lead.email.split('@')[1]);
     const city = slug(lead.city);
     const cityHosts = new Set((CITY_ALIASES[city] || [city]).filter(Boolean).map(c => `${c}.de`));
     return hosts.some(h => GOV_DOMAIN.test(h) || cityHosts.has(h));
@@ -117,7 +123,13 @@ export function isSellable(lead) {
     // Gallery and Museum" is an "Art Gallery", "Central Deli @ Birmingham
     // Central United Synagogue" a "Kosher Food Shop". A Chabad-run store
     // still passes — Chabad is not on this list.
-    if (INSTITUTION_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (institution name)' };
+    // "e.V." is a registered non-profit, full stop. The other institution
+    // words don't apply to a company or a bookshop that merely carries the
+    // word: "Deutsches Museum Shop GmbH", "Your Unibuch - University
+    // Bookstore", and "Literaturhandlung im Jüdischen Museum" (a private
+    // Judaica bookshop inside the museum).
+    if (/\be\.\s?v\.(?![\w-])/i.test(name)) return { ok: false, reason: 'non-profit / religious (e.V.)' };
+    if (INSTITUTION_NAME.test(name) && !COMMERCIAL_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (institution name)' };
     return { ok: true, reason: '' };
 }
 
