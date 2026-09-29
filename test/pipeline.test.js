@@ -180,3 +180,40 @@ test('the same place under two Maps URLs is one row', () => {
     ]);
     assert.equal(rows.length, 1);
 });
+
+test('German City column: a district in the address keeps the searched city', async () => {
+    const { pickCity } = await import('../src/maps.js');
+    const { resolveCountry } = await import('../src/config.js');
+    const de = resolveCountry({ country: 'DE' });
+    const uk = resolveCountry({ country: 'UK' });
+    // Maps' English UI puts the district after the postcode.
+    assert.equal(pickCity('Wahlenstraße 1, 50823 Ehrenfeld', 'Köln', de), 'Köln');
+    assert.equal(pickCity('Österreicher Str. 23, 01279 Dresden-Leuben', 'Dresden', de), 'Dresden');
+    assert.equal(pickCity('Aueblick 33, 23560 Moisling', 'Lübeck', de), 'Lübeck');
+    assert.equal(pickCity('Kobellstraße 17, 68167 Mannheim-Neckarstadt-West', 'Charlottenburg, Berlin', de), 'Mannheim');
+    assert.equal(pickCity('Kobellstraße 17, 68167 Mannheim-Neckarstadt-West', 'Mannheim', de), 'Mannheim');
+    // A shop really in another searched city says so.
+    assert.equal(pickCity('Hauptstr. 1, 90762 Fürth', 'Nürnberg', de), 'Fürth');
+    assert.equal(pickCity('', 'Golders Green, London', de), 'London');
+    // UK addresses carry the real post town.
+    assert.equal(pickCity('Unit 6, Salford M7 4JD', 'Chelmsford', uk), 'Salford');
+});
+
+test('commercial shops with an institution word in the name are sellable', () => {
+    for (const [business_name, category] of [
+        ['Literaturhandlung im Jüdischen Museum', 'Judaica Store'],
+        ['Deutsches Museum Shop GmbH', 'Souvenir Store'],
+        ['Your Unibuch - University Bookstore Bremen', 'Book Store'],
+        ['Books Pustet Passau University Bookstore', 'Book Store'],
+    ]) assert.equal(isSellable({ business_name, category }).ok, true, business_name);
+    for (const [business_name, category] of [
+        ['Christliche Buchhandlung Bad Kreuznach e.V.', 'Book Store'],
+        ['Ben Uri Gallery and Museum', 'Art Gallery'],
+        ['Museumsshop im Alten Museum', 'Book Store'],
+    ]) assert.equal(isSellable({ business_name, category }).ok, false, business_name);
+});
+
+test("a city address on a shop's own pages does not make it a public body", () => {
+    assert.equal(isSellable({ business_name: 'Buchladen Sputnik', category: 'Book Store', website: 'http://buchladen-sputnik.de/', email: 'info@potsdam.de', city: 'Potsdam' }).ok, true);
+    assert.equal(isSellable({ business_name: 'Kulturhof', category: 'Art Gallery', email: 'poststelle@stadt-speyer.de', city: 'Speyer' }).ok, false, 'no website: the email decides');
+});

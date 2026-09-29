@@ -63,6 +63,28 @@ export function cityFromAddress(address, countryCode = 'DE') {
     return '';
 }
 
+/**
+ * The City column. German Maps addresses (English UI) name the district, not
+ * the city: "50823 Ehrenfeld", "01279 Dresden-Leuben". So in Germany the
+ * address town wins only when it is itself one of the cities we search (the
+ * shop really is in another city); a district, or "Dresden-Leuben", keeps
+ * the searched city. UK addresses carry the real post town and always win.
+ */
+export function pickCity(address, queryCity, country = {}) {
+    const searched = String(queryCity || '').replace(/^.*,\s*/, '');
+    const town = cityFromAddress(address, country.code);
+    if (!town) return searched;
+    if (country.code === 'UK') return town;
+    const norm = (x) => String(x).toLowerCase().replace(/\s*\(.*\)$/, '').replace(/ (am|im|an der) .*$/, '');
+    if (norm(town).startsWith(norm(searched))) return searched;
+    const known = new Set(Object.values(country.regions || {}).flat().map(norm));
+    if (known.has(norm(town))) return town;
+    // "Mannheim-Neckarstadt-West": a district of another searched city.
+    const base = town.split('-')[0].trim();
+    if (known.has(norm(base))) return base;
+    return searched;
+}
+
 /** Name + city key, for listings whose URL carries no place id. */
 export function nameKey(name, city) {
     return String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '') + '|' + String(city || '').toLowerCase();
@@ -203,7 +225,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
             const nk = nameKey(name, query.city);
             // The same place comes back from searches in many towns; key it by
             // the town in its address too, so it is kept once.
-            const addrCity = cityFromAddress(address, country.code);
+            const addrCity = pickCity(address, query.city, country);
             const ak = addrCity ? nameKey(name, addrCity) : '';
             if ((pk && seen.has(pk)) || seen.has(nk) || (ak && seen.has(ak))) continue;
             if (d.phone && seen.has(d.phone)) continue;
@@ -225,7 +247,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 greeting:           '',
                 phone:              d.phone || '',
                 website:            d.websiteUrl || '',
-                city:               addrCity || query.city.replace(/^.*,\s*/, ''),
+                city:               addrCity,
                 bundesland:         query.state,
                 address:            address,
                 category:           titleCase(clean(d.category) || clean(c.category)),
