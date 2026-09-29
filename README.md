@@ -139,7 +139,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 75 offline tests
+npm test                                                               # 80 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)

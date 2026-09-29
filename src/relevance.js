@@ -15,16 +15,23 @@ const JUDAICA_STRONG = [
     'judaica', 'judaika', 'menora', 'menorah', 'chanukkia', 'chanukia', 'hanukkia', 'chanukka-leuchter',
     'mesusa', 'mezuzah', 'mezuza', 'kidduschbecher', 'kiddusch-becher', 'kiddush cup', 'kiddusch',
     'sederteller', 'seder plate', 'sederplate', 'tallit', 'tallis', 'tefillin', 'kippa', 'kippot', 'kipa',
-    'schabbatleuchter', 'shabbat candle', 'challa', 'challah', 'hawdala', 'havdalah', 'davidstern',
+    'schabbatleuchter', 'shabbat candle', 'challa cover', 'challah cover', 'challah board', 'hawdala', 'havdalah', 'davidstern',
     'magen david', 'star of david', 'jüdische kunst', 'jewish art', 'jüdische ritualgegenstände',
-    'hanukkiah', 'hanukiah', 'chanukiah', 'kiddush', 'yarmulke', 'kippah', 'jewish gift', 'shabbat candlestick',
+    'hanukkiah', 'hanukiah', 'chanukiah', 'yarmulke', 'kippah', 'jewish gift', 'shabbat candlestick',
 ];
 
 /** Medium signals — Jewish/Israeli context, but not necessarily a shop. */
+/**
+ * Strong words that businesses also use as a brand: "Menorah Massage",
+ * "Menorah Homes", "Star of David Care". In a NAME they only count when the
+ * listing is a shop; on a shop's website they count as usual.
+ */
+const BRAND_PRONE = new Set(['menora', 'menorah', 'magen david', 'star of david', 'davidstern']);
+
 const JEWISH_CONTEXT = [
     'jüdisch', 'juedisch', 'jewish', 'israel', 'israeli', 'hebräisch', 'hebraisch', 'hebrew',
     'koscher', 'kosher', 'schabbat', 'shabbat', 'chanukka', 'hanukkah', 'pessach', 'passover',
-    'rosch haschana', 'rosh hashana', 'jerusalem', 'tel aviv', 'jaffa', 'synagoge', 'synagogue',
+    'rosch haschana', 'rosh hashana', 'jerusalem', 'tel aviv', 'synagoge', 'synagogue', 'challa', 'challah', 'kiddush',
     'jüdische gemeinde', 'chabad', 'tora', 'torah', 'jiddisch', 'yiddish', 'judaism', 'sabbath', 'lubavitch',
 ];
 
@@ -42,7 +49,7 @@ const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'blattgold', 'gold leaf',
  * Categories that are never a buyer, however Jewish the context: a restaurant
  * serving kosher food, a glazier, a lawyer. Checked against the Maps category.
  */
-export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei|solicitor|takeaway|dentist|estate agent|funeral|undertaker|bestatter|removals?|plumber|electrician|accountant|steuerberater)\b/i;
+export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei|solicitor|takeaway|dentist|estate agent|funeral|undertaker|bestatter|removals?|plumber|electrician|accountant|steuerberater|barber|hairdresser|hair salon|beauty salon|nail salon|massage|spa|therapist|home care|care home|health consultant|corporate office|cultural landmark|landmark|tourist attraction|fish & chips|fish and chips|chippy|bagel shop|bagel|leisure centre|gym|sign in|details)\b/i;
 
 /**
  * Organisations we cannot sell to: places of worship, communities, charities,
@@ -54,6 +61,8 @@ export const NON_PROFIT_CATEGORY = /\b(synagog\w*|religious|place of worship|chu
 
 /** …and against the business name. "e.V." is a registered non-profit. */
 export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b)/i;
+
+export const INSTITUTION_NAME = /\b(museum|synagog\w*|school|schule|college|university|universität|library|bibliothek|charity|foundation|stiftung|e\.\s?v\.)(?![\w-])/i;
 
 /**
  * Categories that say "this is a business that sells things". A retail
@@ -104,6 +113,11 @@ export function isSellable(lead) {
         return { ok: false, reason: `non-profit / religious (${category})` };
     }
     if (!retailCategory && NON_PROFIT_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (name)' };
+    // Some names are institutions whatever Maps files them under: "Ben Uri
+    // Gallery and Museum" is an "Art Gallery", "Central Deli @ Birmingham
+    // Central United Synagogue" a "Kosher Food Shop". A Chabad-run store
+    // still passes — Chabad is not on this list.
+    if (INSTITUTION_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (institution name)' };
     return { ok: true, reason: '' };
 }
 
@@ -138,7 +152,9 @@ export function scoreRelevance(lead, siteText = '') {
     const listing = clean([lead.business_name, lead.category, lead.maps_description].join(' ')).toLowerCase();
     const site = clean(siteText).toLowerCase().slice(0, 200000);
 
-    const strongListing = countHits(listing, JUDAICA_STRONG);
+    const retailCat = RETAIL_CATEGORY.test(clean(lead.category));
+    const strongListing = countHits(listing, JUDAICA_STRONG)
+        .filter(w => !BRAND_PRONE.has(w) || retailCat || countHits(listing, RETAIL).length > 0);
     const strongSite = countHits(site, JUDAICA_STRONG);
     const contextListing = countHits(listing, JEWISH_CONTEXT);
     const contextSite = countHits(site, JEWISH_CONTEXT);

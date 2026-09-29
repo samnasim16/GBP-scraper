@@ -33,7 +33,7 @@ const JUNK_EMAIL = [
     // Demo content of website themes, left on live shops: Torah Treasures'
     // site carried contact@, career@ and customercare@martfury.com, the
     // placeholder inboxes of the "Martfury" WooCommerce theme.
-    /@(martfury|envato|themeforest|templatemonster|flatsome|woodmart|porto|electro|shopkeeper|basel|ecomus|kalles|minimog|elessi|yourstore|yourshop|yoursite|yourcompany|mysite|mystore|company|website|store|shop|demo)\.(com|net|org|io)$/i,
+    /@(martfury|nest|pressmart|envato|themeforest|templatemonster|flatsome|woodmart|porto|electro|shopkeeper|basel|ecomus|kalles|minimog|elessi|yourstore|yourshop|yoursite|yourcompany|mysite|mystore|company|website|store|shop|demo)\.(com|net|org|io)$/i,
     /@(demo|themes?|template)[.-]/i,
 ];
 

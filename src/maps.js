@@ -32,6 +32,37 @@ export function placeKey(mapsUrl) {
     return m ? m[1] : '';
 }
 
+const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
+
+/**
+ * The town a shop is actually in, from its address. The search's city is
+ * only where we looked: "Judaica Chelmsford" returned Manchester Judaica
+ * (Salford), and the sheet said Chelmsford.
+ *   DE  "Fasanenstraße 79, 10623 Berlin"              → Berlin
+ *   UK  "5 Bury Old Road, Prestwich, Manchester M25 0FG" → Manchester
+ */
+export function cityFromAddress(address, countryCode = 'DE') {
+    const parts = String(address || '').split(',').map(p => p.trim()).filter(Boolean)
+        .filter(p => !/^(germany|deutschland|united kingdom|uk|england)$/i.test(p));
+    if (!parts.length) return '';
+    if (countryCode === 'UK') {
+        for (let i = parts.length - 1; i >= 0; i--) {
+            if (!UK_POSTCODE.test(parts[i])) continue;
+            const town = parts[i].replace(UK_POSTCODE, '').trim();
+            if (town && !/\d/.test(town)) return town;
+            // "London, NW11 8HB" — the postcode stands alone after the town.
+            if (i > 0 && !/\d/.test(parts[i - 1])) return parts[i - 1];
+            return '';
+        }
+        return '';
+    }
+    for (let i = parts.length - 1; i >= 0; i--) {
+        const m = parts[i].match(/^\d{5}\s+(.+)$/);
+        if (m) return m[1].trim();
+    }
+    return '';
+}
+
 /** Name + city key, for listings whose URL carries no place id. */
 export function nameKey(name, city) {
     return String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '') + '|' + String(city || '').toLowerCase();
@@ -170,10 +201,15 @@ export async function scrapeQuery(page, query, ctx, opts) {
 
             const pk = c.pk || placeKey(page.url());
             const nk = nameKey(name, query.city);
-            if ((pk && seen.has(pk)) || seen.has(nk)) continue;
+            // The same place comes back from searches in many towns; key it by
+            // the town in its address too, so it is kept once.
+            const addrCity = cityFromAddress(address, country.code);
+            const ak = addrCity ? nameKey(name, addrCity) : '';
+            if ((pk && seen.has(pk)) || seen.has(nk) || (ak && seen.has(ak))) continue;
             if (d.phone && seen.has(d.phone)) continue;
             if (pk) seen.add(pk);
             seen.add(nk);
+            if (ak) seen.add(ak);
             if (d.phone) seen.add(d.phone);
 
             const rating = d.rating ?? c.rating ?? null;
@@ -189,7 +225,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 greeting:           '',
                 phone:              d.phone || '',
                 website:            d.websiteUrl || '',
-                city:               query.city.replace(/^.*,\s*/, ''),
+                city:               addrCity || query.city.replace(/^.*,\s*/, ''),
                 bundesland:         query.state,
                 address:            address,
                 category:           titleCase(clean(d.category) || clean(c.category)),
