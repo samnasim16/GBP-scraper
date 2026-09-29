@@ -122,3 +122,53 @@ test('smoke run: a website theme\'s demo inboxes are not the shop\'s', async () 
     // mail.com is a real provider, not a placeholder.
     assert.deepEqual(extractEmails('<p>owner@mail.com</p>'), ['owner@mail.com']);
 });
+
+test('full England run: brand names, bread and barbers are not Judaica sellers', () => {
+    for (const [business_name, category] of [
+        ['The Menorah', 'Cultural Landmark'], ['Menorah Massage Ltd', 'Massage Therapist'],
+        ['Menorah Homes', 'Health Consultant'], ['Menorah Center LP', 'Corporate Office'],
+        ['Menorah Hotel', ''], ['Menorah Mirielle', 'Home Care Service'],
+        ['Jewish Barbers', 'Barber Shop'], ['White Fish', 'Fish & Chips Shop'],
+    ]) assert.ok(!isTarget(scoreRelevance({ business_name, category })), business_name);
+    // Challah is bread, kiddush alone is wine: context, not Judaica objects.
+    assert.equal(scoreRelevance({ business_name: 'Hendon Bagel Bakery', category: 'Bagel Shop' }, 'challah kosher').tier, 'Not a retailer');
+    assert.equal(scoreRelevance({ business_name: 'Kosher Kingdom', category: 'Kosher Food Shop' }, 'challah kiddush').tier, 'Jewish / Israeli retail');
+    // "Jaffa" is an orange and a cake in England.
+    assert.ok(!isTarget(scoreRelevance({ business_name: 'Jaffa Food House', category: 'Supermarket' })));
+    // A menorah shop is still a Judaica seller, and so is a Judaica object on a shop's site.
+    assert.equal(scoreRelevance({ business_name: 'Menorah Gifts', category: 'Gift shop' }).tier, 'Judaica seller');
+    assert.equal(scoreRelevance({ business_name: 'Central Kosher', category: 'Supermarket' }, 'kiddush cup menorah').tier, 'Judaica seller');
+});
+
+test('full England run: institutions stay out even under a shop category', () => {
+    assert.equal(isSellable({ business_name: 'Ben Uri Gallery and Museum', category: 'Art Gallery' }).ok, false);
+    assert.equal(isSellable({ business_name: 'Central Deli @ Birmingham Central United Synagogue', category: 'Kosher Food Shop' }).ok, false);
+    assert.equal(isSellable({ business_name: 'Chabad Judaica Shop', category: 'Gift shop' }).ok, true);
+    assert.equal(isSellable({ business_name: 'Kinor Judaica Store', category: 'Religious Goods Shop' }).ok, true);
+});
+
+test('full England run: the City column comes from the address', async () => {
+    const { cityFromAddress } = await import('../src/maps.js');
+    assert.equal(cityFromAddress('Unit 6, Salford M7 4JD', 'UK'), 'Salford');
+    assert.equal(cityFromAddress('5 Bury Old Road, Prestwich, Manchester M25 0FG', 'UK'), 'Manchester');
+    assert.equal(cityFromAddress('100 Golders Green Road, London NW11 8HB, United Kingdom', 'UK'), 'London');
+    assert.equal(cityFromAddress('Fasanenstraße 79, 10623 Berlin', 'DE'), 'Berlin');
+    assert.equal(cityFromAddress('', 'UK'), '');
+});
+
+test('full England run: a chain gets the email once, not once per branch', async () => {
+    const { buildMailMerge, uniqueByEmail } = await import('../src/output.js');
+    const rows = [
+        { business_name: 'Shefa Mehadrin', city: 'Manchester', email: 'info@shefamehadrin.co.uk', relevance_tier: 'Jewish / Israeli retail' },
+        { business_name: 'Shefa Mehadrin', city: 'London', email: 'info@shefamehadrin.co.uk', relevance_tier: 'Jewish / Israeli retail' },
+        { business_name: 'Tapuach', city: 'London', email: 'sales@tapuach.co.uk', relevance_tier: 'Jewish / Israeli retail' },
+    ];
+    assert.equal(uniqueByEmail(rows).length, 2);
+    const csv = buildMailMerge(rows, ['Jewish / Israeli retail']);
+    assert.equal(csv.match(/info@shefamehadrin/g).length, 1);
+});
+
+test('full England run: more theme demo inboxes are discarded', async () => {
+    const { extractEmails } = await import('../src/contacts.js');
+    assert.deepEqual(extractEmails('<p>sale@nest.com support@pressmart.com ruthcjj@hotmail.co.uk</p>'), ['ruthcjj@hotmail.co.uk']);
+});

@@ -103,18 +103,33 @@ function tierRank(t) {
     return i === -1 ? TARGET_TIERS.length : i;
 }
 
-/** One mail-merge row per lead that has an address and is a target. */
+/**
+ * One mail-merge row per ADDRESS among the targets. Chains list every branch
+ * (Shefa Mehadrin in Manchester and London, both info@shefamehadrin.co.uk);
+ * the shop should get the email once, not once per branch.
+ */
 export function buildMailMerge(rows, includeTiers) {
     const cols = ['email', 'greeting', 'contact_name', 'business_name', 'city', 'website', 'email_subject', 'email_body'];
-    const targets = rows.filter(r => r.email && isTarget(r, includeTiers));
-    return buildCSV(targets, cols);
+    return buildCSV(uniqueByEmail(rows.filter(r => r.email && isTarget(r, includeTiers))), cols);
+}
+
+/** Keep the first (best-ranked) row for each address. */
+export function uniqueByEmail(rows) {
+    const seen = new Set();
+    return rows.filter(r => {
+        const key = String(r.email || '').toLowerCase();
+        if (!key) return true;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 }
 
 async function writeXlsx(rows, file, includeTiers) {
     const wb = new ExcelJS.Workbook();
     const targets = rows.filter(r => isTarget(r, includeTiers));
     const sheets = [
-        ['Outreach', targets.filter(r => r.email)],
+        ['Outreach', uniqueByEmail(targets.filter(r => r.email))],
         ['No email found', targets.filter(r => !r.email)],
         ['All results', rows],
     ];
