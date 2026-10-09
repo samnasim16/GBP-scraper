@@ -36,6 +36,9 @@ const JUNK_EMAIL = [
     // placeholder inboxes of the "Martfury" WooCommerce theme.
     /@(martfury|nest|pressmart|envato|themeforest|templatemonster|flatsome|woodmart|porto|electro|shopkeeper|basel|ecomus|kalles|minimog|elessi|yourstore|yourshop|yoursite|yourcompany|mysite|mystore|company|website|store|shop|demo)\.(com|net|org|io)$/i,
     /@(demo|themes?|template)[.-]/i,
+    // The shop software's own addresses, left in page source by the
+    // platform: Emet (Paris) came back as license@prestashop.com.
+    /@(prestashop|woocommerce|woothemes|shopify|wordpress|wix|jimdo|squarespace|magento|opencart|shopware|oxid|ionos|strato|ovh|o2switch|hostinger|gandi|elementor|wpengine|automattic)\.(com|net|org|io|fr|de|eu)$/i,
 ];
 
 /** Cloudflare's "email protection" hides addresses as a hex XOR string. */
