@@ -95,3 +95,10 @@ test('French and Belgian inboxes rank as expected', () => {
     assert.equal(rankEmails(['rgpd@shop.be', 'winkel@shop.be'], 'https://www.shop.be/', 'Shop')[0], 'winkel@shop.be');
     assert.equal(rankEmails(['dpo@x.fr', 'owner@skynet.be'], '', 'X')[0], 'owner@skynet.be');
 });
+
+test('France smoke run: platform addresses and a shop called "Judaic"', async () => {
+    const { extractEmails } = await import('../src/contacts.js');
+    // Emet (Paris) came back as license@prestashop.com.
+    assert.deepEqual(extractEmails('<p>license@prestashop.com support@woocommerce.com</p><a href="mailto:contact@emet.fr">x</a>'), ['contact@emet.fr']);
+    assert.equal(scoreRelevance({ business_name: 'Judaic', category: 'Religious Book Store' }).tier, 'Judaica seller');
+});

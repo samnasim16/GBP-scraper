@@ -12,7 +12,7 @@ import { clean } from './util.js';
 
 /** Strong signals — words a shop only uses if it sells Jewish ritual objects. */
 const JUDAICA_STRONG = [
-    'judaica', 'judaika', 'menora', 'menorah', 'chanukkia', 'chanukia', 'hanukkia', 'chanukka-leuchter',
+    'judaica', 'judaika', 'judaic', 'menora', 'menorah', 'chanukkia', 'chanukia', 'hanukkia', 'chanukka-leuchter',
     'mesusa', 'mezuzah', 'mezuza', 'kidduschbecher', 'kiddusch-becher', 'kiddush cup', 'kiddusch',
     'sederteller', 'seder plate', 'sederplate', 'tallit', 'tallis', 'tefillin', 'kippa', 'kippot', 'kipa',
     'schabbatleuchter', 'shabbat candle', 'challa cover', 'challah cover', 'challah board', 'hawdala', 'havdalah', 'davidstern',
