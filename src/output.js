@@ -15,13 +15,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { placeKey } from './maps.js';
 import { isTarget, TARGET_TIERS } from './relevance.js';
-import { greetingFor } from './contacts.js';
+import { greetingFor, shortBusinessName } from './contacts.js';
+import { classifyWhatsApp, whatsappLink, loadWhatsAppTemplate } from './whatsapp.js';
 import { renderEmail } from './email-template.js';
 
 export const COLUMNS = [
     ['business_name',      'Business Name',     34],
     ['relevance_tier',     'Relevance',         22],
     ['relevance_score',    'Score',              8],
+    ['whatsapp_status',    'WhatsApp',          30],
+    ['whatsapp_number',    'WhatsApp Number',   17],
+    ['whatsapp_link',      'WhatsApp Chat',     18],
     ['email',              'Email',             32],
     ['greeting',           'Greeting',          28],
     ['contact_name',       'Contact Person',    24],
@@ -69,7 +73,7 @@ export function buildCSV(rows, columns = CSV_COLUMNS) {
 }
 
 /** Dedupe by place id, then by website domain + city; best relevance first. */
-export function prepareLeads(leads, { template = null, sender = {} } = {}) {
+export function prepareLeads(leads, { template = null, sender = {}, whatsappTemplate = loadWhatsAppTemplate() } = {}) {
     const sorted = (leads || []).filter(Boolean).slice().sort((a, b) =>
         (tierRank(a.relevance_tier) - tierRank(b.relevance_tier))
         || ((b.relevance_score || 0) - (a.relevance_score || 0))
@@ -93,9 +97,34 @@ export function prepareLeads(leads, { template = null, sender = {} } = {}) {
             row.email_subject = e.subject;
             row.email_body = e.body;
         }
+        const wa = classifyWhatsApp(row);
+        row.whatsapp_status = wa.status;
+        row.whatsapp_number = wa.number;
+        row.whatsapp_priority = wa.priority;
+        row.whatsapp_link = wa.number && wa.priority < 4
+            ? whatsappLink(wa.number, fillWhatsApp(whatsappTemplate, row, sender)) : '';
         out.push(row);
     }
-    return out;
+    // WhatsApp first: among the likely buyers (the top two tiers), shops with
+    // WhatsApp come before the rest, then by tier and score as before.
+    const group = (r) => (tierRank(r.relevance_tier) < 2 ? 0 : 1);
+    return out
+        .map((r, i) => ({ r, i }))
+        .sort((a, b) => (group(a.r) - group(b.r))
+            || (group(a.r) === 0 ? (a.r.whatsapp_priority - b.r.whatsapp_priority) : 0)
+            || (a.i - b.i))
+        .map(x => x.r);
+}
+
+function fillWhatsApp(text, row, sender) {
+    if (!text) return '';
+    const vars = {
+        ...row,
+        shop_name: shortBusinessName(row.business_name) || row.business_name,
+        sender_name: sender.name || '[Your Name]',
+        sender_title: sender.title || '[Title]',
+    };
+    return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] == null ? '' : String(vars[k])));
 }
 
 function tierRank(t) {
@@ -109,7 +138,7 @@ function tierRank(t) {
  * the shop should get the email once, not once per branch.
  */
 export function buildMailMerge(rows, includeTiers) {
-    const cols = ['email', 'greeting', 'contact_name', 'business_name', 'city', 'website', 'email_subject', 'email_body'];
+    const cols = ['email', 'greeting', 'contact_name', 'business_name', 'city', 'website', 'whatsapp_status', 'whatsapp_number', 'email_subject', 'email_body'];
     return buildCSV(uniqueByEmail(rows.filter(r => r.email && isTarget(r, includeTiers))), cols);
 }
 
@@ -129,6 +158,8 @@ async function writeXlsx(rows, file, includeTiers) {
     const wb = new ExcelJS.Workbook();
     const targets = rows.filter(r => isTarget(r, includeTiers));
     const sheets = [
+        // Everyone worth a WhatsApp message, best evidence first.
+        ['WhatsApp', targets.filter(r => r.whatsapp_priority < 4)],
         ['Outreach', uniqueByEmail(targets.filter(r => r.email))],
         ['No email found', targets.filter(r => !r.email)],
         ['All results', rows],
@@ -153,6 +184,13 @@ async function writeXlsx(rows, file, includeTiers) {
                 mail.value = { text: String(r.email), hyperlink: `mailto:${r.email}?subject=${subj}&body=${body}` };
                 mail.font = { color: { argb: 'FF1155CC' }, underline: true };
             }
+            const chat = row.getCell('whatsapp_link');
+            if (r.whatsapp_link) {
+                chat.value = { text: 'Open chat', hyperlink: r.whatsapp_link };
+                chat.font = { color: { argb: 'FF128C7E' }, underline: true };
+            }
+            const fill = { 1: 'FFD8F3DC', 2: 'FFFFF3CD', 3: 'FFF1F3F5' }[r.whatsapp_priority];
+            if (fill) row.getCell('whatsapp_status').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
             row.getCell('email_body').alignment = { wrapText: false, vertical: 'top' };
         }
         ws.getRow(1).font = { bold: true };
@@ -165,7 +203,7 @@ async function writeXlsx(rows, file, includeTiers) {
  * Create a saver bound to an output directory. Serialised so overlapping
  * writes can't clobber each other.
  */
-export function createSaver(outputDir, { template = null, sender = {}, includeTiers, log = console.log } = {}) {
+export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, log = console.log } = {}) {
     fs.mkdirSync(outputDir, { recursive: true });
     let saving = false;
 
@@ -173,7 +211,7 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
         if (saving) return;
         saving = true;
         try {
-            const rows = prepareLeads(leads, { template, sender });
+            const rows = prepareLeads(leads, { template, sender, ...(whatsappTemplate !== undefined ? { whatsappTemplate } : {}) });
             fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'leads.json'), JSON.stringify(rows, null, 2), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'mail-merge.csv'), buildMailMerge(rows, includeTiers), 'utf8');
@@ -184,7 +222,8 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
             }
             if (!quiet) {
                 const t = rows.filter(r => isTarget(r, includeTiers));
-                log(`   💾 Saved ${rows.length} places (${t.length} targets, ${t.filter(r => r.email).length} with email) → ${path.basename(outputDir)}/`);
+                const wa = t.filter(r => r.whatsapp_priority === 1).length;
+                log(`   💾 Saved ${rows.length} places (${t.length} targets, ${t.filter(r => r.email).length} with email, ${wa} with WhatsApp) → ${path.basename(outputDir)}/`);
             }
         } catch (e) {
             console.error(`   ⚠️  Save failed: ${e.message}`);

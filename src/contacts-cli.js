@@ -22,7 +22,7 @@ const probeAt = process.argv.indexOf('--probe');
 /** The contact-page conventions of the configured country (Impressum vs Contact). */
 function countryContacts(input) {
     const c = resolveCountry(input);
-    return { acceptLanguage: c.acceptLanguage, keyPage: c.contactKeyPage, guessPaths: c.contactPaths };
+    return { acceptLanguage: c.acceptLanguage, phoneCode: c.phoneCode, keyPage: c.contactKeyPage, guessPaths: c.contactPaths };
 }
 
 async function probe(url, name) {

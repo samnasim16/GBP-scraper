@@ -1,0 +1,21 @@
+{
+    "country": "BE",
+    "cities": [
+        "Antwerpen"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "Judaica",
+        "Judaica winkel"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-be-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}

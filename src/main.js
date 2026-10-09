@@ -106,6 +106,7 @@ async function main() {
         http,
         config: {
             acceptLanguage: COUNTRY.acceptLanguage,
+            phoneCode: COUNTRY.phoneCode,
             keyPage: COUNTRY.contactKeyPage,
             guessPaths: COUNTRY.contactPaths,
             ...contacts,
@@ -114,7 +115,8 @@ async function main() {
         onDone: (lead) => {
             lead.contacts_checked = true;
             Object.assign(lead, relevanceFields(lead, lead._siteText));
-            const bits = [lead.email || 'no email', lead.contact_name || null].filter(Boolean).join(' · ');
+            const wa = lead.whatsapp_site_numbers || lead.whatsapp_site_linked ? 'WhatsApp ✓' : null;
+            const bits = [lead.email || 'no email', lead.contact_name || null, wa].filter(Boolean).join(' · ');
             console.log(`    📇 ${lead.business_name}: ${bits} — ${lead.relevance_tier}`);
         },
     });
@@ -242,6 +244,7 @@ async function main() {
     console.log(`   Places scraped: ${rows.length}`);
     for (const t of [...TARGET_TIERS, 'Unrelated', 'Not a retailer', 'Non-profit / religious']) console.log(`     ${t}: ${byTier(t)}`);
     console.log(`   Outreach targets: ${targets.length} — ${targets.filter(r => r.email).length} with email, ${targets.filter(r => r.contact_name).length} with a named contact`);
+    console.log(`   WhatsApp: ${targets.filter(r => r.whatsapp_priority === 1).length} confirmed on website/listing, ${targets.filter(r => r.whatsapp_priority === 2).length} likely (mobile / mentioned), ${targets.filter(r => r.whatsapp_priority === 3).length} landlines to check`);
     const s = enricher.stats;
     console.log(`   Websites read: ${s.sites} (${s.pages} pages)`);
     console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/judaica-leads.xlsx and mail-merge.csv`);

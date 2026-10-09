@@ -15,6 +15,7 @@ import { sleep, clean, titleCase } from './util.js';
 import { extractFeedCards, extractDetail } from './dom-extract.js';
 import { isSessionDead } from './browser.js';
 import { NON_RETAIL_CATEGORY, scoreRelevance, isSellable } from './relevance.js';
+import { extractWhatsApp } from './whatsapp.js';
 
 import { COUNTRIES } from './config.js';
 
@@ -40,10 +41,12 @@ const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
  * (Salford), and the sheet said Chelmsford.
  *   DE  "Fasanenstraße 79, 10623 Berlin"              → Berlin
  *   UK  "5 Bury Old Road, Prestwich, Manchester M25 0FG" → Manchester
+ *   FR  "10 Rue des Rosiers, 75004 Paris"             → Paris
+ *   BE  "Lange Kievitstraat 1, 2018 Antwerpen"        → Antwerpen (4-digit postcode)
  */
 export function cityFromAddress(address, countryCode = 'DE') {
     const parts = String(address || '').split(',').map(p => p.trim()).filter(Boolean)
-        .filter(p => !/^(germany|deutschland|united kingdom|uk|england)$/i.test(p));
+        .filter(p => !/^(germany|deutschland|united kingdom|uk|england|france|belgium|belgique|belgië|belgie)$/i.test(p));
     if (!parts.length) return '';
     if (countryCode === 'UK') {
         for (let i = parts.length - 1; i >= 0; i--) {
@@ -57,7 +60,7 @@ export function cityFromAddress(address, countryCode = 'DE') {
         return '';
     }
     for (let i = parts.length - 1; i >= 0; i--) {
-        const m = parts[i].match(/^\d{5}\s+(.+)$/);
+        const m = parts[i].match(/^\d{4,5}\s+(.+)$/);
         if (m) return m[1].trim();
     }
     return '';
@@ -255,6 +258,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 review_count:       d.reviews || c.reviewCount || 0,
                 facebook_url:       '',
                 instagram_url:      '',
+                whatsapp_listing:   extractWhatsApp((d.whatsappUrls || []).join(' '), country.phoneCode).numbers.join('; '),
                 maps_description:   clean(d.description),
                 hours_summary:      clean(d.hoursSummary),
                 maps_url:           c.href || page.url(),

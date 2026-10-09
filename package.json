@@ -1,7 +1,7 @@
 {
     "name": "germany-judaica-scraper",
     "version": "1.0.0",
-    "description": "Finds Judaica retailers in Germany or England on Google Maps, pulls email and owner name from each shop's website, and writes a mail-merge sheet for Jaffa Glass outreach.",
+    "description": "Finds Judaica retailers in Germany, England, France or Belgium on Google Maps, pulls email, owner name and WhatsApp from each shop's website, and writes a prioritised outreach sheet for Jaffa Glass.",
     "type": "module",
     "engines": {
         "node": ">=18"
@@ -11,6 +11,10 @@
         "smoke": "node src/main.js --input ./input.smoke.json",
         "england": "node src/main.js --input ./input.england.json",
         "smoke:england": "node src/main.js --input ./input.england-smoke.json",
+        "france": "node src/main.js --input ./input.france.json",
+        "smoke:france": "node src/main.js --input ./input.france-smoke.json",
+        "belgium": "node src/main.js --input ./input.belgium.json",
+        "smoke:belgium": "node src/main.js --input ./input.belgium-smoke.json",
         "contacts": "node src/contacts-cli.js",
         "test": "node --test test/*.test.js"
     },

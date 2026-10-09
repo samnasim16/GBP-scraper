@@ -1,0 +1,30 @@
+{
+    "country": "FR",
+    "sender": {
+        "name": "",
+        "title": ""
+    },
+    "regions_comment": "Leave states empty for all of France, or pick regions: IDF PACA ARA GES OCC NAQ HDF NOR BRE PDL CVL BFC",
+    "states": [],
+    "cities": [],
+    "districts": true,
+    "searchCategories": [],
+    "includeTiers": [
+        "Judaica seller",
+        "Jewish / Israeli retail"
+    ],
+    "maxLeads": 5000,
+    "maxResultsPerQuery": 60,
+    "delayBetweenQueries": 4000,
+    "delayBetweenListings": 1800,
+    "browser": {
+        "mode": "local",
+        "headless": false,
+        "userDataDir": ".cache/chrome-profile"
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 3,
+        "maxPagesPerSite": 4
+    }
+}

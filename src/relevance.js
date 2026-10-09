@@ -18,6 +18,14 @@ const JUDAICA_STRONG = [
     'schabbatleuchter', 'shabbat candle', 'challa cover', 'challah cover', 'challah board', 'hawdala', 'havdalah', 'davidstern',
     'magen david', 'star of david', 'jüdische kunst', 'jewish art', 'jüdische ritualgegenstände',
     'hanukkiah', 'hanukiah', 'chanukiah', 'yarmulke', 'kippah', 'jewish gift', 'shabbat candlestick',
+    // French
+    'judaïca', 'ménorah', 'hanoukia', 'hanoukkia', 'hanouccia', 'chandelier de hanoucca', 'mezouza', 'mézouza',
+    'mezouzah', 'coupe de kiddouch', 'gobelet de kiddouch', 'plateau du seder', 'plat du seder', 'assiette du seder',
+    'talith', 'talit', 'téfilines', 'tefilines', 'bougeoirs de chabbat', 'chandeliers de chabbat', 'havdala',
+    'étoile de david', 'art juif', 'objets de culte juifs', 'cadeaux juifs', 'articles religieux juifs',
+    // Dutch
+    'chanoekia', 'chanoekkia', 'mezoeza', 'kiddoesjbeker', 'sederschotel', 'davidster', 'joodse kunst',
+    'joodse geschenken', 'keppel', 'keppeltje', 'talliet',
 ];
 
 /** Medium signals — Jewish/Israeli context, but not necessarily a shop. */
@@ -26,13 +34,19 @@ const JUDAICA_STRONG = [
  * "Menorah Homes", "Star of David Care". In a NAME they only count when the
  * listing is a shop; on a shop's website they count as usual.
  */
-const BRAND_PRONE = new Set(['menora', 'menorah', 'magen david', 'star of david', 'davidstern']);
+const BRAND_PRONE = new Set(['menora', 'menorah', 'ménorah', 'magen david', 'star of david', 'davidstern', 'étoile de david', 'davidster']);
 
 const JEWISH_CONTEXT = [
     'jüdisch', 'juedisch', 'jewish', 'israel', 'israeli', 'hebräisch', 'hebraisch', 'hebrew',
     'koscher', 'kosher', 'schabbat', 'shabbat', 'chanukka', 'hanukkah', 'pessach', 'passover',
     'rosch haschana', 'rosh hashana', 'jerusalem', 'tel aviv', 'synagoge', 'synagogue', 'challa', 'challah', 'kiddush',
     'jüdische gemeinde', 'chabad', 'tora', 'torah', 'jiddisch', 'yiddish', 'judaism', 'sabbath', 'lubavitch',
+    // French
+    'juif', 'juive', 'juifs', 'juives', 'judaïsme', 'israël', 'israélien', 'israélienne', 'hébreu', 'hébraïque',
+    'casher', 'cacher', 'kasher', 'chabbat', 'hanoucca', 'hanouka', 'pessah', 'roch hachana', 'jérusalem',
+    'loubavitch', 'habad',
+    // Dutch
+    'joods', 'joodse', 'israëlisch', 'hebreeuws', 'koosjer', 'sjabbat', 'chanoeka', 'pesach',
 ];
 
 /** Retail signals — they sell things to the public. */
@@ -40,10 +54,13 @@ const RETAIL = [
     'shop', 'laden', 'geschäft', 'geschenk', 'gift', 'boutique', 'buchhandlung', 'buchladen',
     'bookstore', 'museumsshop', 'museum shop', 'store', 'handel', 'versand', 'onlineshop',
     'online-shop', 'kaufen', 'galerie', 'gallery', 'kunsthandwerk', 'souvenir', 'supermarkt', 'markt',
+    'magasin', 'librairie', 'épicerie', 'cadeau', 'grossiste', 'supérette', 'supermarché', 'vente',
+    'winkel', 'boekhandel', 'geschenken', 'kado', 'groothandel',
 ];
 
 /** Glass & finish — Jaffa Glass's own product language. */
-const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'blattgold', 'gold leaf', 'mundgeblasen', 'hand-blown', 'handblown'];
+const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'cristal', 'verre', 'verrerie', 'vitrail', 'blattgold', 'gold leaf',
+    "feuille d'or", 'bladgoud', 'mundgeblasen', 'hand-blown', 'handblown', 'soufflé bouche'];
 
 /**
  * Categories that are never a buyer, however Jewish the context: a restaurant
@@ -60,12 +77,15 @@ export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hot
 export const NON_PROFIT_CATEGORY = /\b(synagog\w*|religious|place of worship|church|kirche|mosque|moschee|temple|chabad|non-?profit|charity|foundation|stiftung|association|verein|society|community|gemeinde|cultural cent(er|re)|kulturzentrum|research|institut\w*|university|universität|college|hochschule|school|schule|gymnasium|kindergarten|kita|preschool|daycare|library|bibliothek|archive|archiv|museum|memorial|gedenkstätte|monument|denkmal|cemetery|friedhof|embassy|botschaft|consulate|konsulat|government|city hall|rathaus|political|youth|jugend|social services|nursing|hospital|seminary|yeshiva)\b/i;
 
 /** …and against the business name. "e.V." is a registered non-profit. */
-export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b)/i;
+export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b|\basbl\b|\bvzw\b|\bassociation\b|\bconsistoire\b|\bloubavitch\b|\bhabad\b|\bgemeente\b|\bmairie\b|\bfondation\b|\bstichting\b|\bvereniging\b|(?<![\p{L}])(école|musée|bibliothèque|communauté|centre communautaire)(?![\p{L}]))/iu;
 
 /** A trading company or a bookshop, whatever else its name says. */
-const COMMERCIAL_NAME = /(\bGmbH\b|\bKG\b|\bAG\b|\bUG\b|\bLtd\b|\bplc\b|book ?store|bookshop|buchhandlung|literaturhandlung|buchladen|unibuch)/i;
+const COMMERCIAL_NAME = /(\bGmbH\b|\bKG\b|\bAG\b|\bUG\b|\bLtd\b|\bplc\b|\bSARL\b|\bSASU?\b|\bEURL\b|\bSRL\b|\bSPRL\b|\bBVBA\b|\bBV\b|\bNV\b|book ?store|bookshop|buchhandlung|literaturhandlung|buchladen|unibuch|librairie|boekhandel)/i;
 
-export const INSTITUTION_NAME = /\b(museum|synagog\w*|school|schule|college|university|universität|library|bibliothek|charity|foundation|stiftung|e\.\s?v\.)(?![\w-])/i;
+export const INSTITUTION_NAME = /(?<![\p{L}])(museum|musée|synagog\p{L}*|school|schule|école|college|university|universität|université|library|bibliothek|bibliothèque|charity|foundation|fondation|stiftung|stichting|e\.\s?v\.)(?![\p{L}\p{N}-])/iu;
+
+/** Registered non-profit legal forms: Germany's e.V., Belgium's ASBL / VZW. Always dropped. */
+const NONPROFIT_FORM = /(\be\.\s?v\.(?![\w-])|\basbl\b|\bvzw\b)/i;
 
 /**
  * Categories that say "this is a business that sells things". A retail
@@ -79,14 +99,18 @@ export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|su
  * stadt-oldenburg.de, *.rlp.de. A city library or municipal gallery is not a
  * customer, even when Maps files it as an "Art Gallery".
  */
-const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$/;
+const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$|\.gouv\.fr$|(^|\.)(ville|mairie|commune|agglo|metropole)-[a-z-]+\.fr$|(^|\.)[a-z-]+-(ville|mairie)\.fr$|(^|\.)(belgium|fgov|vlaanderen|wallonie|irisnet)\.be$|(^|\.)(stad|gemeente|commune|ville)-?[a-z-]*\.be$/;
 
 const slug = (s) => clean(s).toLowerCase()
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/\s*\(.*\)$/, '').replace(/ am main| im breisgau| am neckar| am rhein| an der .*/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-const CITY_ALIASES = { muenchen: ['muenchen', 'munich'], koeln: ['koeln', 'cologne'], 'frankfurt': ['frankfurt'], nuernberg: ['nuernberg', 'nuremberg'] };
+const CITY_ALIASES = {
+    muenchen: ['muenchen', 'munich'], koeln: ['koeln', 'cologne'], 'frankfurt': ['frankfurt'], nuernberg: ['nuernberg', 'nuremberg'],
+    bruxelles: ['bruxelles', 'brussel', 'brussels'], antwerpen: ['antwerpen', 'anvers'], liege: ['liege'],
+};
 
 /** Is this the website or inbox of a city, district or state government? */
 export function isPublicBody(lead) {
@@ -97,7 +121,8 @@ export function isPublicBody(lead) {
     // the place. The email decides only when there is no website.
     if (!hosts.length && lead.email && lead.email.includes('@')) hosts.push(lead.email.split('@')[1]);
     const city = slug(lead.city);
-    const cityHosts = new Set((CITY_ALIASES[city] || [city]).filter(Boolean).map(c => `${c}.de`));
+    // The city's own portal: koeln.de, paris.fr, antwerpen.be, gent.be.
+    const cityHosts = new Set((CITY_ALIASES[city] || [city]).filter(Boolean).flatMap(c => [`${c}.de`, `${c}.fr`, `${c}.be`]));
     return hosts.some(h => GOV_DOMAIN.test(h) || cityHosts.has(h));
 }
 
@@ -128,7 +153,7 @@ export function isSellable(lead) {
     // word: "Deutsches Museum Shop GmbH", "Your Unibuch - University
     // Bookstore", and "Literaturhandlung im Jüdischen Museum" (a private
     // Judaica bookshop inside the museum).
-    if (/\be\.\s?v\.(?![\w-])/i.test(name)) return { ok: false, reason: 'non-profit / religious (e.V.)' };
+    if (NONPROFIT_FORM.test(name)) return { ok: false, reason: 'non-profit / religious (e.V. / ASBL / VZW)' };
     if (INSTITUTION_NAME.test(name) && !COMMERCIAL_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (institution name)' };
     return { ok: true, reason: '' };
 }
