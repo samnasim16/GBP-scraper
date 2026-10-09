@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A Node.js scraper that finds **Judaica retailers across Germany or England** on Google Maps for **Jaffa Glass** (Israeli maker of hand-crafted kosher glass Judaica with 24-karat gold paint). For each place, it reads the shop's website and **Impressum** to get an email address and a named contact. It scores how likely the place is to stock Judaica, then writes a spreadsheet and a mail-merge CSV with the partnership email rendered for each shop.
+A Node.js scraper that finds **Judaica retailers across Germany, England, France or Belgium** on Google Maps for **Jaffa Glass** (Israeli maker of hand-crafted kosher glass Judaica with 24-karat gold paint). For each place, it reads the shop's website and **Impressum** to get an email address and a named contact. It scores how likely the place is to stock Judaica, then writes a spreadsheet and a mail-merge CSV with the partnership email rendered for each shop.
 
 It is adapted from the archived *no-website lead scraper*, which found US businesses without websites. That project's browser handling (`browser.js`), in-page extractors (`dom-extract.js`) and HTTP transport (`http.js`) were kept, along with their tests. The US social-profile enrichment was replaced with website/Impressum contact extraction. The main difference in purpose: **here we want shops that do have a website**, because the website is where the email comes from.
 
@@ -17,9 +17,11 @@ npm run smoke                        # Berlin, 2 terms, 10 places, visible brows
 npm start                            # all of Germany → output/
 npm run smoke:england                # London, 2 terms, 10 places → output-uk-smoke/
 npm run england                      # all of England → output-uk/ (input.england.json)
+npm run smoke:france / npm run france       # → output-fr-smoke/ / output-fr/   (input.france.json)
+npm run smoke:belgium / npm run belgium     # → output-be-smoke/ / output-be/   (input.belgium.json)
 npm run contacts -- --probe https://shop.de "Shop Name"
 npm run contacts -- output/leads.json
-npm test                             # 83 tests, offline; browser tests skip without Chrome
+npm test                             # 96 tests, offline; browser tests skip without Chrome
 ```
 
 Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silently in cmd.exe.
@@ -29,7 +31,7 @@ Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silen
 ```
 src/
   main.js           orchestration: query loop, session hygiene, saving, summary
-  config.js         COUNTRIES (DE, UK): cities by region, districts, search terms, phone code, output dir; query matrix
+  config.js         COUNTRIES (DE, UK, FR, BE): cities by region, districts, search terms, phone code, output dir; query matrix
   maps.js           one Maps query: consent → feed → detail pages → lead rows
   dom-extract.js    functions that run INSIDE the page (self-contained, serialised by puppeteer)
   relevance.js      Judaica keyword scoring → tier
@@ -38,6 +40,8 @@ src/
   output.js         dedupe, sort, xlsx (Outreach / No email found / All results), mail-merge.csv
   contacts-cli.js   re-run contact lookup on an export; --probe one site
   resume.js         continue a stopped run: load saved places, progress.json, --fresh backup
+  whatsapp.js       WhatsApp evidence (site/listing links, mentions, mobile ranges), status, priority, wa.me chat link
+templates/whatsapp-message.txt    the WhatsApp intro, prefilled in each chat link (never sent automatically)
   browser.js        local Chrome launch / optional Bright Data
   http.js           direct fetch with a browser fallback
 templates/partnership-email.txt   the outreach email (first line "Subject: …")
@@ -48,6 +52,8 @@ test/               node:test + jsdom; fixtures/ has Maps markup and a fake Germ
 
 - **One codebase, one profile per market** (`COUNTRIES` in `config.js`, chosen by `"country"` in the input file; default `DE`). A profile carries the Maps `gl`, the phone trunk code, the foreign-address filter, the search terms, the contact-page conventions (`contactKeyPage`/`contactPaths`: Impressum in Germany, Contact page in England) and a default output folder, so one market's run never overwrites another's. To add a market, add a profile and test it the way `test/england.test.js` does; don't branch on the country inside the code.
 
+- **WhatsApp is evidence-based, never probed** (`whatsapp.js`). There is no free, permitted way to ask WhatsApp whether a number is registered, and automating WhatsApp Web to check breaks its terms and risks the user's account. So the status comes from what the shop publishes: a wa.me / api.whatsapp.com link or a number written next to "WhatsApp" on its site (`extractWhatsApp`, run inside the contact lookup) or on its Maps listing (`whatsappUrls` in `dom-extract.js`) gives **Yes** and the WhatsApp number itself; a bare mention or a mobile range gives **Likely**; a landline gives **Check**, because WhatsApp Business runs on landlines (21 of 34 hand-verified England shops were landlines). A `whatsapp_verified` value (yes/no) set by hand always wins. Every row gets a `wa.me/<n>?text=` link with `templates/whatsapp-message.txt` prefilled; the user presses Send. `prepareLeads` sorts the top two tiers by WhatsApp priority first, and the workbook leads with a **WhatsApp** sheet.
+- **France and Belgium** reuse every rule above. Their legal notices are *mentions légales* (FR: *directeur de la publication*, *gérant*) and *colofon* (BE: *zaakvoerder*), so the role labels, honorifics (Madame/Mme/Monsieur, Mevrouw/Dhr.), company forms (SARL, SAS, BVBA, NV…), non-profit forms (ASBL/VZW, which always drop like e.V.), freemail (orange, free, skynet, telenet…) and public-body domains (`mairie-*.fr`, `<city>.fr/.be`, `*.gouv.fr`) are extended for them. Belgian postcodes have 4 digits; `cityFromAddress` reads 4–5.
 - **A restart resumes; it never overwrites** (`resume.js`). Before this, re-running after a crash began at query 1 and its first save replaced the stopped run's files. Now `main.js` loads the output folder's `leads.json`, marks those places seen, re-queues the ones whose website lookup may not have finished (`contacts_checked` is set when a lookup completes), and starts at `progress.json`'s `next`. `progress.json` is written after every query and is trusted only if its country and query count match the current run. Without one, the run resumes at the last query that produced a place. A finished run exits with a hint instead of re-running; `--fresh` moves the old files to `previous-<date>/` first.
 - **Maps is loaded with `?hl=en&gl=<country>`**: local results with an English UI. The extractors read English labels (`stars`, `reviews`, `Add website`). Supporting one UI language is much easier than supporting two. Don't drop `hl=en` without also teaching `dom-extract.js` German labels, and prove it with a fixture.
 - **EU consent redirect.** From an EU IP, Maps first redirects to `consent.google.com`. `passConsent` answers it. `detectBlockPage` must **not** treat consent as a block (the US original did).

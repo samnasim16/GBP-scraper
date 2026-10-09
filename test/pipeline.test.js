@@ -86,7 +86,7 @@ test('mail merge only includes targets that have an address', () => {
     const rows = prepareLeads(LEADS, { template: loadTemplate() });
     const csv = buildMailMerge(rows, ['Judaica seller', 'Jewish / Israeli retail']);
     const lines = csv.replace(/^﻿/, '').split('\n');
-    assert.equal(lines[0], 'email,greeting,contact_name,business_name,city,website,email_subject,email_body');
+    assert.equal(lines[0], 'email,greeting,contact_name,business_name,city,website,whatsapp_status,whatsapp_number,email_subject,email_body');
     assert.match(csv, /shop@judaica-haus\.de/);
     assert.doesNotMatch(csv, /cafe@x\.de/, 'a café is not a target');
 });

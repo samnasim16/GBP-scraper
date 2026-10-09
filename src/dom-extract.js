@@ -319,6 +319,13 @@ export function extractDetail(phoneCode = '49') {
         }
     }
 
+    // ── WhatsApp links on the listing (wa.me, api.whatsapp.com) ───────────
+    const whatsappUrls = [];
+    for (const a of panel.querySelectorAll('a[href]')) {
+        const h = a.href || '';
+        if (/wa\.me\/|whatsapp\.com\/send|wa\.link\//i.test(h) && whatsappUrls.indexOf(h) === -1) whatsappUrls.push(h);
+    }
+
     // ── Description / editorial summary ───────────────────────────────────
     let description = '';
     for (const s of ['.PYvSYb', '.WeS02d .PYvSYb', '[data-attrid="description"]', '.HlvSq .PYvSYb']) {
@@ -405,7 +412,7 @@ export function extractDetail(phoneCode = '49') {
 
     return {
         name, rating, reviews, category, phone,
-        websiteStatus, websiteUrl, socialUrls,
+        websiteStatus, websiteUrl, socialUrls, whatsappUrls,
         description, hasHours, hoursSummary, priceLevel,
         email, bookingLink, address, hasPhotos,
     };

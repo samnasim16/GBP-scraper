@@ -131,6 +131,79 @@ export const ENGLAND_CATEGORIES = [
 ];
 
 /**
+ * French cities, grouped by region.
+ *
+ * France has Europe's largest Jewish population. Beyond Paris and its
+ * north-eastern suburbs (Sarcelles, Saint-Brice, Créteil, Saint-Mandé,
+ * Vincennes, Neuilly, Boulogne), the communities are in Marseille, Lyon,
+ * Nice, Strasbourg (and Alsace), Toulouse and Montpellier.
+ */
+export const FRANCE_CITIES = {
+    IDF: ['Paris', 'Sarcelles', 'Saint-Brice-sous-Forêt', 'Garges-lès-Gonesse', 'Créteil', 'Saint-Mandé',
+          'Vincennes', 'Neuilly-sur-Seine', 'Boulogne-Billancourt', 'Levallois-Perret', 'Le Raincy',
+          'Montreuil', 'Versailles', 'Saint-Germain-en-Laye', 'Aubervilliers'],
+    PACA: ['Marseille', 'Nice', 'Cannes', 'Antibes', 'Aix-en-Provence', 'Toulon', 'Avignon'],
+    ARA: ['Lyon', 'Villeurbanne', 'Grenoble', 'Saint-Étienne', 'Annecy', 'Clermont-Ferrand'],
+    GES: ['Strasbourg', 'Metz', 'Nancy', 'Mulhouse', 'Colmar', 'Reims', 'Troyes'],
+    OCC: ['Toulouse', 'Montpellier', 'Nîmes', 'Perpignan'],
+    NAQ: ['Bordeaux', 'Biarritz', 'Pau', 'Limoges', 'Poitiers', 'La Rochelle'],
+    HDF: ['Lille', 'Roubaix', 'Amiens'],
+    NOR: ['Rouen', 'Le Havre', 'Caen'],
+    BRE: ['Rennes', 'Brest'],
+    PDL: ['Nantes', 'Angers'],
+    CVL: ['Tours', 'Orléans'],
+    BFC: ['Dijon', 'Besançon'],
+};
+
+export const FRANCE_DISTRICTS = {
+    Paris: ['Le Marais', '4e arrondissement', '9e arrondissement', '11e arrondissement', '16e arrondissement',
+            '17e arrondissement', '19e arrondissement', '20e arrondissement', 'Belleville'],
+    Marseille: ['Castellane', 'Le Prado', 'Saint-Just'],
+};
+
+export const FRANCE_CATEGORIES = [
+    'Judaica',
+    'Boutique Judaica',
+    'Cadeaux juifs',
+    'Librairie juive',
+    'Articles religieux juifs',
+    'Épicerie casher',
+    'Magasin casher',
+    'Menorah',
+    'Art juif',
+    'Verrerie d\'art',
+];
+
+/**
+ * Belgian cities. Antwerp's Orthodox community (around the diamond district)
+ * is one of the largest in Europe; Brussels' is spread over Uccle, Forest,
+ * Saint-Gilles, Ixelles and Anderlecht. Search terms mix Dutch and French.
+ */
+export const BELGIUM_CITIES = {
+    BRU: ['Bruxelles'],
+    VLG: ['Antwerpen', 'Gent', 'Brugge', 'Leuven', 'Mechelen', 'Hasselt', 'Kortrijk', 'Oostende', 'Knokke-Heist'],
+    WAL: ['Liège', 'Charleroi', 'Namur', 'Mons', 'Waterloo', 'Arlon'],
+};
+
+export const BELGIUM_DISTRICTS = {
+    Bruxelles: ['Uccle', 'Forest', 'Saint-Gilles', 'Ixelles', 'Anderlecht', 'Woluwe-Saint-Lambert', 'Schaerbeek', 'Etterbeek'],
+    Antwerpen: ['Diamantwijk', 'Zurenborg', 'Berchem', 'Wilrijk'],
+};
+
+export const BELGIUM_CATEGORIES = [
+    'Judaica',
+    'Judaica winkel',
+    'Boutique Judaica',
+    'Joodse geschenken',
+    'Cadeaux juifs',
+    'Joodse boekhandel',
+    'Librairie juive',
+    'Koosjer winkel',
+    'Épicerie casher',
+    'Menorah',
+];
+
+/**
  * Everything that differs between the markets. `gl` sets the country Maps
  * searches in; `phoneCode` is what a national number starting with 0 gets;
  * `foreign` drops cross-border results.
@@ -169,12 +242,48 @@ export const COUNTRIES = {
         // Northern Ireland are the UK and stay.
         foreign: /,\s*(Ireland|Éire|Co\.\s*\w+|France|Netherlands|Belgium|Germany|Deutschland|Spain|Israel|USA|United States)\s*$/i,
     },
+    FR: {
+        name: 'France',
+        gl: 'fr',
+        phoneCode: '33',
+        regionLabel: 'région',
+        regions: FRANCE_CITIES,
+        districts: FRANCE_DISTRICTS,
+        categories: FRANCE_CATEGORIES,
+        highYield: ['Judaica', 'Boutique Judaica', 'Cadeaux juifs', 'Librairie juive'],
+        acceptLanguage: 'fr-FR,fr;q=0.9,en;q=0.8',
+        // French sites must carry "Mentions légales", naming the
+        // "directeur de la publication" — the French Impressum.
+        contactKeyPage: 'mentions|legal|contact',
+        contactPaths: ['/mentions-legales', '/contact', '/mentions-legales/', '/nous-contacter', '/pages/contact'],
+        outputDir: 'output-fr',
+        // Monaco and Andorra are their own countries.
+        foreign: /(,\s*(Belgium|Belgique|Switzerland|Suisse|Schweiz|Luxembourg|Germany|Allemagne|Deutschland|Spain|Espagne|Italy|Italie|Monaco|Andorra|Andorre|United Kingdom|UK|Israel|Israël)|\b980\d\d\s+Monaco)\s*$/i,
+    },
+    BE: {
+        name: 'Belgium',
+        gl: 'be',
+        phoneCode: '32',
+        regionLabel: 'region',
+        regions: BELGIUM_CITIES,
+        districts: BELGIUM_DISTRICTS,
+        categories: BELGIUM_CATEGORIES,
+        highYield: ['Judaica', 'Judaica winkel', 'Boutique Judaica', 'Joodse geschenken'],
+        acceptLanguage: 'nl-BE,nl;q=0.9,fr-BE;q=0.8,fr;q=0.7,en;q=0.6',
+        contactKeyPage: 'mentions|legal|contact|colofon|disclaimer',
+        contactPaths: ['/contact', '/mentions-legales', '/nl/contact', '/fr/contact', '/colofon'],
+        outputDir: 'output-be',
+        foreign: /,\s*(France|Netherlands|Nederland|Pays-Bas|Germany|Deutschland|Allemagne|Duitsland|Luxembourg|Luxemburg|United Kingdom|UK|Israel)\s*$/i,
+    },
 };
 
 /** "DE", "UK", "GB", "England" → a COUNTRIES entry (default Germany). */
 export function resolveCountry(input = {}) {
     const raw = String(input.country || 'DE').trim().toUpperCase();
-    const code = { GB: 'UK', ENGLAND: 'UK', 'UNITED KINGDOM': 'UK', GERMANY: 'DE', DEUTSCHLAND: 'DE' }[raw] || raw;
+    const code = {
+        GB: 'UK', ENGLAND: 'UK', 'UNITED KINGDOM': 'UK', GERMANY: 'DE', DEUTSCHLAND: 'DE',
+        FRANCE: 'FR', BELGIUM: 'BE', BELGIQUE: 'BE', 'BELGIË': 'BE', BELGIE: 'BE',
+    }[raw] || raw;
     const c = COUNTRIES[code];
     if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);
     return { code, ...c };

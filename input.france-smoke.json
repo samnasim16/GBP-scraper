@@ -1,0 +1,21 @@
+{
+    "country": "FR",
+    "cities": [
+        "Paris"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "Judaica",
+        "Cadeaux juifs"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-fr-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}
