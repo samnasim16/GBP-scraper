@@ -100,5 +100,26 @@ test('France smoke run: platform addresses and a shop called "Judaic"', async ()
     const { extractEmails } = await import('../src/contacts.js');
     // Emet (Paris) came back as license@prestashop.com.
     assert.deepEqual(extractEmails('<p>license@prestashop.com support@woocommerce.com</p><a href="mailto:contact@emet.fr">x</a>'), ['contact@emet.fr']);
+    // Shop-builder agencies and module vendors leave their support address in the footer.
+    assert.deepEqual(extractEmails('<p>support@alloj.com tech@202-ecommerce.com</p><a href="mailto:shop@makolet.fr">x</a>'), ['shop@makolet.fr']);
     assert.equal(scoreRelevance({ business_name: 'Judaic', category: 'Religious Book Store' }).tier, 'Judaica seller');
+});
+
+test('full France run: placeholder emails, media, associations, street names', async () => {
+    const { extractEmails, extractContact, greetingFor } = await import('../src/contacts.js');
+    // La Makolet, Espace Sarah and Maison Juif et Fils carried template addresses.
+    assert.deepEqual(extractEmails('<p>example@mail.com prenom.nom@domaine.com jean.dupont@gmail.com</p><a href="mailto:contact@makolet.fr">x</a>'), ['contact@makolet.fr']);
+    assert.deepEqual(extractEmails('<p>owner@mail.com</p>'), ['owner@mail.com'], 'mail.com itself is a real provider');
+    // Radio stations and community associations named "Judaïca" are not shops.
+    assert.equal(isSellable({ business_name: 'Radio Judaïca Lyon', category: 'Radio Broadcaster' }).ok, false);
+    assert.equal(isSellable({ business_name: 'Judaica Marseille', category: 'Cultural Association' }).ok, false);
+    assert.equal(isSellable({ business_name: 'CENTRE JUDAICA', category: 'Place Of Worship' }).ok, false);
+    assert.equal(isSellable({ business_name: 'Judaica Direct', category: 'Public Library' }).ok, true, 'a mis-filed shop still passes');
+    // A street called "Rue aux Juifs" is not Jewish context.
+    assert.ok(!isTarget(scoreRelevance({ business_name: 'NORMAL Rouen, Rue aux Juifs', category: 'Discount Store' })));
+    assert.ok(!isTarget(scoreRelevance({ business_name: 'BeKef Sandwich - Traiteur - Shabbat', category: 'Sandwich Shop' })));
+    // Brunet Elisabeth was greeted "Dear Mr. Team".
+    assert.equal(extractContact('Gérant : M. Pascal Chartier Team').name, 'M. Pascal Chartier');
+    assert.equal(greetingFor({ contact_name: 'M. Pascal Chartier' }), 'Dear Mr. Chartier');
+    assert.equal(greetingFor({ business_name: 'Contacts | Premium Kosher' }), 'Dear Premium Kosher Team');
 });

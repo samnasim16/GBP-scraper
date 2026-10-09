@@ -29,6 +29,11 @@ const JUNK_EMAIL = [
     /@(example|domain|email|beispiel|test|yourdomain|ihredomain|mustermann|sentry|sentry-next|wixpress|sentry\.wixpress)\./i,
     /@(\d+x|2x|3x)\./i,
     /^(name|vorname\.nachname|ihre?\.?email|your\.?email|email|user|username|max\.mustermann)@/i,
+    // Placeholder addresses left in contact forms and templates. France had
+    // example@mail.com, prenom.nom@domaine.com and jean.dupont@gmail.com
+    // (the French "John Smith").
+    /^(example|exemple|sample|prenom\.?nom|pr[ée]nom|nom|votre[.-]?(e-?mail|adresse|mail|nom)|jean\.?dupont|john\.?doe|jane\.?doe|john\.?smith|max\.?muster|test|demo)@/i,
+    /@(domaine|exemple|example|monsite|votresite|votredomaine|tonsite|yoursite|yourdomain)\.[a-z]+$/i,
     /@.*\.(local|invalid|lan)$/i,
     /(sentry|wixpress|cloudflare|googleapis|schema\.org|w3\.org)/i,
     // Demo content of website themes, left on live shops: Torah Treasures'
@@ -38,7 +43,7 @@ const JUNK_EMAIL = [
     /@(demo|themes?|template)[.-]/i,
     // The shop software's own addresses, left in page source by the
     // platform: Emet (Paris) came back as license@prestashop.com.
-    /@(prestashop|woocommerce|woothemes|shopify|wordpress|wix|jimdo|squarespace|magento|opencart|shopware|oxid|ionos|strato|ovh|o2switch|hostinger|gandi|elementor|wpengine|automattic)\.(com|net|org|io|fr|de|eu)$/i,
+    /@(prestashop|woocommerce|woothemes|shopify|wordpress|wix|jimdo|squarespace|magento|opencart|shopware|oxid|ionos|strato|ovh|o2switch|hostinger|gandi|elementor|wpengine|automattic|alloj|202-ecommerce|presta-module|prestaplugins|webkul|knowband|boostmyshop)\.(com|net|org|io|fr|de|eu)$/i,
 ];
 
 /** Cloudflare's "email protection" hides addresses as a hex XOR string. */
@@ -146,7 +151,7 @@ export function registrableDomain(host) {
  * these has no Impressum of its own — crawling it yields the platform's
  * legal inbox (behoerdenanfragen@kleinanzeigen.de), never the shop's.
  */
-export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen|leboncoin|pagesjaunes|2ememain|2dehands|marktplaats|goudengids|pagesdor|infobel|mappy)\.[a-z.]+$/;
+export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen|livre-rare-book|leboncoin|pagesjaunes|2ememain|2dehands|marktplaats|goudengids|pagesdor|infobel|mappy)\.[a-z.]+$/;
 
 const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service|bestellung|order|orders|verkauf|sales|laden|store|post|team|enquiries|enquiry|admin|bonjour|commande|commandes|vente|ventes|boutique|magasin|librairie|accueil|winkel|bestelling|bestellingen)@/;
 const BAD_PREFIX = /^(no-?reply|donotreply|datenschutz|privacy|dsgvo|abuse|postmaster|hostmaster|webmaster|bewerbung|jobs|karriere|presse|press|newsletter|rechnung|invoice|buchhaltung|rgpd|dpo|recrutement|emploi|facturation|comptabilite|factuur|boekhouding|vacatures)@/;
@@ -234,7 +239,7 @@ const NOT_A_NAME = /\b(Ltd|Limited|Registered|Company|Director|Founder|England|W
  * French and Dutch field labels and company words that follow a name in a
  * legal notice. Unicode-aware, because \\b does not see "Société" end.
  */
-const NOT_A_NAME_EU = /^(SARL|SAS|SASU|EURL|SCI|SNC|SIRET|SIREN|RCS|TVA|Capital|Hébergeur|Hébergement|Téléphone|Tél\.?|Courriel|France|Paris|Belgique|België|Belgium|Bruxelles|Brussel|Antwerpen|BV|BVBA|SRL|SPRL|NV|ASBL|VZW|KBO|BTW|Ondernemingsnummer|Numéro|Contactez|Mentions|Publication|Rédaction|Siège|Société|Boutique|Librairie|Winkel|Boekhandel|Uitgever|Telefoon|Adres|Rue|Avenue|Av\.|Boulevard|Bd|Place|Quai|Chaussée|Allée|Impasse|Cours)[,.:]?$/iu;
+const NOT_A_NAME_EU = /^(Team|Équipe|Equipe|Staff|Service|SARL|SAS|SASU|EURL|SCI|SNC|SIRET|SIREN|RCS|TVA|Capital|Hébergeur|Hébergement|Téléphone|Tél\.?|Courriel|France|Paris|Belgique|België|Belgium|Bruxelles|Brussel|Antwerpen|BV|BVBA|SRL|SPRL|NV|ASBL|VZW|KBO|BTW|Ondernemingsnummer|Numéro|Contactez|Mentions|Publication|Rédaction|Siège|Société|Boutique|Librairie|Winkel|Boekhandel|Uitgever|Telefoon|Adres|Rue|Avenue|Av\.|Boulevard|Bd|Place|Quai|Chaussée|Allée|Impasse|Cours)[,.:]?$/iu;
 
 /** "Fasanenstraße" is a compound, so \\bStraße misses it; "Str" may lose its dot. */
 const STREET_WORD = /(straße|strasse|str\.?|platz|allee|gasse|weg|straat|laan|lei|plein|steenweg|kaai|dreef)[,.]?$/i;
@@ -346,7 +351,9 @@ export function shortBusinessName(name) {
         .replace(/[®™©]/g, '')
         // A Hebrew (or other non-Latin) word standing on its own is a translation of the name.
         .replace(/(^|\s)[\p{Script=Hebrew}\p{Script=Cyrillic}\p{Script=Arabic}\u200e\u200f\s]+$/u, '');
-    n = n.split(/\s+[|–—]\s+|\s+-\s+|\s+I\s+|\s*\|\s*/)[0];
+    // "Contacts | Premium Kosher": a page-title word before the real name.
+    const segs = n.split(/\s+[|–—]\s+|\s+-\s+|\s+I\s+|\s*\|\s*/).filter(Boolean);
+    n = (segs.length > 1 && /^(contacts?|accueil|home|welcome|bienvenue|startseite|kontakt)$/i.test(segs[0].trim())) ? segs[1] : segs[0] || '';
     n = n.replace(/[,\s]+(GmbH\s*&\s*Co\.?\s*KG|GmbH|GbR|UG(\s*\(haftungsbeschränkt\))?|AG|KG|OHG|e\.\s?K\.?|Inh\..*|SARL|SASU|SAS|EURL|SRL|SPRL|BVBA|BV|NV)$/i, '');
     return clean(n);
 }

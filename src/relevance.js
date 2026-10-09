@@ -66,7 +66,7 @@ const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'cristal', 'verre', 'verr
  * Categories that are never a buyer, however Jewish the context: a restaurant
  * serving kosher food, a glazier, a lawyer. Checked against the Maps category.
  */
-export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei|solicitor|takeaway|dentist|estate agent|funeral|undertaker|bestatter|removals?|plumber|electrician|accountant|steuerberater|barber|hairdresser|hair salon|beauty salon|nail salon|massage|spa|therapist|home care|care home|health consultant|corporate office|cultural landmark|landmark|tourist attraction|fish & chips|fish and chips|chippy|bagel shop|bagel|leisure centre|gym|sign in|details)\b/i;
+export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei|solicitor|takeaway|dentist|estate agent|funeral|undertaker|bestatter|removals?|plumber|electrician|accountant|steuerberater|barber|hairdresser|hair salon|beauty salon|nail salon|massage|spa|therapist|home care|care home|health consultant|corporate office|cultural landmark|landmark|tourist attraction|fish & chips|fish and chips|chippy|bagel shop|bagel|leisure centre|gym|sign in|details|sandwich|traiteur|pizzeria|snack|kebab|radio|broadcaster|television|tv station|newspaper|magazine publisher)\b/i;
 
 /**
  * Organisations we cannot sell to: places of worship, communities, charities,
@@ -140,10 +140,18 @@ export function isSellable(lead) {
         // A Judaica name under a wrong category (Maps files some shops as
         // "Public Library") still gets through — unless the name itself says
         // it is an organisation.
-        if (countHits(name.toLowerCase(), JUDAICA_STRONG).length && !NON_PROFIT_NAME.test(name)) return { ok: true, reason: '' };
+        // It never covers a category that is plainly an organisation:
+        // "Judaica Marseille" is a Cultural Association, "CENTRE JUDAICA" a
+        // Place Of Worship.
+        const organisation = /association|worship|synagog|religious (organi[sz]ation|institution)|community|church|charity|non-?profit|foundation|club/i.test(category);
+        if (!organisation && countHits(name.toLowerCase(), JUDAICA_STRONG).length && !NON_PROFIT_NAME.test(name)) return { ok: true, reason: '' };
         return { ok: false, reason: `non-profit / religious (${category})` };
     }
     if (!retailCategory && NON_PROFIT_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (name)' };
+    // A radio station or newspaper named "Judaïca" buys nothing.
+    if (!retailCategory && /\b(radio|broadcaster|television|tv station|newspaper|magazine|news agency|media company)\b/i.test(category)) {
+        return { ok: false, reason: `not a shop (${category})` };
+    }
     // Some names are institutions whatever Maps files them under: "Ben Uri
     // Gallery and Museum" is an "Art Gallery", "Central Deli @ Birmingham
     // Central United Synagogue" a "Kosher Food Shop". A Chabad-run store
@@ -186,7 +194,10 @@ function countHits(hay, words, { anywhere = false } = {}) {
  * @returns {{ score:number, tier:string, evidence:string }}
  */
 export function scoreRelevance(lead, siteText = '') {
-    const listing = clean([lead.business_name, lead.category, lead.maps_description].join(' ')).toLowerCase();
+    // Street names are not context: "NORMAL Rouen, Rue aux Juifs" is a
+    // discount store on the Rue aux Juifs.
+    const listing = clean([lead.business_name, lead.category, lead.maps_description].join(' ')).toLowerCase()
+        .replace(/\b(rue|place|impasse|all[ée]e|quai|passage)\s+(aux|des|du)\s+juifs?\b|judengasse|judenstra(ss|ß)e|judenhof|old jewry|jewry street|jodenstraat|jodenbreestraat/gi, ' ');
     const site = clean(siteText).toLowerCase().slice(0, 200000);
 
     const retailCat = RETAIL_CATEGORY.test(clean(lead.category));
