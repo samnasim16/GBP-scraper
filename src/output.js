@@ -66,10 +66,23 @@ export function escapeCSV(val) {
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function buildCSV(rows, columns = CSV_COLUMNS) {
+export function buildCSV(rows, columns = CSV_COLUMNS, { flat = false } = {}) {
     const header = columns.join(',');
-    const lines = rows.map(r => columns.map(c => escapeCSV(r[c])).join(','));
-    return '﻿' + [header, ...lines].join('\n');   // BOM so Excel reads umlauts
+    const cell = flat ? flatCell : (v) => v;
+    const lines = rows.map(r => columns.map(c => escapeCSV(cell(r[c]))).join(','));
+    return '\ufeff' + [header, ...lines].join('\n');   // BOM so Excel reads umlauts
+}
+
+// leads.csv is one line per place: line breaks inside a cell made Excel show
+// every row as a tall block with blank-looking gaps. The full email body is in
+// mail-merge.csv and the workbook, so it is left out here.
+export const LEADS_CSV_COLUMNS = CSV_COLUMNS.filter(c => c !== 'email_body');
+
+/** One-line cell: Maps' private-use icon glyphs dropped, whitespace collapsed. */
+function flatCell(v) {
+    if (v == null || typeof v !== 'string') return v;
+    return v.replace(/[\uE000-\uF8FF]/g, ' ').replace(/\s*[\r\n]+\s*/g, ' · ').replace(/[ \t]{2,}/g, ' ').replace(/\s+·\s*(·\s*)+/g, ' · ')
+        .replace(/\b([ap]m)(?=\d)/g, '$1, ').replace(/\s+;/g, ';').trim();   // Maps hours: '2 pm4–7 pm'
 }
 
 /** Dedupe by place id, then by website domain + city; best relevance first. */
@@ -212,7 +225,7 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
         saving = true;
         try {
             const rows = prepareLeads(leads, { template, sender, ...(whatsappTemplate !== undefined ? { whatsappTemplate } : {}) });
-            fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows), 'utf8');
+            fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows, LEADS_CSV_COLUMNS, { flat: true }), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'leads.json'), JSON.stringify(rows, null, 2), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'mail-merge.csv'), buildMailMerge(rows, includeTiers), 'utf8');
             try {
