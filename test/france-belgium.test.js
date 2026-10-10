@@ -123,3 +123,11 @@ test('full France run: placeholder emails, media, associations, street names', a
     assert.equal(greetingFor({ contact_name: 'M. Pascal Chartier' }), 'Dear Mr. Chartier');
     assert.equal(greetingFor({ business_name: 'Contacts | Premium Kosher' }), 'Dear Premium Kosher Team');
 });
+
+test('full Belgium run: the website domain is part of the listing', () => {
+    // Avenue Wines & Whiskeys (Antwerp) links kosher-wine.eu; its name alone says nothing.
+    const wine = { business_name: 'Avenue Wines & Whiskeys', category: 'Wine Store', website: 'http://www.kosher-wine.eu/' };
+    assert.equal(scoreRelevance(wine).tier, 'Jewish / Israeli retail');
+    // A Facebook page says nothing about the shop.
+    assert.equal(scoreRelevance({ business_name: 'Corner Wines', category: 'Wine Store', website: 'https://www.facebook.com/kosher.wines' }).tier, 'Unrelated');
+});

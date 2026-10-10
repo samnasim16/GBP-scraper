@@ -189,6 +189,14 @@ function countHits(hay, words, { anywhere = false } = {}) {
     return hits;
 }
 
+function domainWords(url) {
+    try {
+        const host = new URL(String(url || '')).hostname.replace(/^www\./, '');
+        if (/(^|\.)(facebook|instagram|google|linktr|wixsite|business\.site)\./.test(host)) return '';
+        return host.split('.').slice(0, -1).join(' ').replace(/-/g, ' ');
+    } catch { return ''; }
+}
+
 /**
  * Score one lead. `siteText` is the visible text of its website, if fetched.
  * @returns {{ score:number, tier:string, evidence:string }}
@@ -204,7 +212,9 @@ export function scoreRelevance(lead, siteText = '') {
     const strongListing = countHits(listing, JUDAICA_STRONG)
         .filter(w => !BRAND_PRONE.has(w) || retailCat || countHits(listing, RETAIL).length > 0);
     const strongSite = countHits(site, JUDAICA_STRONG);
-    const contextListing = countHits(listing, JEWISH_CONTEXT);
+    // The website's domain is on the listing too: "Avenue Wines & Whiskeys"
+    // links kosher-wine.eu. Platform hosts (facebook.com…) say nothing.
+    const contextListing = countHits(listing + ' ' + domainWords(lead.website), JEWISH_CONTEXT);
     const contextSite = countHits(site, JEWISH_CONTEXT);
     // Retail must show in the LISTING. Every community and institute website
     // has a "Shop" or "Spenden-Shop" link somewhere, which made them retailers.
