@@ -8,7 +8,7 @@ import { mapsSearchUrl, cityFromAddress, stateFromAddress, pickCity } from '../s
 import { extractDetail } from '../src/dom-extract.js';
 import { extractWhatsApp, classifyWhatsApp, normaliseNumber, WA, loadWhatsAppTemplate } from '../src/whatsapp.js';
 import { scoreRelevance, isSellable, isPublicBody, isTarget } from '../src/relevance.js';
-import { rankEmails } from '../src/contacts.js';
+import { rankEmails, ContactEnricher, ownWebsite } from '../src/contacts.js';
 import { prepareLeads } from '../src/output.js';
 
 test('the US is its own market: NY, NJ and FL, each city with its state', () => {
@@ -111,4 +111,56 @@ test('the US email and WhatsApp message say the collection is coming to the US',
     assert.match(row.whatsapp_link, /^https:\/\/wa\.me\/17188510303\?text=.*United%20States/);
     // Other markets keep the original wording.
     assert.equal(resolveCountry({ country: 'DE' }).emailTemplate, undefined);
+});
+
+/** A fake website: path → HTML; anything else is a 404. Records what was fetched. */
+function fakeHttp(pages) {
+    const fetched = [];
+    return {
+        fetched,
+        async fetchText(url) {
+            fetched.push(url);
+            const u = new URL(url);
+            const body = pages[u.origin + u.pathname];
+            return body ? { ok: true, status: 200, body } : { ok: false, status: 404, body: '' };
+        },
+    };
+}
+
+const US_CONTACTS = () => {
+    const us = resolveCountry({ country: 'US' });
+    return { phoneCode: us.phoneCode, keyPage: us.contactKeyPage, guessPaths: us.contactPaths, delayMs: 0, concurrency: 1 };
+};
+
+test('smoke run: a Maps link to a branch page still finds the shop\'s email', async () => {
+    // Eichlers' listing gave no email in the run; its homepage → contact page has info@.
+    const http = fakeHttp({
+        'https://www.eichlers.com/': '<a href="/pages/contact-us">Contact Us</a><p>Judaica, menorahs, mezuzahs</p>',
+        'https://www.eichlers.com/pages/contact-us': '<p>Email us: info@eichlers.com · returns@eichlers.com</p>',
+    });
+    const lead = { business_name: 'Eichlers Judaica', website: 'https://www.eichlers.com/pages/brooklyn-store?utm_source=gmb' };
+    await new ContactEnricher({ http, config: US_CONTACTS(), log: () => {} }).enrich(lead);
+    assert.equal(lead.email, 'info@eichlers.com');
+
+    // A homepage with tracking codes and no contact link: the guessed /contact-us page.
+    const http2 = fakeHttp({
+        'https://keterjudaica.com/': '<p>Keter Judaica — Borough Park</p>',
+        'https://keterjudaica.com/contact-us': '<p>keterjudaica@gmail.com</p>',
+    });
+    const keter = { business_name: 'Keter Judaica', website: 'https://keterjudaica.com/?utm_source=google&utm_medium=organic' };
+    await new ContactEnricher({ http: http2, config: US_CONTACTS(), log: () => {} }).enrich(keter);
+    assert.equal(keter.email, 'keterjudaica@gmail.com');
+});
+
+test('the homepage fallback never reaches an umbrella organisation\'s homepage', async () => {
+    const http = fakeHttp({
+        'https://www.chabadflatbush.org/': '<p>info@chabadflatbush.org</p>',
+        'https://www.chabadflatbush.org/templates/articlecco_cdo/aid/123': '<p>Kosher King — a store in our community</p>',
+    });
+    const lead = { business_name: 'Kosher King', website: 'https://www.chabadflatbush.org/templates/articlecco_cdo/aid/123' };
+    await new ContactEnricher({ http, config: US_CONTACTS(), log: () => {} }).enrich(lead);
+    assert.ok(!http.fetched.includes('https://www.chabadflatbush.org/'), 'the umbrella homepage is not fetched');
+    assert.equal(ownWebsite('https://www.eichlers.com/pages/brooklyn', 'Eichlers Judaica'), true);
+    assert.equal(ownWebsite('https://shop.com/', 'Anything'), true);
+    assert.equal(ownWebsite('https://www.chabadflatbush.org/aid/123', 'Kosher King'), false);
 });

@@ -505,6 +505,7 @@ export class ContactEnricher {
             this.stats.sites++;
             const home = await this._get(site);
             const pages = [];
+            const tried = new Set([norm(site)]);
             if (home) {
                 pages.push(home);
                 this._absorb(home, result);
@@ -512,12 +513,36 @@ export class ContactEnricher {
                 const hasKeyPage = links.some(u => new RegExp(this.opts.keyPage, 'i').test(u));
                 const guesses = (this.opts.guessImpressum && !hasKeyPage) ? guessContactUrls(site, this.opts.guessPaths).slice(0, 2) : [];
                 for (const url of [...links, ...guesses].slice(0, this.opts.maxPagesPerSite)) {
+                    tried.add(norm(url));
                     const body = await this._get(url);
                     if (!body) continue;
                     pages.push(body);
                     this._absorb(body, result);
                     // Stop early once we have both an address and a person.
                     if (result.emails.length && result.contactName) break;
+                }
+            }
+            // The Maps link is often not the homepage: a branch page
+            // ("eichlers.com/pages/brooklyn"), a link with tracking codes, or a
+            // page that failed to load. When it gave no address, try the
+            // site's own homepage and contact pages — but only on the shop's
+            // own site, never an umbrella organisation's (its info@ is not
+            // the shop's).
+            if (!result.emails.length && ownWebsite(site, lead.business_name)) {
+                const root = new URL(site).origin + '/';
+                const queue = [root, ...guessContactUrls(site, this.opts.guessPaths)];
+                let budget = this.opts.maxPagesPerSite;
+                while (queue.length && budget > 0 && !result.emails.length) {
+                    const url = queue.shift();
+                    if (tried.has(norm(url))) continue;
+                    tried.add(norm(url));
+                    budget--;
+                    const body = await this._get(url);
+                    if (!body) continue;
+                    pages.push(body);
+                    this._absorb(body, result);
+                    // The homepage links the real contact page: try it next.
+                    if (url === root) queue.unshift(...findContactLinks(body, root, { max: 2 }));
                 }
             }
             result.siteText = pages.map(p => stripHtml(p)).join(' ').slice(0, 200000);
@@ -549,6 +574,33 @@ export class ContactEnricher {
             result.contactName = c.name;
             result.contactRole = c.role;
         }
+    }
+}
+
+/** A URL without its tracking codes, fragment and trailing slash, for "already fetched?". */
+function norm(url) {
+    try {
+        const u = new URL(url);
+        return (u.origin + u.pathname).replace(/\/+$/, '').toLowerCase();
+    } catch {
+        return String(url || '');
+    }
+}
+
+/**
+ * Is this URL the shop's own website? Its homepage, or any page on a domain
+ * that spells the shop's name ("eichlers.com" for Eichlers Judaica). A deep
+ * page on another domain belongs to an umbrella organisation.
+ */
+export function ownWebsite(websiteUrl, businessName = '') {
+    try {
+        const u = new URL(websiteUrl);
+        const domain = registrableDomain(u.hostname).replace(/[^a-z0-9]/g, '');
+        if (!domain || PLATFORM_DOMAIN.test(u.hostname)) return false;
+        if (u.pathname.split('/').filter(Boolean).length === 0) return true;
+        return nameTokens(businessName).filter(t => t.length >= 4).some(w => domain.includes(w));
+    } catch {
+        return false;
     }
 }
 
