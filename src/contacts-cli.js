@@ -17,6 +17,33 @@ import { loadInput, resolveCountry } from './config.js';
 import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { TARGET_TIERS, isSellable } from './relevance.js';
 import { loadWhatsAppTemplate } from './whatsapp.js';
+import { createBrowserFactory } from './browser.js';
+
+/**
+ * A hidden Chrome, started only if a site turns out to be a JavaScript app
+ * shell. Its own throwaway profile, so it never collides with a scrape that
+ * is running at the same time on .cache/chrome-profile.
+ */
+function lazyBrowser() {
+    let factory = null;
+    let session = null;
+    let opening = null;
+    return {
+        async get() {
+            if (!opening) {
+                opening = (async () => {
+                    factory = await createBrowserFactory({ config: { mode: 'local', headless: true, userDataDir: '' }, log: () => {} });
+                    session = await factory.open();
+                })().catch(() => { session = null; });
+            }
+            await opening;
+            return session ? session.browser : null;
+        },
+        async close() {
+            if (factory && session) await factory.close(session);
+        },
+    };
+}
 
 const probeAt = process.argv.indexOf('--probe');
 
@@ -27,7 +54,8 @@ function countryContacts(input) {
 }
 
 async function probe(url, name) {
-    const http = createHttpClient({ transport: 'local' });
+    const chrome = lazyBrowser();
+    const http = createHttpClient({ transport: 'local', getBrowser: chrome.get });
     const enricher = new ContactEnricher({ http, config: { ...countryContacts(loadInput(() => {})), delayMs: 0 } });
     const lead = { business_name: name || new URL(url).hostname, website: url };
     const result = await enricher.enrich(lead);
@@ -42,6 +70,7 @@ async function probe(url, name) {
         // Every page tried, where redirects led, and whether it loaded.
         pages_read: result.pagesRead,
     }, null, 2));
+    await chrome.close();
 }
 
 async function refresh(file) {
@@ -51,7 +80,8 @@ async function refresh(file) {
     const all = JSON.parse(fs.readFileSync(file, 'utf8'));
     const leads = input.keepNonProfits ? all : all.filter(l => isSellable(l).ok);
     if (leads.length < all.length) console.log(`Skipping ${all.length - leads.length} non-profit / public / religious rows`);
-    const http = createHttpClient({ transport: 'local' });
+    const chrome = lazyBrowser();
+    const http = createHttpClient({ transport: 'local', getBrowser: chrome.get });
     const enricher = new ContactEnricher({ http, config: { ...countryContacts(input), ...(input.contacts || {}) } });
     let done = 0;
     await Promise.all(leads.map(l => enricher.enqueue(l).then(() => {
@@ -67,6 +97,7 @@ async function refresh(file) {
         includeTiers: input.includeTiers || TARGET_TIERS.slice(0, 2),
     });
     await save(leads);
+    await chrome.close();
 }
 
 if (probeAt !== -1 && process.argv[probeAt + 1]) {

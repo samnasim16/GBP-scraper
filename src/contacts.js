@@ -496,6 +496,15 @@ export class ContactEnricher {
         return r ? r.body : null;
     }
 
+    /** The same page drawn by a real browser (JavaScript sites). */
+    async _fetchRendered(url, result) {
+        const res = await this.http.fetchRendered(url);
+        if (result) result.pagesRead.push(`${url} (rendered${res.ok && res.body ? '' : ': failed ' + (res.error || res.status || '')})`);
+        if (!res.ok || !res.body) return null;
+        this.stats.pages++;
+        return { body: res.body, url: res.url || url };
+    }
+
     /** Returns { emails, contactName, contactRole, siteText, social } and applies them to `lead`. */
     async enrich(lead) {
         const site = clean(lead.website);
@@ -562,6 +571,23 @@ export class ContactEnricher {
                     if (url === root) queue.unshift(...findContactLinks(body, root, { max: 2 }));
                 }
             }
+            // Some sites send an empty app shell and draw everything with
+            // JavaScript: 1800eichlers.com answered 200 to /contact, /about
+            // and /pages/contact-us alike, with almost no text. Read those in
+            // the browser, as a visitor would see them.
+            if (!result.emails.length && pages.length && looksLikeAppShell(pages)
+                && typeof this.http.fetchRendered === 'function' && this.opts.renderShells !== false) {
+                const shown = await this._fetchRendered(base, result);
+                if (shown) {
+                    pages.push(shown.body);
+                    this._absorb(shown.body, result);
+                    for (const link of findContactLinks(shown.body, shown.url, { max: 2 })) {
+                        if (result.emails.length) break;
+                        const r = await this._fetchRendered(link, result);
+                        if (r) { pages.push(r.body); this._absorb(r.body, result); }
+                    }
+                }
+            }
             result.siteText = pages.map(p => stripHtml(p)).join(' ').slice(0, 200000);
             for (const p of pages) {
                 const s = findSocialLinks(p);
@@ -592,6 +618,17 @@ export class ContactEnricher {
             result.contactRole = c.role;
         }
     }
+}
+
+/**
+ * Is this an app shell — markup that JavaScript fills in later? Almost no
+ * visible text on the homepage, or several different addresses returning the
+ * very same page (the app's catch-all route).
+ */
+export function looksLikeAppShell(pages) {
+    const texts = pages.map(p => stripHtml(p).replace(/\s+/g, ' ').trim());
+    if (texts[0].length < 400) return true;
+    return pages.length >= 3 && new Set(pages).size === 1;
 }
 
 /** A URL without its tracking codes, fragment and trailing slash, for "already fetched?". */
