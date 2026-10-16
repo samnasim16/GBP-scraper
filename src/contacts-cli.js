@@ -30,7 +30,7 @@ async function probe(url, name) {
     const http = createHttpClient({ transport: 'local' });
     const enricher = new ContactEnricher({ http, config: { ...countryContacts(loadInput(() => {})), delayMs: 0 } });
     const lead = { business_name: name || new URL(url).hostname, website: url };
-    await enricher.enrich(lead);
+    const result = await enricher.enrich(lead);
     Object.assign(lead, relevanceFields(lead, lead._siteText));
     console.log(JSON.stringify({
         email: lead.email, other_emails: lead.other_emails,
@@ -39,6 +39,8 @@ async function probe(url, name) {
         facebook: lead.facebook_url, instagram: lead.instagram_url,
         relevance: `${lead.relevance_tier} (${lead.relevance_score}) — ${lead.relevance_evidence}`,
         pages_fetched: enricher.stats.pages,
+        // Every page tried, where redirects led, and whether it loaded.
+        pages_read: result.pagesRead,
     }, null, 2));
 }
 

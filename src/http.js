@@ -57,7 +57,8 @@ export function createHttpClient({
                 headers: { ...DEFAULT_HEADERS, ...headers },
             });
             const body = await res.text();
-            return { ok: res.ok, status: res.status, body, via: 'local' };
+            // res.url is where redirects ended: 1800eichlers.com may be eichlers.com.
+            return { ok: res.ok, status: res.status, body, via: 'local', url: res.url || url };
         } finally {
             clearTimeout(timer);
         }
@@ -121,7 +122,7 @@ export function createHttpClient({
             } catch { /* take whatever rendered rather than nothing */ }
 
             const body = await page.content();
-            return { ok: true, status: res ? res.status() : 200, body, via: 'browser' };
+            return { ok: true, status: res ? res.status() : 200, body, via: 'browser', url: page.url() || url };
         } finally {
             if (page) { try { await page.close(); } catch { /* already gone */ } }
         }

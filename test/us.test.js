@@ -114,15 +114,17 @@ test('the US email and WhatsApp message say the collection is coming to the US',
 });
 
 /** A fake website: path → HTML; anything else is a 404. Records what was fetched. */
-function fakeHttp(pages) {
+function fakeHttp(pages, redirects = {}) {
     const fetched = [];
     return {
         fetched,
         async fetchText(url) {
             fetched.push(url);
             const u = new URL(url);
-            const body = pages[u.origin + u.pathname];
-            return body ? { ok: true, status: 200, body } : { ok: false, status: 404, body: '' };
+            const to = redirects[u.origin + u.pathname];
+            const at = to ? new URL(to) : u;
+            const body = pages[at.origin + at.pathname];
+            return body ? { ok: true, status: 200, body, url: at.toString() } : { ok: false, status: 404, body: '', url: at.toString() };
         },
     };
 }
@@ -163,4 +165,17 @@ test('the homepage fallback never reaches an umbrella organisation\'s homepage',
     assert.equal(ownWebsite('https://www.eichlers.com/pages/brooklyn', 'Eichlers Judaica'), true);
     assert.equal(ownWebsite('https://shop.com/', 'Anything'), true);
     assert.equal(ownWebsite('https://www.chabadflatbush.org/aid/123', 'Kosher King'), false);
+});
+
+test('smoke run: Maps lists 1800eichlers.com, which redirects to eichlers.com', async () => {
+    // The homepage links its contact page on the domain it redirected to.
+    const http = fakeHttp({
+        'https://www.eichlers.com/': '<a href="https://www.eichlers.com/pages/contact-us">Contact</a><p>Judaica</p>',
+        'https://www.eichlers.com/pages/contact-us': '<p>info@eichlers.com</p>',
+    }, { 'https://www.1800eichlers.com/': 'https://www.eichlers.com/' });
+    const lead = { business_name: 'Eichlers Judaica', website: 'https://www.1800eichlers.com/' };
+    const result = await new ContactEnricher({ http, config: US_CONTACTS(), log: () => {} }).enrich(lead);
+    assert.equal(lead.email, 'info@eichlers.com');
+    assert.equal(result.finalSite, 'https://www.eichlers.com/');
+    assert.ok(result.pagesRead[0].includes('→ https://www.eichlers.com/'), 'the probe shows where the link led');
 });
