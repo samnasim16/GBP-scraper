@@ -481,18 +481,25 @@ export class ContactEnricher {
         return new Promise(r => this.idle.push(r));
     }
 
-    async _get(url) {
+    /** Fetch a page: { body, url } where url is where redirects ended, or null. */
+    async _fetch(url, result) {
         const res = await this.http.fetchText(url, { headers: { 'Accept-Language': this.opts.acceptLanguage } });
         if (this.opts.delayMs) await new Promise(r => setTimeout(r, this.opts.delayMs));
+        if (result) result.pagesRead.push(`${url}${res.url && res.url !== url ? ' → ' + res.url : ''} (${res.ok && res.body ? res.status || 'ok' : 'failed ' + (res.status || res.error || '')})`);
         if (!res.ok || !res.body) return null;
         this.stats.pages++;
-        return res.body;
+        return { body: res.body, url: res.url || url };
+    }
+
+    async _get(url, result) {
+        const r = await this._fetch(url, result);
+        return r ? r.body : null;
     }
 
     /** Returns { emails, contactName, contactRole, siteText, social } and applies them to `lead`. */
     async enrich(lead) {
         const site = clean(lead.website);
-        const result = { emails: [], contactName: '', contactRole: '', siteText: '', social: {}, whatsapp: { numbers: [], linked: false, mentioned: false } };
+        const result = { emails: [], contactName: '', contactRole: '', siteText: '', social: {}, whatsapp: { numbers: [], linked: false, mentioned: false }, pagesRead: [], finalSite: '' };
         if (lead.email) result.emails.push(lead.email);
 
         let host = '';
@@ -503,18 +510,28 @@ export class ContactEnricher {
             result.whatsapp = { numbers: wa.numbers, linked: true, mentioned: true };
         } else if (site && /^https?:\/\//i.test(site) && !PLATFORM_DOMAIN.test(host)) {
             this.stats.sites++;
-            const home = await this._get(site);
+            const first = await this._fetch(site, result);
+            const home = first && first.body;
+            // Where the link really leads: Maps lists 1800eichlers.com, the
+            // shop lives at eichlers.com. Its contact links are on the new
+            // domain, so that is the base — unless it is a platform page.
+            let base = site;
+            try {
+                const landed = first && new URL(first.url);
+                if (landed && /^https?:$/.test(landed.protocol) && !PLATFORM_DOMAIN.test(landed.hostname)) base = landed.toString();
+            } catch { /* keep the listed URL */ }
+            result.finalSite = base !== site ? base : '';
             const pages = [];
-            const tried = new Set([norm(site)]);
+            const tried = new Set([norm(site), norm(base)]);
             if (home) {
                 pages.push(home);
                 this._absorb(home, result);
-                const links = findContactLinks(home, site, { max: this.opts.maxPagesPerSite });
+                const links = findContactLinks(home, base, { max: this.opts.maxPagesPerSite });
                 const hasKeyPage = links.some(u => new RegExp(this.opts.keyPage, 'i').test(u));
-                const guesses = (this.opts.guessImpressum && !hasKeyPage) ? guessContactUrls(site, this.opts.guessPaths).slice(0, 2) : [];
+                const guesses = (this.opts.guessImpressum && !hasKeyPage) ? guessContactUrls(base, this.opts.guessPaths).slice(0, 2) : [];
                 for (const url of [...links, ...guesses].slice(0, this.opts.maxPagesPerSite)) {
                     tried.add(norm(url));
-                    const body = await this._get(url);
+                    const body = await this._get(url, result);
                     if (!body) continue;
                     pages.push(body);
                     this._absorb(body, result);
@@ -528,16 +545,16 @@ export class ContactEnricher {
             // site's own homepage and contact pages — but only on the shop's
             // own site, never an umbrella organisation's (its info@ is not
             // the shop's).
-            if (!result.emails.length && ownWebsite(site, lead.business_name)) {
-                const root = new URL(site).origin + '/';
-                const queue = [root, ...guessContactUrls(site, this.opts.guessPaths)];
+            if (!result.emails.length && ownWebsite(base, lead.business_name)) {
+                const root = new URL(base).origin + '/';
+                const queue = [root, ...guessContactUrls(base, this.opts.guessPaths)];
                 let budget = this.opts.maxPagesPerSite;
                 while (queue.length && budget > 0 && !result.emails.length) {
                     const url = queue.shift();
                     if (tried.has(norm(url))) continue;
                     tried.add(norm(url));
                     budget--;
-                    const body = await this._get(url);
+                    const body = await this._get(url, result);
                     if (!body) continue;
                     pages.push(body);
                     this._absorb(body, result);
@@ -606,7 +623,8 @@ export function ownWebsite(websiteUrl, businessName = '') {
 
 /** Write an enrichment result onto the lead row. */
 export function applyContacts(lead, result) {
-    const ranked = rankEmails(result.emails, lead.website, lead.business_name);
+    // Rank against where the website really is (after redirects).
+    const ranked = rankEmails(result.emails, result.finalSite || lead.website, lead.business_name);
     lead.email = ranked[0] || lead.email || '';
     lead.other_emails = ranked.slice(1, 4).join('; ');
     if (result.contactName) {
