@@ -45,6 +45,14 @@ export function isMobile(e164) {
     return MOBILE.some(re => re.test(d));
 }
 
+/**
+ * US and Canadian (+1) mobiles share area codes with landlines, so the number
+ * alone says nothing: "mobile number" and "landline" would both be guesses.
+ */
+export function mobileUnknowable(e164) {
+    return /^\+?1\d{10}$/.test(String(e164 || '').replace(/[^\d+]/g, ''));
+}
+
 /** "+44 7958 131295", "07958131295", "0044 7958…" → "+447958131295". */
 export function normaliseNumber(raw, phoneCode = '49') {
     const s = String(raw || '').trim();
@@ -53,6 +61,8 @@ export function normaliseNumber(raw, phoneCode = '49') {
     if (/^\+/.test(s)) { /* already international */ }
     else if (d.startsWith('00')) d = d.slice(2);
     else if (d.startsWith('0')) d = phoneCode + d.slice(1);
+    // US: "(718) 555-1234" has no trunk 0; ten digits are a national number.
+    else if (phoneCode === '1' && d.length === 10) d = '1' + d;
     if (d.length < 8 || d.length > 15) return '';
     return '+' + d;
 }
@@ -94,11 +104,12 @@ export const WA = {
     MENTIONED: 'Likely — website mentions WhatsApp',
     MOBILE: 'Likely — mobile number',
     LANDLINE: 'Check — landline (WhatsApp Business possible)',
+    UNKNOWN: 'Check — US number (mobile or landline unknown)',
     NONE: 'No phone',
 };
 
 const PRIORITY = {
-    [WA.LINK_SITE]: 1, [WA.LINK_LISTING]: 1, [WA.MENTIONED]: 2, [WA.MOBILE]: 2, [WA.LANDLINE]: 3, [WA.NONE]: 4,
+    [WA.LINK_SITE]: 1, [WA.LINK_LISTING]: 1, [WA.MENTIONED]: 2, [WA.MOBILE]: 2, [WA.LANDLINE]: 3, [WA.UNKNOWN]: 3, [WA.NONE]: 4,
 };
 
 export function whatsappPriority(status) {
@@ -133,6 +144,7 @@ export function classifyWhatsApp(lead) {
     if (listing.length) return { status: WA.LINK_LISTING, number: listing[0], priority: 1 };
     if (!phone) return { status: WA.NONE, number: '', priority: 4 };
     if (lead.whatsapp_mentioned) return { status: WA.MENTIONED, number: phone, priority: 2 };
+    if (mobileUnknowable(phone)) return { status: WA.UNKNOWN, number: phone, priority: 3 };
     if (isMobile(phone)) return { status: WA.MOBILE, number: phone, priority: 2 };
     return { status: WA.LANDLINE, number: phone, priority: 3 };
 }

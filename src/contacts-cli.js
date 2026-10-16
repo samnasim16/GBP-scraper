@@ -16,6 +16,7 @@ import { relevanceFields } from './maps.js';
 import { loadInput, resolveCountry } from './config.js';
 import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { TARGET_TIERS, isSellable } from './relevance.js';
+import { loadWhatsAppTemplate } from './whatsapp.js';
 
 const probeAt = process.argv.indexOf('--probe');
 
@@ -55,8 +56,11 @@ async function refresh(file) {
         Object.assign(l, relevanceFields(l, l._siteText));
         console.log(`[${++done}/${leads.length}] ${l.business_name}: ${l.email || 'no email'}${l.contact_name ? ' · ' + l.contact_name : ''}`);
     })));
-    const save = createSaver(path.resolve(input.outputDir || resolveCountry(input).outputDir), {
-        template: loadTemplate(input.emailTemplate || DEFAULT_TEMPLATE_PATH),
+    const country = resolveCountry(input);
+    const waFile = input.whatsappTemplate || country.whatsappTemplate;
+    const save = createSaver(path.resolve(input.outputDir || country.outputDir), {
+        template: loadTemplate(input.emailTemplate || country.emailTemplate || DEFAULT_TEMPLATE_PATH),
+        ...(waFile ? { whatsappTemplate: loadWhatsAppTemplate(waFile) } : {}),
         sender: input.sender || {},
         includeTiers: input.includeTiers || TARGET_TIERS.slice(0, 2),
     });

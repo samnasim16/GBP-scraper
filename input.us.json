@@ -1,0 +1,30 @@
+{
+    "country": "US",
+    "sender": {
+        "name": "",
+        "title": ""
+    },
+    "states_comment": "New York, New Jersey and Florida first. Add more states here once they are in src/config.js (US_CITIES).",
+    "states": ["NY", "NJ", "FL"],
+    "cities": [],
+    "districts": true,
+    "searchCategories": [],
+    "includeTiers": [
+        "Judaica seller",
+        "Jewish / Israeli retail"
+    ],
+    "maxLeads": 8000,
+    "maxResultsPerQuery": 60,
+    "delayBetweenQueries": 4000,
+    "delayBetweenListings": 1800,
+    "browser": {
+        "mode": "local",
+        "headless": false,
+        "userDataDir": ".cache/chrome-profile"
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 3,
+        "maxPagesPerSite": 4
+    }
+}

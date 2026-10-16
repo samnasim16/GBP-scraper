@@ -26,6 +26,9 @@ const JUDAICA_STRONG = [
     // Dutch
     'chanoekia', 'chanoekkia', 'mezoeza', 'kiddoesjbeker', 'sederschotel', 'davidster', 'joodse kunst',
     'joodse geschenken', 'keppel', 'keppeltje', 'talliet',
+    // American / Yiddish-English
+    'seforim', 'sefarim', 'sforim', 'tzitzis', 'tzitzit', 'esrog', 'etrog', 'lulav', 'shabbos candle',
+    'kiddush cups', 'havdalah set', 'mezuzah case', 'mezuzah cases', 'mezuzos', 'tallis bag', 'tefillin bag',
 ];
 
 /** Medium signals — Jewish/Israeli context, but not necessarily a shop. */
@@ -47,6 +50,8 @@ const JEWISH_CONTEXT = [
     'loubavitch', 'habad',
     // Dutch
     'joods', 'joodse', 'israëlisch', 'hebreeuws', 'koosjer', 'sjabbat', 'chanoeka', 'pesach',
+    // American
+    'shabbos', 'yom tov', 'glatt', 'heimish', 'haimish', 'frum', 'chassidic', 'hasidic', 'chasidic',
 ];
 
 /** Retail signals — they sell things to the public. */
@@ -56,6 +61,7 @@ const RETAIL = [
     'online-shop', 'kaufen', 'galerie', 'gallery', 'kunsthandwerk', 'souvenir', 'supermarkt', 'markt',
     'magasin', 'librairie', 'épicerie', 'cadeau', 'grossiste', 'supérette', 'supermarché', 'vente',
     'winkel', 'boekhandel', 'geschenken', 'kado', 'groothandel',
+    'market', 'supermarket', 'grocery', 'emporium', 'outlet', 'wholesale',
 ];
 
 /** Glass & finish — Jaffa Glass's own product language. */
@@ -80,9 +86,13 @@ export const NON_PROFIT_CATEGORY = /\b(synagog\w*|religious|place of worship|chu
 export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b|\basbl\b|\bvzw\b|\bassociation\b|\bconsistoire\b|\bloubavitch\b|\bhabad\b|\bgemeente\b|\bmairie\b|\bfondation\b|\bstichting\b|\bvereniging\b|(?<![\p{L}])(école|musée|bibliothèque|communauté|centre communautaire)(?![\p{L}]))/iu;
 
 /** A trading company or a bookshop, whatever else its name says. */
-const COMMERCIAL_NAME = /(\bGmbH\b|\bKG\b|\bAG\b|\bUG\b|\bLtd\b|\bplc\b|\bSARL\b|\bSASU?\b|\bEURL\b|\bSRL\b|\bSPRL\b|\bBVBA\b|\bBV\b|\bNV\b|book ?store|bookshop|buchhandlung|literaturhandlung|buchladen|unibuch|librairie|boekhandel)/i;
+const COMMERCIAL_NAME = /(\bGmbH\b|\bKG\b|\bAG\b|\bUG\b|\bLtd\b|\bplc\b|\bLLC\b|\bSARL\b|\bSASU?\b|\bEURL\b|\bSRL\b|\bSPRL\b|\bBVBA\b|\bBV\b|\bNV\b|book ?store|bookshop|buchhandlung|literaturhandlung|buchladen|unibuch|librairie|boekhandel)/i;
 
-export const INSTITUTION_NAME = /(?<![\p{L}])(museum|musée|synagog\p{L}*|school|schule|école|college|university|universität|université|library|bibliothek|bibliothèque|charity|foundation|fondation|stiftung|stichting|e\.\s?v\.)(?![\p{L}\p{N}-])/iu;
+export const INSTITUTION_NAME = /(?<![\p{L}])(museum|musée|synagog\p{L}*|school|schule|école|college|university|universität|université|library|bibliothek|bibliothèque|charity|foundation|fondation|stiftung|stichting|e\.\s?v\.|congregation|sisterhood|hadassah)(?![\p{L}\p{N}-])/iu;
+
+// American synagogues: "Temple Beth El Gift Shop" is the sisterhood's shop.
+// Only at the start — "Boutique du Temple" is a street in the Marais.
+const TEMPLE_NAME = /^(the\s+)?temple\s+\p{L}/iu;
 
 /** Registered non-profit legal forms: Germany's e.V., Belgium's ASBL / VZW. Always dropped. */
 const NONPROFIT_FORM = /(\be\.\s?v\.(?![\w-])|\basbl\b|\bvzw\b)/i;
@@ -99,7 +109,7 @@ export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|su
  * stadt-oldenburg.de, *.rlp.de. A city library or municipal gallery is not a
  * customer, even when Maps files it as an "Art Gallery".
  */
-const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$|\.gouv\.fr$|(^|\.)(ville|mairie|commune|agglo|metropole)-[a-z-]+\.fr$|(^|\.)[a-z-]+-(ville|mairie)\.fr$|(^|\.)(belgium|fgov|vlaanderen|wallonie|irisnet)\.be$|(^|\.)(stad|gemeente|commune|ville)-?[a-z-]*\.be$/;
+const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$|\.gouv\.fr$|(^|\.)(ville|mairie|commune|agglo|metropole)-[a-z-]+\.fr$|(^|\.)[a-z-]+-(ville|mairie)\.fr$|(^|\.)(belgium|fgov|vlaanderen|wallonie|irisnet)\.be$|(^|\.)(stad|gemeente|commune|ville)-?[a-z-]*\.be$|\.(gov|mil)$|\.[a-z]{2}\.us$/;
 
 const slug = (s) => clean(s).toLowerCase()
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
@@ -162,7 +172,7 @@ export function isSellable(lead) {
     // Bookstore", and "Literaturhandlung im Jüdischen Museum" (a private
     // Judaica bookshop inside the museum).
     if (NONPROFIT_FORM.test(name)) return { ok: false, reason: 'non-profit / religious (e.V. / ASBL / VZW)' };
-    if (INSTITUTION_NAME.test(name) && !COMMERCIAL_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (institution name)' };
+    if ((INSTITUTION_NAME.test(name) || TEMPLE_NAME.test(name)) && !COMMERCIAL_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (institution name)' };
     return { ok: true, reason: '' };
 }
 

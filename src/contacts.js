@@ -157,7 +157,7 @@ const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service
 const BAD_PREFIX = /^(no-?reply|donotreply|datenschutz|privacy|dsgvo|abuse|postmaster|hostmaster|webmaster|bewerbung|jobs|karriere|presse|press|newsletter|rechnung|invoice|buchhaltung|rgpd|dpo|recrutement|emploi|facturation|comptabilite|factuur|boekhouding|vacatures)@/;
 /** "Made by pixelagentur.de" — the site's builder, not the shop. */
 const AGENCY_DOMAIN = /(agentur|agency|webdesign|design|werbung|media|medien|digital|marketing|hosting|studio|webservice|internet|-it\.|software|wix|jimdo|shopify|strato|ionos)/;
-const FREEMAIL = /@(gmail|googlemail|gmx|web|t-online|yahoo|hotmail|outlook|icloud|aol|freenet|posteo|mail|arcor|live|me|btinternet|btopenworld|sky|virginmedia|talktalk|blueyonder|ntlworld|tiscali|orange|wanadoo|free|sfr|laposte|neuf|club-internet|skynet|telenet|proximus|scarlet|voo)\./;
+const FREEMAIL = /@(gmail|googlemail|gmx|web|t-online|yahoo|hotmail|outlook|icloud|aol|freenet|posteo|mail|arcor|live|me|btinternet|btopenworld|sky|virginmedia|talktalk|blueyonder|ntlworld|tiscali|orange|wanadoo|free|sfr|laposte|neuf|club-internet|skynet|telenet|proximus|scarlet|voo|optonline|optimum|verizon|comcast|att|sbcglobal|bellsouth|earthlink|msn|ymail|rocketmail|aim|juno|netzero|cox|charter|spectrum|frontier|protonmail|[a-z]+\.rr)\./;
 
 /**
  * Rank addresses and return the best one first.

@@ -43,11 +43,17 @@ const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
  *   UK  "5 Bury Old Road, Prestwich, Manchester M25 0FG" → Manchester
  *   FR  "10 Rue des Rosiers, 75004 Paris"             → Paris
  *   BE  "Lange Kievitstraat 1, 2018 Antwerpen"        → Antwerpen (4-digit postcode)
+ *   US  "4920 13th Ave, Brooklyn, NY 11219"           → Brooklyn (town before "ST 12345")
  */
 export function cityFromAddress(address, countryCode = 'DE') {
-    const parts = String(address || '').split(',').map(p => p.trim()).filter(Boolean)
-        .filter(p => !/^(germany|deutschland|united kingdom|uk|england|france|belgium|belgique|belgië|belgie)$/i.test(p));
+    const parts = addressParts(address);
     if (!parts.length) return '';
+    if (countryCode === 'US') {
+        for (let i = parts.length - 1; i > 0; i--) {
+            if (US_STATE_ZIP.test(parts[i]) && !/\d/.test(parts[i - 1])) return parts[i - 1];
+        }
+        return '';
+    }
     if (countryCode === 'UK') {
         for (let i = parts.length - 1; i >= 0; i--) {
             if (!UK_POSTCODE.test(parts[i])) continue;
@@ -66,6 +72,23 @@ export function cityFromAddress(address, countryCode = 'DE') {
     return '';
 }
 
+const US_STATE_ZIP = /^[A-Z]{2}(\s+\d{5}(-\d{4})?)?$/;
+
+function addressParts(address) {
+    return String(address || '').split(',').map(p => p.trim()).filter(Boolean)
+        .filter(p => !/^(germany|deutschland|united kingdom|uk|england|france|belgium|belgique|belgië|belgie|united states|usa|us)$/i.test(p));
+}
+
+/** "…, Brooklyn, NY 11219" → "NY". Only US addresses carry the state. */
+export function stateFromAddress(address) {
+    const parts = addressParts(address);
+    for (let i = parts.length - 1; i > 0; i--) {
+        const m = parts[i].match(US_STATE_ZIP);
+        if (m) return parts[i].slice(0, 2);
+    }
+    return '';
+}
+
 /**
  * The City column. German Maps addresses (English UI) name the district, not
  * the city: "50823 Ehrenfeld", "01279 Dresden-Leuben". So in Germany the
@@ -74,10 +97,12 @@ export function cityFromAddress(address, countryCode = 'DE') {
  * the searched city. UK addresses carry the real post town and always win.
  */
 export function pickCity(address, queryCity, country = {}) {
-    const searched = String(queryCity || '').replace(/^.*,\s*/, '');
+    // "Borough Park, Brooklyn, NY" → "Brooklyn"; "Paris" stays "Paris".
+    const searched = String(queryCity || '').replace(/,\s*[A-Z]{2}$/, '').replace(/^.*,\s*/, '');
     const town = cityFromAddress(address, country.code);
     if (!town) return searched;
-    if (country.code === 'UK') return town;
+    // UK and US addresses carry the real post town.
+    if (country.addressTownWins || country.code === 'UK') return town;
     const norm = (x) => String(x).toLowerCase().replace(/\s*\(.*\)$/, '').replace(/ (am|im|an der) .*$/, '');
     if (norm(town).startsWith(norm(searched))) return searched;
     const known = new Set(Object.values(country.regions || {}).flat().map(norm));
@@ -251,7 +276,8 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 phone:              d.phone || '',
                 website:            d.websiteUrl || '',
                 city:               addrCity,
-                bundesland:         query.state,
+                // A US address names its state; a Teaneck search can return a Monsey shop.
+                bundesland:         (country.stateInAddress && stateFromAddress(address)) || query.state,
                 address:            address,
                 category:           titleCase(clean(d.category) || clean(c.category)),
                 rating:             rating ?? '',

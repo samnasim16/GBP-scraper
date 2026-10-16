@@ -1,0 +1,21 @@
+{
+    "country": "US",
+    "cities": [
+        "Borough Park, Brooklyn, NY"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "Judaica",
+        "Judaica store"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-us-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}
