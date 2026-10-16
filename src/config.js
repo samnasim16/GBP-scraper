@@ -6,6 +6,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+const TEMPLATES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
 /** Load .env without requiring dotenv. */
 export function loadDotEnv(cwd = process.cwd()) {
@@ -204,6 +207,56 @@ export const BELGIUM_CATEGORIES = [
 ];
 
 /**
+ * United States, by state. Starts with the three biggest Jewish markets:
+ * New York (Brooklyn — Borough Park, Williamsburg, Crown Heights, Flatbush —
+ * Queens, the Five Towns, Monsey, Monroe/Kiryas Joel), New Jersey (Lakewood,
+ * Teaneck/Bergen County, Passaic, Highland Park) and South Florida (Miami
+ * Beach, Aventura, Hollywood, Boca Raton). Each city carries its state, so
+ * "Judaica Lawrence, NY" is not searched in Kansas. Add a state by adding a
+ * key here.
+ */
+export const US_CITIES = {
+    NY: ['Manhattan, NY', 'Brooklyn, NY', 'Queens, NY', 'Bronx, NY', 'Staten Island, NY',
+         'Lawrence, NY', 'Cedarhurst, NY', 'Woodmere, NY', 'Hewlett, NY', 'Great Neck, NY', 'West Hempstead, NY',
+         'Oceanside, NY', 'Long Beach, NY', 'Plainview, NY', 'Roslyn, NY', 'Merrick, NY',
+         'New Rochelle, NY', 'Scarsdale, NY', 'White Plains, NY', 'Yonkers, NY',
+         'Monsey, NY', 'Spring Valley, NY', 'New City, NY', 'Monroe, NY', 'Kiryas Joel, NY', 'Monticello, NY',
+         'Albany, NY', 'Rochester, NY', 'Buffalo, NY', 'Syracuse, NY'],
+    NJ: ['Lakewood, NJ', 'Jackson, NJ', 'Toms River, NJ', 'Howell, NJ', 'Teaneck, NJ', 'Englewood, NJ',
+         'Bergenfield, NJ', 'Fair Lawn, NJ', 'Paramus, NJ', 'Hackensack, NJ', 'Fort Lee, NJ', 'Passaic, NJ',
+         'Clifton, NJ', 'Elizabeth, NJ', 'Highland Park, NJ', 'Edison, NJ', 'East Brunswick, NJ', 'Livingston, NJ',
+         'West Orange, NJ', 'Deal, NJ', 'Long Branch, NJ', 'Morristown, NJ', 'Cherry Hill, NJ', 'Princeton, NJ',
+         'Jersey City, NJ'],
+    FL: ['Miami Beach, FL', 'Surfside, FL', 'Bal Harbour, FL', 'Sunny Isles Beach, FL', 'Aventura, FL',
+         'North Miami Beach, FL', 'Miami, FL', 'Hollywood, FL', 'Hallandale Beach, FL', 'Fort Lauderdale, FL',
+         'Plantation, FL', 'Weston, FL', 'Coral Springs, FL', 'Parkland, FL', 'Boca Raton, FL', 'Delray Beach, FL',
+         'Boynton Beach, FL', 'West Palm Beach, FL', 'Palm Beach Gardens, FL', 'Jupiter, FL', 'Orlando, FL',
+         'Tampa, FL', 'St. Petersburg, FL', 'Sarasota, FL', 'Naples, FL', 'Jacksonville, FL'],
+};
+
+export const US_DISTRICTS = {
+    'Brooklyn, NY': ['Borough Park', 'Williamsburg', 'Crown Heights', 'Flatbush', 'Midwood', 'Marine Park',
+                     'Sheepshead Bay', 'Brighton Beach', 'Mill Basin', 'Kensington'],
+    'Manhattan, NY': ['Upper West Side', 'Upper East Side', 'Lower East Side', 'Washington Heights', 'Midtown'],
+    'Queens, NY': ['Kew Gardens Hills', 'Forest Hills', 'Rego Park', 'Far Rockaway', 'Fresh Meadows',
+                   'Jamaica Estates', 'Bayside'],
+    'Bronx, NY': ['Riverdale'],
+};
+
+export const US_CATEGORIES = [
+    'Judaica',
+    'Judaica store',
+    'Jewish gift shop',
+    'Seforim store',
+    'Jewish bookstore',
+    'Israeli gifts',
+    'Jewish museum shop',
+    'kosher supermarket',
+    'Menorah',
+    'art glass gallery',
+];
+
+/**
  * Everything that differs between the markets. `gl` sets the country Maps
  * searches in; `phoneCode` is what a national number starting with 0 gets;
  * `foreign` drops cross-border results.
@@ -222,6 +275,7 @@ export const COUNTRIES = {
         contactKeyPage: 'impressum|imprint|legal',
         contactPaths: ['/impressum', '/kontakt', '/impressum/', '/pages/impressum', '/imprint'],
         outputDir: 'output',
+        script: 'start',
         foreign: /,\s*(Austria|Österreich|Switzerland|Schweiz|Suisse|France|Frankreich|Netherlands|Niederlande|Nederland|Belgium|Belgien|Poland|Polen|Czechia|Czech Republic|Tschechien|Denmark|Dänemark|Luxembourg|Luxemburg|Italy|Italien|Israel|United Kingdom|UK|USA|United States)\s*$/i,
     },
     UK: {
@@ -238,6 +292,7 @@ export const COUNTRIES = {
         contactKeyPage: 'contact',
         contactPaths: ['/contact', '/contact-us', '/pages/contact', '/about', '/about-us'],
         outputDir: 'output-uk',
+        script: 'england',
         // The Republic of Ireland and the Continent; Scotland, Wales and
         // Northern Ireland are the UK and stay.
         foreign: /,\s*(Ireland|Éire|Co\.\s*\w+|France|Netherlands|Belgium|Germany|Deutschland|Spain|Israel|USA|United States)\s*$/i,
@@ -257,6 +312,7 @@ export const COUNTRIES = {
         contactKeyPage: 'mentions|legal|contact',
         contactPaths: ['/mentions-legales', '/contact', '/mentions-legales/', '/nous-contacter', '/pages/contact'],
         outputDir: 'output-fr',
+        script: 'france',
         // Monaco and Andorra are their own countries.
         foreign: /(,\s*(Belgium|Belgique|Switzerland|Suisse|Schweiz|Luxembourg|Germany|Allemagne|Deutschland|Spain|Espagne|Italy|Italie|Monaco|Andorra|Andorre|United Kingdom|UK|Israel|Israël)|\b980\d\d\s+Monaco)\s*$/i,
     },
@@ -274,15 +330,40 @@ export const COUNTRIES = {
         contactPaths: ['/contact', '/mentions-legales', '/nl/contact', '/fr/contact', '/colofon'],
         outputDir: 'output-be',
         foreign: /,\s*(France|Netherlands|Nederland|Pays-Bas|Germany|Deutschland|Allemagne|Duitsland|Luxembourg|Luxemburg|United Kingdom|UK|Israel)\s*$/i,
+        script: 'belgium',
+    },
+    US: {
+        name: 'United States',
+        gl: 'us',
+        phoneCode: '1',
+        regionLabel: 'state',
+        regions: US_CITIES,
+        districts: US_DISTRICTS,
+        categories: US_CATEGORIES,
+        highYield: ['Judaica', 'Judaica store', 'Jewish gift shop', 'Seforim store'],
+        acceptLanguage: 'en-US,en;q=0.9',
+        contactKeyPage: 'contact',
+        contactPaths: ['/contact', '/contact-us', '/pages/contact', '/pages/contact-us', '/about', '/about-us'],
+        outputDir: 'output-us',
+        // The address names the real town and state ("Brooklyn, NY 11219").
+        addressTownWins: true,
+        stateInAddress: true,
+        // "We export throughout Europe" reads oddly to a shop in Brooklyn.
+        emailTemplate: path.join(TEMPLATES, 'partnership-email-us.txt'),
+        whatsappTemplate: path.join(TEMPLATES, 'whatsapp-message-us.txt'),
+        // Canada (a province and an "A1A 1A1" postcode) and anywhere abroad.
+        foreign: /(,\s*(Canada|Israel|Mexico|Bahamas|United Kingdom|UK)|\b(ON|QC|BC|AB|MB|NS|NB)\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)\s*$/i,
+        script: 'us',
     },
 };
 
-/** "DE", "UK", "GB", "England" → a COUNTRIES entry (default Germany). */
+/** "DE", "UK", "GB", "England", "USA" → a COUNTRIES entry (default Germany). */
 export function resolveCountry(input = {}) {
     const raw = String(input.country || 'DE').trim().toUpperCase();
     const code = {
         GB: 'UK', ENGLAND: 'UK', 'UNITED KINGDOM': 'UK', GERMANY: 'DE', DEUTSCHLAND: 'DE',
         FRANCE: 'FR', BELGIUM: 'BE', BELGIQUE: 'BE', 'BELGIË': 'BE', BELGIE: 'BE',
+        USA: 'US', 'UNITED STATES': 'US', AMERICA: 'US', 'U.S.': 'US', 'U.S.A.': 'US',
     }[raw] || raw;
     const c = COUNTRIES[code];
     if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);

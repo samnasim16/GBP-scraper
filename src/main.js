@@ -26,6 +26,7 @@ import { createHttpClient } from './http.js';
 import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { isTarget, TARGET_TIERS } from './relevance.js';
 import { sleep } from './util.js';
+import { loadWhatsAppTemplate } from './whatsapp.js';
 import { loadPrevious, readProgress, writeProgress, resumePoint, seedSeen, needsContactLookup, backupPrevious } from './resume.js';
 
 loadDotEnv();
@@ -45,16 +46,20 @@ const {
     contacts             = {},
     includeTiers         = TARGET_TIERS.slice(0, 2),
     sender               = {},
-    emailTemplate        = DEFAULT_TEMPLATE_PATH,
 } = input;
 
 const COUNTRY = resolveCountry(input);
+// A market can carry its own wording (the US email doesn't say "we export
+// throughout Europe" alone); "emailTemplate" in the input file still wins.
+const emailTemplate = input.emailTemplate || COUNTRY.emailTemplate || DEFAULT_TEMPLATE_PATH;
+const whatsappTemplate = (input.whatsappTemplate || COUNTRY.whatsappTemplate)
+    ? loadWhatsAppTemplate(input.whatsappTemplate || COUNTRY.whatsappTemplate) : undefined;
 const FRESH = process.argv.includes('--fresh');
 // Each market writes to its own folder, so an England run never overwrites
 // the Germany results.
 const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
 const template = loadTemplate(emailTemplate);
-const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers });
+const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate });
 
 // ─── CRASH SAFETY NET ─────────────────────────────────────────────────────
 let LEADS_REF = [];
@@ -146,7 +151,7 @@ async function main() {
                 if (startAt >= queries.length) {
                     console.log(`   ✅ The previous ${COUNTRY.name} run already finished all ${queries.length} queries (${previous.length} places).`);
                     console.log('      Nothing to resume. To search again from the start, add --fresh:');
-                    console.log(`        npm run ${COUNTRY.code === 'UK' ? 'england' : 'start'} -- --fresh`);
+                    console.log(`        npm run ${COUNTRY.script || 'start'} -- --fresh`);
                     process.exit(0);
                 }
                 allLeads.push(...previous);
@@ -236,7 +241,7 @@ async function main() {
     }
 
     await saveResults(allLeads);
-    const rows = prepareLeads(allLeads);
+    const rows = prepareLeads(allLeads, whatsappTemplate !== undefined ? { whatsappTemplate } : {});
     const targets = rows.filter(r => isTarget(r, includeTiers));
     const byTier = (t) => rows.filter(r => r.relevance_tier === t).length;
 
@@ -244,7 +249,7 @@ async function main() {
     console.log(`   Places scraped: ${rows.length}`);
     for (const t of [...TARGET_TIERS, 'Unrelated', 'Not a retailer', 'Non-profit / religious']) console.log(`     ${t}: ${byTier(t)}`);
     console.log(`   Outreach targets: ${targets.length} — ${targets.filter(r => r.email).length} with email, ${targets.filter(r => r.contact_name).length} with a named contact`);
-    console.log(`   WhatsApp: ${targets.filter(r => r.whatsapp_priority === 1).length} confirmed on website/listing, ${targets.filter(r => r.whatsapp_priority === 2).length} likely (mobile / mentioned), ${targets.filter(r => r.whatsapp_priority === 3).length} landlines to check`);
+    console.log(`   WhatsApp: ${targets.filter(r => r.whatsapp_priority === 1).length} confirmed on website/listing, ${targets.filter(r => r.whatsapp_priority === 2).length} likely (mobile / mentioned), ${targets.filter(r => r.whatsapp_priority === 3).length} to check by hand (landlines / US numbers)`);
     const s = enricher.stats;
     console.log(`   Websites read: ${s.sites} (${s.pages} pages)`);
     console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/judaica-leads.xlsx and mail-merge.csv`);
