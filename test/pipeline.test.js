@@ -102,6 +102,11 @@ test('saver writes every deliverable', async () => {
     for (const f of ['judaica-leads.xlsx', 'mail-merge.csv', 'leads.csv', 'leads.json']) {
         assert.ok(fs.existsSync(path.join(dir, f)), f);
     }
+    // leads.csv is one physical line per place (the email body made Excel rows tall).
+    const csv = fs.readFileSync(path.join(dir, 'leads.csv'), 'utf8').split('\n');
+    assert.equal(csv.length, 1 + JSON.parse(fs.readFileSync(path.join(dir, 'leads.json'), 'utf8')).length);
+    assert.ok(!csv.some(l => /\r/.test(l)));
+    assert.ok(!csv[0].includes('email_body'));
     fs.rmSync(dir, { recursive: true, force: true });
 });
 

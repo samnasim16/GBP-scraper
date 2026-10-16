@@ -66,10 +66,23 @@ export function escapeCSV(val) {
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function buildCSV(rows, columns = CSV_COLUMNS) {
+export function buildCSV(rows, columns = CSV_COLUMNS, { flat = false } = {}) {
     const header = columns.join(',');
-    const lines = rows.map(r => columns.map(c => escapeCSV(r[c])).join(','));
-    return '﻿' + [header, ...lines].join('\n');   // BOM so Excel reads umlauts
+    const cell = flat ? flatCell : (v) => v;
+    const lines = rows.map(r => columns.map(c => escapeCSV(cell(r[c]))).join(','));
+    return '\ufeff' + [header, ...lines].join('\n');   // BOM so Excel reads umlauts
+}
+
+// leads.csv is one line per place: line breaks inside a cell made Excel show
+// every row as a tall block with blank-looking gaps. The full email body is in
+// mail-merge.csv and the workbook, so it is left out here.
+export const LEADS_CSV_COLUMNS = CSV_COLUMNS.filter(c => c !== 'email_body');
+
+/** One-line cell: Maps' private-use icon glyphs dropped, whitespace collapsed. */
+function flatCell(v) {
+    if (v == null || typeof v !== 'string') return v;
+    return v.replace(/[\uE000-\uF8FF]/g, ' ').replace(/\s*[\r\n]+\s*/g, ' · ').replace(/[ \t]{2,}/g, ' ').replace(/\s+·\s*(·\s*)+/g, ' · ')
+        .replace(/\b([ap]m)(?=\d)/g, '$1, ').replace(/\s+;/g, ';').trim();   // Maps hours: '2 pm4–7 pm'
 }
 
 /** Dedupe by place id, then by website domain + city; best relevance first. */
@@ -154,27 +167,60 @@ export function uniqueByEmail(rows) {
     });
 }
 
-async function writeXlsx(rows, file, includeTiers) {
+// Workbook palette: a navy header, one soft colour per relevance tier and per
+// WhatsApp status, light grid lines, and one fixed-height line per place.
+const XL = {
+    font: 'Calibri',
+    header: { fill: 'FF1F3864', font: 'FFFFFFFF' },
+    border: 'FFD9DEE5',
+    link: 'FF1155CC',
+    chat: 'FF128C7E',
+    band: 'FFF8F9FB',
+    tier: {
+        'Judaica seller':          { fill: 'FFC6EFCE', font: 'FF006100' },
+        'Jewish / Israeli retail': { fill: 'FFDDEBF7', font: 'FF1F4E79' },
+        'Glass & gift shop':       { fill: 'FFFFEB9C', font: 'FF7F6000' },
+        'Unrelated':               { fill: 'FFEDEDED', font: 'FF595959' },
+        'Not a retailer':          { fill: 'FFEDEDED', font: 'FF595959' },
+        'Non-profit / religious':  { fill: 'FFFCE4D6', font: 'FF833C0B' },
+    },
+    whatsapp: {
+        1: { fill: 'FFC6EFCE', font: 'FF006100' },
+        2: { fill: 'FFFFEB9C', font: 'FF7F6000' },
+        3: { fill: 'FFEDEDED', font: 'FF404040' },
+    },
+    tabs: { 'WhatsApp': 'FF25D366', 'Outreach': 'FF1F3864', 'No email found': 'FFBF8F00', 'All results': 'FF7F7F7F' },
+};
+
+const solid = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+
+/** Write sheets ([title, rows] pairs) as one styled workbook. */
+export async function writeWorkbook(file, sheets) {
     const wb = new ExcelJS.Workbook();
-    const targets = rows.filter(r => isTarget(r, includeTiers));
-    const sheets = [
-        // Everyone worth a WhatsApp message, best evidence first.
-        ['WhatsApp', targets.filter(r => r.whatsapp_priority < 4)],
-        ['Outreach', uniqueByEmail(targets.filter(r => r.email))],
-        ['No email found', targets.filter(r => !r.email)],
-        ['All results', rows],
-    ];
+    wb.creator = 'Jaffa Glass';
+    const thin = { style: 'thin', color: { argb: XL.border } };
+    const grid = { top: thin, left: thin, bottom: thin, right: thin };
     for (const [title, data] of sheets) {
-        const ws = wb.addWorksheet(title, { views: [{ state: 'frozen', ySplit: 1, xSplit: 1 }] });
+        const ws = wb.addWorksheet(title, {
+            views: [{ state: 'frozen', ySplit: 1, xSplit: 1, zoomScale: 100 }],
+            properties: { tabColor: { argb: XL.tabs[title] || 'FF1F3864' }, defaultRowHeight: 18 },
+        });
         ws.columns = COLUMNS.map(([key, header, width]) => ({ key, header, width }));
-        for (const r of data) {
+        data.forEach((r, i) => {
             const row = ws.addRow(r);
+            row.height = 18;
+            row.font = { name: XL.font, size: 10 };
+            row.eachCell({ includeEmpty: true }, (cell) => {
+                cell.border = grid;
+                cell.alignment = { vertical: 'middle', wrapText: false };
+                if (i % 2) cell.fill = solid(XL.band);
+            });
             for (const col of LINK_COLUMNS) {
                 const cell = row.getCell(col);
                 const v = String(cell.value || '');
                 if (/^https?:\/\//i.test(v)) {
                     cell.value = { text: v, hyperlink: v };
-                    cell.font = { color: { argb: 'FF1155CC' }, underline: true };
+                    cell.font = { name: XL.font, size: 10, color: { argb: XL.link }, underline: true };
                 }
             }
             const mail = row.getCell('email');
@@ -182,21 +228,54 @@ async function writeXlsx(rows, file, includeTiers) {
                 const subj = encodeURIComponent(r.email_subject || '');
                 const body = encodeURIComponent(r.email_body || '').slice(0, 1800);
                 mail.value = { text: String(r.email), hyperlink: `mailto:${r.email}?subject=${subj}&body=${body}` };
-                mail.font = { color: { argb: 'FF1155CC' }, underline: true };
+                mail.font = { name: XL.font, size: 10, color: { argb: XL.link }, underline: true };
             }
             const chat = row.getCell('whatsapp_link');
             if (r.whatsapp_link) {
                 chat.value = { text: 'Open chat', hyperlink: r.whatsapp_link };
-                chat.font = { color: { argb: 'FF128C7E' }, underline: true };
+                chat.font = { name: XL.font, size: 10, bold: true, color: { argb: XL.chat }, underline: true };
+                chat.alignment = { vertical: 'middle', horizontal: 'center' };
             }
-            const fill = { 1: 'FFD8F3DC', 2: 'FFFFF3CD', 3: 'FFF1F3F5' }[r.whatsapp_priority];
-            if (fill) row.getCell('whatsapp_status').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-            row.getCell('email_body').alignment = { wrapText: false, vertical: 'top' };
-        }
-        ws.getRow(1).font = { bold: true };
+            const tier = XL.tier[r.relevance_tier];
+            if (tier) {
+                const c = row.getCell('relevance_tier');
+                c.fill = solid(tier.fill);
+                c.font = { name: XL.font, size: 10, bold: true, color: { argb: tier.font } };
+            }
+            const wa = XL.whatsapp[r.whatsapp_priority];
+            if (wa) {
+                const c = row.getCell('whatsapp_status');
+                c.fill = solid(wa.fill);
+                c.font = { name: XL.font, size: 10, color: { argb: wa.font } };
+            }
+            row.getCell('business_name').font = { name: XL.font, size: 10, bold: true };
+            for (const key of ['relevance_score', 'rating', 'review_count', 'bundesland']) {
+                row.getCell(key).alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+            row.getCell('rating').numFmt = '0.0';
+        });
+        const head = ws.getRow(1);
+        head.height = 26;
+        head.eachCell((cell) => {
+            cell.fill = solid(XL.header.fill);
+            cell.font = { name: XL.font, size: 10, bold: true, color: { argb: XL.header.font } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            cell.border = grid;
+        });
         ws.autoFilter = { from: 'A1', to: { row: 1, column: COLUMNS.length } };
     }
     await wb.xlsx.writeFile(file);
+}
+
+async function writeXlsx(rows, file, includeTiers) {
+    const targets = rows.filter(r => isTarget(r, includeTiers));
+    await writeWorkbook(file, [
+        // Everyone worth a WhatsApp message, best evidence first.
+        ['WhatsApp', targets.filter(r => r.whatsapp_priority < 4)],
+        ['Outreach', uniqueByEmail(targets.filter(r => r.email))],
+        ['No email found', targets.filter(r => !r.email)],
+        ['All results', rows],
+    ]);
 }
 
 /**
@@ -212,7 +291,7 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
         saving = true;
         try {
             const rows = prepareLeads(leads, { template, sender, ...(whatsappTemplate !== undefined ? { whatsappTemplate } : {}) });
-            fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows), 'utf8');
+            fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows, LEADS_CSV_COLUMNS, { flat: true }), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'leads.json'), JSON.stringify(rows, null, 2), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'mail-merge.csv'), buildMailMerge(rows, includeTiers), 'utf8');
             try {
