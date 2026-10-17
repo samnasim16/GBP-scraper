@@ -360,10 +360,12 @@ export function greetingFor({ contact_name: name = '', contact_role: role = '', 
  *   "KosherStar GbR" → "KosherStar",  "JEWERIA® - Jewish jewelry" → "JEWERIA"
  */
 export function shortBusinessName(name) {
-    let n = clean(name)
-        .replace(/[®™©]/g, '')
-        // A Hebrew (or other non-Latin) word standing on its own is a translation of the name.
-        .replace(/(^|\s)[\p{Script=Hebrew}\p{Script=Cyrillic}\p{Script=Arabic}\u200e\u200f\s]+$/u, '');
+    let n = clean(name).replace(/[®™©]/g, '');
+    // A Hebrew (or other non-Latin) run after a Latin name is its translation:
+    // "Tallis Center טלית סנטר". An all-Hebrew name is the name itself
+    // ("כפתור ופרח יודאיקה - החנות"), so it stays.
+    const tr = n.match(/(^|\s)[\p{Script=Hebrew}\p{Script=Cyrillic}\p{Script=Arabic}\u200e\u200f\s]+$/u);
+    if (tr && /\p{Script=Latin}/u.test(n.slice(0, tr.index))) n = n.slice(0, tr.index);
     // "Contacts | Premium Kosher": a page-title word before the real name.
     const segs = n.split(/\s+[|–—]\s+|\s+-\s+|\s+I\s+|\s*\|\s*/).filter(Boolean);
     n = (segs.length > 1 && /^(contacts?|accueil|home|welcome|bienvenue|startseite|kontakt)$/i.test(segs[0].trim())) ? segs[1] : segs[0] || '';
