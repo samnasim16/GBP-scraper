@@ -23,7 +23,7 @@ npm run smoke:us / npm run us               # → output-us-smoke/ / output-us/ 
 npm run smoke:israel / npm run israel       # → output-il-smoke/ / output-il/   (input.israel.json)
 npm run contacts -- --probe https://shop.de "Shop Name"
 npm run contacts -- output/leads.json
-npm test                             # 119 tests, offline; browser tests skip without Chrome
+npm test                             # 120 tests, offline; browser tests skip without Chrome
 ```
 
 Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silently in cmd.exe.

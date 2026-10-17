@@ -8,7 +8,7 @@ import { mapsSearchUrl, cityFromAddress, pickCity } from '../src/maps.js';
 import { extractDetail } from '../src/dom-extract.js';
 import { classifyWhatsApp, WA, loadWhatsAppTemplate } from '../src/whatsapp.js';
 import { scoreRelevance, isSellable, isPublicBody, isTarget } from '../src/relevance.js';
-import { findContactLinks, registrableDomain, rankEmails } from '../src/contacts.js';
+import { findContactLinks, registrableDomain, rankEmails, shortBusinessName } from '../src/contacts.js';
 import { loadTemplate, renderEmail } from '../src/email-template.js';
 import { prepareLeads } from '../src/output.js';
 
@@ -116,4 +116,13 @@ test('the Israeli email and WhatsApp message are in Hebrew and follow the anti-s
     assert.match(row.whatsapp_link, /^https:\/\/wa\.me\/972541234567\?text=/);
     assert.match(decodeURIComponent(row.whatsapp_link), /יודאיקה גאולה/);
     assert.ok(fs.existsSync(IL.whatsappTemplate));
+});
+
+test('smoke run: Hebrew shop names are shortened, not emptied', () => {
+    assert.equal(shortBusinessName('כפתור ופרח יודאיקה - החנות'), 'כפתור ופרח יודאיקה');
+    assert.equal(shortBusinessName('חנות יודאיקה ותשמישי קדושה - מרקוביץ רקמה'), 'חנות יודאיקה ותשמישי קדושה');
+    assert.equal(shortBusinessName('טלית סנטר'), 'טלית סנטר');
+    assert.equal(shortBusinessName('| פרוכת לארון קודש | Jerusalem Yarmulka |'), 'פרוכת לארון קודש');
+    // A Hebrew translation after a Latin name is still dropped.
+    assert.equal(shortBusinessName('Tallis Center טלית סנטר'), 'Tallis Center');
 });
