@@ -419,7 +419,10 @@ export const COUNTRIES = {
         // A Hebrew email and WhatsApp message for Israeli shops.
         emailTemplate: path.join(TEMPLATES, 'partnership-email-il.txt'),
         whatsappTemplate: path.join(TEMPLATES, 'whatsapp-message-il.txt'),
-        foreign: /,\s*(Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece)\s*$/i,
+        // Abroad, and the Palestinian Authority (a Bethlehem souvenir shop came
+        // back as a Judaica seller). Israeli towns in the West Bank carry no
+        // country in their Maps address and stay.
+        foreign: /,\s*(Palestine|Palestinian Territories|Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece|Italy|France|Germany|United Kingdom|UK|USA|United States|Spain|Netherlands|Russia|Ukraine|United Arab Emirates|Morocco)\s*$/i,
         script: 'israel',
     },
 };

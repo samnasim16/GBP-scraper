@@ -123,8 +123,10 @@ Put your name and title in `"sender"` in `input.israel.json`. You can write it i
 - **Who is a target:**
   - Every shop in Israel is Jewish and kosher, so "Jewish context" doesn't count. A kosher supermarket is not a target.
   - The targets are **Judaica sellers** (Hebrew or English Judaica words in the listing or on the site) and **gift, souvenir, art and glass shops**, which sell Judaica to visitors.
-  - Hebrew prefixes are understood ("והמזוזות" counts as מזוזות).
+  - Hebrew prefixes are understood ("והמזוזות" counts as מזוזות), but "מטלית" (cleaning cloth) is not "טלית".
   - "מנורה" doesn't count, because in Hebrew it is any lamp.
+  - Toy shops, florists, photo shops, malls, furniture stores and glaziers are never gift-shop targets.
+  - Directory pages (Dapei Zahav, B144, Easy, Zap) are not read as a shop's website.
 - **Not buyers:** synagogues (בית כנסת), yeshivas (ישיבה), gemachs (גמ"ח), non-profits (עמותה), museums, schools, and `gov.il` / `muni.il` sites. A name with בע"מ (Ltd) is treated as a company.
 - **Contact pages:** "צור קשר" / "אודות". Israeli inboxes (walla, netvision, bezeqint, 012/013) count as the shop's own.
 - **Phones** are `+972`. Mobiles (`05…`) show as **Likely** on WhatsApp.
@@ -222,7 +224,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 120 offline tests
+npm test                                                               # 122 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)

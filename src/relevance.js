@@ -33,9 +33,9 @@ const JUDAICA_STRONG = [
 ];
 
 /**
- * Hebrew Judaica words. Matched anywhere in a word, because Hebrew glues
- * prefixes on (ה, ו, ב, ל, מ, ש: "והמזוזות", "לטליתות"). "מנורה" is left out:
- * in Hebrew it is any lamp, and lighting shops are full of them.
+ * Hebrew Judaica words. Matched after up to two prefix letters (ו, ה, ב, כ,
+ * ל, ש: "והמזוזות", "לטליתות") — not מ, because "מטלית" is a cleaning cloth.
+ * "מנורה" is left out: in Hebrew it is any lamp.
  */
 const JUDAICA_HE = [
     'יודאיקה', 'יודאיקא', 'תשמישי קדושה', 'תשמיש קדושה', 'כלי קודש', 'מזוזה', 'מזוזות', 'בית מזוזה', 'בתי מזוזה',
@@ -50,8 +50,18 @@ const RETAIL_HE = ['חנות', 'מתנות', 'גלריה', 'גלרית', 'מזכ
 /** Hebrew organisations we cannot sell to. */
 const NON_PROFIT_HE = /בית כנסת|בית הכנסת|ישיבת|ישיבה|עמותת|עמותה|גמ["״]?ח|מוזיאון|בית ספר|תלמוד תורה|בית חב["״]ד|מתנ["״]ס|מרכז קהילתי|קהילת/;
 
-/** Categories and names of shops that sell Judaica to visitors (Israel). */
-const GIFT_SHOP = /gift|souvenir|art gallery|gallery|glass|craft|judaica|religious goods|silver|מתנות|מזכרות|גלריה|גלרית|זכוכית/i;
+/**
+ * Israel's second tier: shops that sell Judaica to visitors and gift buyers.
+ * Gift, souvenir, art and Judaica categories count; a generic "Store" /
+ * "Novelty Store" counts when its name says gifts or Judaica; any shop
+ * whose website names a Judaica object counts. Toy, flower, photo and
+ * furniture shops, malls, promotional suppliers and glaziers never do —
+ * the full run had Toys R Us, the LEGO Store and glass-railing installers.
+ */
+const GIFT_SHOP = /gift shop|gift basket|souvenir|art gallery|art studio|judaica|religious goods|religious book|glass blower|stained glass|craft store|wedding souvenir|silversmith|artist|handicraft|ceramic|pottery/i;
+const GENERIC_SHOP = /^(store|shop|novelty store|general store|variety store|department store|home goods store|)$/i;
+const GIFT_NAME = /gift|souvenir|judaica|מתנות|מזכרות|גלריה|גלרית|יודאיקה|(^|\s)שי(\s|$)/i;
+const NOT_GIFT = /florist|toy|photo|promotional|shopping mall|shopping center|furniture|kitchen|mirror|balloon|computer|hardware|tool|musical|pharmacy|optic|clothing|shoe|cosmetic|perfume|electronic|phone|stationery|office supply|supermarket|grocery|market|bakery|pastry|candy|lighting/i;
 
 /** Medium signals — Jewish/Israeli context, but not necessarily a shop. */
 /**
@@ -94,7 +104,7 @@ const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'cristal', 'verre', 'verr
  * Categories that are never a buyer, however Jewish the context: a restaurant
  * serving kosher food, a glazier, a lawyer. Checked against the Maps category.
  */
-export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei|solicitor|takeaway|dentist|estate agent|funeral|undertaker|bestatter|removals?|plumber|electrician|accountant|steuerberater|barber|hairdresser|hair salon|beauty salon|nail salon|massage|spa|therapist|home care|care home|health consultant|corporate office|cultural landmark|landmark|tourist attraction|fish & chips|fish and chips|chippy|bagel shop|bagel|leisure centre|gym|sign in|details|sandwich|traiteur|pizzeria|snack|kebab|radio|broadcaster|television|tv station|newspaper|magazine publisher)\b/i;
+export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hotel|pension|hostel|rechtsanwalt|anwalt|lawyer|attorney|arzt|doctor|praxis|clinic|klinik|reisebüro|travel agency|glaserei|glazier|fensterbau|window|autoglas|mirror shop|glass repair|immobilien|real estate|parkplatz|parking|haltestelle|bus stop|station|caterer|catering|bakery|bäckerei|butcher|metzgerei|solicitor|takeaway|dentist|estate agent|funeral|undertaker|bestatter|removals?|plumber|electrician|accountant|steuerberater|barber|hairdresser|hair salon|beauty salon|nail salon|massage|spa|therapist|home care|care home|health consultant|corporate office|cultural landmark|landmark|tourist attraction|fish & chips|fish and chips|chippy|bagel shop|bagel|leisure centre|gym|sign in|details|sandwich|traiteur|pizzeria|snack|kebab|radio|broadcaster|television|tv station|newspaper|magazine publisher)\b/i;
 
 /**
  * Organisations we cannot sell to: places of worship, communities, charities,
@@ -215,13 +225,16 @@ const patternCache = new Map();
  * "tora"), so a bare substring test finds Torah in every restoration workshop.
  * Glass is the exception — "Kunstglas", "Bleiglas" — and opts into `anywhere`.
  */
-function countHits(hay, words, { anywhere = false } = {}) {
+function countHits(hay, words, { anywhere = false, hebrew = false } = {}) {
     const hits = [];
     for (const w of words) {
-        const key = w + (anywhere ? '*' : '');
+        const key = w + (anywhere ? '*' : '') + (hebrew ? 'he' : '');
         let re = patternCache.get(key);
         if (!re) {
-            re = new RegExp((anywhere ? '' : '(?<![\\p{L}\\p{N}])') + escape(w), 'iu');
+            // Hebrew glues one or two prefix letters on (ו, ה, ב, כ, ל, ש:
+            // "והמזוזות", "לטליתות"). Not מ: "מטלית" is a cleaning cloth.
+            const start = anywhere ? '' : hebrew ? '(?<![\\p{L}\\p{N}])[והבכלש]{0,2}' : '(?<![\\p{L}\\p{N}])';
+            re = new RegExp(start + escape(w), 'iu');
             patternCache.set(key, re);
         }
         if (re.test(hay)) hits.push(w);
@@ -276,12 +289,12 @@ export function scoreRelevance(lead, siteText = '') {
     // "Menorah Medical Supply" and "Menorah Collections" (clothing) are shops,
     // but not that kind.
     const giftLike = GIFT_LIKE.test(clean(lead.category)) || /gift|judaica|art|silver|glass|book|seforim/i.test(clean(lead.business_name));
-    const strongListing = [...countHits(listing, JUDAICA_STRONG), ...countHits(listing, JUDAICA_HE, { anywhere: true })]
+    const strongListing = [...countHits(listing, JUDAICA_STRONG), ...countHits(listing, JUDAICA_HE, { hebrew: true })]
         .filter(w => !BRAND_PRONE.has(w) || ((retailCat || countHits(listing, RETAIL).length > 0) && (giftLike || !clean(lead.category))));
     // The shop's own name on its website is not evidence: menorahmedical.com
     // says "Menorah" on every page.
     const brandInName = countHits(clean(lead.business_name).toLowerCase(), [...BRAND_PRONE]).length > 0;
-    const strongSite = [...countHits(site, JUDAICA_STRONG), ...countHits(site, JUDAICA_HE, { anywhere: true })]
+    const strongSite = [...countHits(site, JUDAICA_STRONG), ...countHits(site, JUDAICA_HE, { hebrew: true })]
         .filter(w => !BRAND_PRONE.has(w) || !brandInName || giftLike);
     // In Israel every shop is Jewish and kosher, so context says nothing.
     const profile = COUNTRIES[lead.country] || {};
@@ -297,7 +310,7 @@ export function scoreRelevance(lead, siteText = '') {
     const contextSite = profile.contextEverywhere ? [] : countHits(site, JEWISH_CONTEXT);
     // Retail must show in the LISTING. Every community and institute website
     // has a "Shop" or "Spenden-Shop" link somewhere, which made them retailers.
-    const retail = [...countHits(listing, RETAIL), ...countHits(listing, RETAIL_HE, { anywhere: true })];
+    const retail = [...countHits(listing, RETAIL), ...countHits(listing, RETAIL_HE, { hebrew: true })];
     const retailCategory = RETAIL_CATEGORY.test(clean(lead.category));
     const glass = countHits(listing + ' ' + site, GLASS, { anywhere: true });
 
@@ -329,10 +342,12 @@ export function scoreRelevance(lead, siteText = '') {
         // It needs the listing itself to be Jewish/Israeli, or a Judaica
         // object named on the site.
         tier = 'Jewish / Israeli retail';
-    } else if (glass.length && isRetail) {
+    } else if (glass.length && isRetail && !(profile.contextEverywhere && NOT_GIFT.test(category))) {
         tier = 'Glass & gift shop';
-    } else if (profile.contextEverywhere && isRetail && GIFT_SHOP.test(category + ' ' + clean(lead.business_name))) {
-        // Israel: the gift, souvenir and art shops that sell Judaica to visitors.
+    } else if (profile.contextEverywhere && isRetail && !NOT_GIFT.test(category)
+        && (GIFT_SHOP.test(category) || strongSite.length >= 1
+            || (GENERIC_SHOP.test(category) && GIFT_NAME.test(clean(lead.business_name))))) {
+        // Israel: the gift, souvenir, art and religious shops that sell Judaica.
         tier = 'Glass & gift shop';
     } else {
         tier = 'Unrelated';

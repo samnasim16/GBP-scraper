@@ -8,7 +8,7 @@ import { mapsSearchUrl, cityFromAddress, pickCity } from '../src/maps.js';
 import { extractDetail } from '../src/dom-extract.js';
 import { classifyWhatsApp, WA, loadWhatsAppTemplate } from '../src/whatsapp.js';
 import { scoreRelevance, isSellable, isPublicBody, isTarget } from '../src/relevance.js';
-import { findContactLinks, registrableDomain, rankEmails, shortBusinessName } from '../src/contacts.js';
+import { findContactLinks, registrableDomain, rankEmails, shortBusinessName, extractEmails, PLATFORM_DOMAIN } from '../src/contacts.js';
 import { loadTemplate, renderEmail } from '../src/email-template.js';
 import { prepareLeads } from '../src/output.js';
 
@@ -125,4 +125,39 @@ test('smoke run: Hebrew shop names are shortened, not emptied', () => {
     assert.equal(shortBusinessName('| פרוכת לארון קודש | Jerusalem Yarmulka |'), 'פרוכת לארון קודש');
     // A Hebrew translation after a Latin name is still dropped.
     assert.equal(shortBusinessName('Tallis Center טלית סנטר'), 'Tallis Center');
+});
+
+test('full Israel run: cleaning cloths, toy shops, florists, glaziers and Bethlehem are not targets', () => {
+    // "מטלית" (cleaning cloth) is not "טלית" (tallit); "לטליתות" still is.
+    assert.notEqual(tierOf(il('Out of the Box Gadgets and Gifts', 'Novelty Store'), 'מטלית מיקרופייבר לניקוי'), 'Judaica seller');
+    assert.equal(tierOf(il('חנות ספרים', 'Book store'), 'כיפות לטליתות ותפילין'), 'Judaica seller');
+    for (const [business_name, category] of [
+        ['Toys R Us', 'Toy Store'],
+        ['LEGO® Store - BIG Fashion אשדוד', 'Toy Store'],
+        ['א.רות ופרח-חנות פרחים ומתנות', 'Florist'],
+        ['GIFTSTOCK - Advertising products', 'Promotional Products Supplier'],
+        ['סמיילי צילום - חנות צילום ומתנות בקריון', 'Photo Shop'],
+        ['מרכז מסחרי שוהם', 'Shopping Mall'],
+        ['Showers | Glass railings | Glass cladding - Ariel Glass', 'Glass & Mirror Shop'],
+        ['Tzomet Sfarim', 'Book Store'],
+    ]) assert.equal(targetOf(il(business_name, category)), false, business_name);
+    // A generic shop named for gifts, a religious bookshop, and a shop whose
+    // site names a Judaica object are.
+    for (const [business_name, category, site] of [
+        ['בזאר המתנות', 'Store', ''],
+        ['ופרצת חנות ספרים', 'Religious Book Store', ''],
+        ['Art with Spirit', 'Store', 'יודאיקה בעבודת יד'],
+        ['Kado Afula', 'Home Goods Store', 'פמוטים לשבת'],
+    ]) assert.equal(targetOf(il(business_name, category), site), true, business_name);
+    assert.ok(IL.foreign.test('Manger Street Bethlehem, Palestine'));
+    assert.ok(IL.foreign.test('0123 Milan, Metropolitan City of Milan, Italy'));
+    assert.ok(!IL.foreign.test('HaRav Shach St 5, Betar Illit'));
+});
+
+test('full Israel run: a Dapei Zahav page is a directory, not the shop\'s site', () => {
+    assert.ok(PLATFORM_DOMAIN.test('www.d.co.il'));
+    assert.ok(PLATFORM_DOMAIN.test('www.b144.co.il'));
+    assert.ok(!PLATFORM_DOMAIN.test('www.kvj.co.il'), 'a shop on .co.il is not a directory');
+    assert.ok(!PLATFORM_DOMAIN.test('yefe.co.il'));
+    assert.deepEqual(extractEmails('<a href="mailto:1800@d.co.il">x</a><p>info@kvj.co.il</p>'), ['info@kvj.co.il']);
 });
