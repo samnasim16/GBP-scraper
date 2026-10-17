@@ -10,6 +10,9 @@ import { loadTemplate, renderEmail } from '../src/email-template.js';
 import { prepareLeads, buildMailMerge, buildCSV, createSaver } from '../src/output.js';
 import { mapsSearchUrl, placeKey } from '../src/maps.js';
 
+/** isTarget reads a lead's relevance_tier; scoreRelevance returns { tier }. */
+const targetOf = (lead, siteText = '') => isTarget({ relevance_tier: scoreRelevance(lead, siteText).tier });
+
 test('relevance: a Judaica shop, a kosher restaurant, a synagogue, a restorer', () => {
     assert.equal(scoreRelevance({ business_name: 'Judaica Haus', category: 'Gift shop' }).tier, 'Judaica seller');
     assert.equal(scoreRelevance({ business_name: 'Restaurant Tel Aviv', category: 'Israeli restaurant' }).tier, 'Not a retailer');
@@ -131,7 +134,7 @@ test('real run: synagogues, communities, institutes and museums are not sellable
     ];
     for (const [business_name, category] of noSale) {
         assert.equal(isSellable({ business_name, category }).ok, false, business_name);
-        assert.ok(!isTarget(scoreRelevance({ business_name, category }, 'Shop Menora Kiddusch Jüdisch Israel')), business_name);
+        assert.ok(!targetOf({ business_name, category }, 'Shop Menora Kiddusch Jüdisch Israel'), business_name);
     }
 });
 
@@ -171,7 +174,7 @@ test('full run: "Israel" on a website alone does not make a shop Jewish/Israeli 
     for (const [business_name, category] of [
         ['KOSELI - geschenke aus nepal', 'Gift Shop'], ['Buchsalon Ehrenfeld', 'Book Store'],
         ['YaaYaa - Das kultigbunte Kaufhaus!', 'Gift Shop'], ['FRANK FLUEGEL GALERIE', 'Art Gallery'],
-    ]) assert.ok(!isTarget(scoreRelevance({ business_name, category }, 'Israel israeli Tel Aviv jüdisch')), business_name);
+    ]) assert.ok(!targetOf({ business_name, category }, 'Israel israeli Tel Aviv jüdisch'), business_name);
     // A Judaica object named on the site still qualifies it.
     assert.equal(scoreRelevance({ business_name: 'Treffpunkt Buchhandlung', category: 'Book Store' }, 'Chanukkia aus Israel, jüdisch').tier, 'Jewish / Israeli retail');
     // And a Jewish/Israeli listing needs nothing from the site.

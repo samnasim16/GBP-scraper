@@ -9,10 +9,13 @@ import { mapsSearchUrl, cityFromAddress, stateFromAddress, pickCity } from '../s
 import { extractDetail } from '../src/dom-extract.js';
 import { extractWhatsApp, classifyWhatsApp, normaliseNumber, WA, loadWhatsAppTemplate } from '../src/whatsapp.js';
 import { scoreRelevance, isSellable, isPublicBody, isTarget } from '../src/relevance.js';
-import { rankEmails, ContactEnricher, ownWebsite, looksLikeAppShell } from '../src/contacts.js';
+import { rankEmails, ContactEnricher, ownWebsite, looksLikeAppShell, extractEmails, extractContact, pickEmail, isThirdPartyEmail } from '../src/contacts.js';
 import { createHttpClient } from '../src/http.js';
 import { createBrowserFactory, resolveChromePath } from '../src/browser.js';
 import { prepareLeads } from '../src/output.js';
+
+/** isTarget reads a lead's relevance_tier; scoreRelevance returns { tier }. */
+const targetOf = (lead, siteText = '') => isTarget({ relevance_tier: scoreRelevance(lead, siteText).tier });
 
 test('the US is its own market: NY, NJ and FL, each city with its state', () => {
     for (const name of ['US', 'USA', 'United States', 'america']) assert.equal(resolveCountry({ country: name }).code, 'US');
@@ -79,7 +82,7 @@ test('US Judaica stores, seforim stores and kosher groceries are targets', () =>
     assert.equal(scoreRelevance({ business_name: 'Z. Berman Books', category: 'Book store' }, 'seforim, tallis bags, mezuzah cases, kiddush cups').tier, 'Judaica seller');
     assert.equal(scoreRelevance({ business_name: 'Pomegranate', category: 'Kosher grocery store' }).tier, 'Jewish / Israeli retail');
     assert.equal(scoreRelevance({ business_name: 'Gourmet Glatt', category: 'Supermarket' }).tier, 'Jewish / Israeli retail');
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'Kosher Pizza Plus', category: 'Pizza restaurant' })));
+    assert.ok(!targetOf({ business_name: 'Kosher Pizza Plus', category: 'Pizza restaurant' }));
 });
 
 test('US synagogues, their gift shops, charities and government are not buyers', () => {
@@ -224,4 +227,58 @@ test('smoke run: 1800eichlers.com is a JavaScript app; Chrome reads its contact 
         await factory.close(session);
         server.close();
     }
+});
+
+test('full US run: junk emails, menu-bar names, temples, thrift shops, names and halal markets', () => {
+    // Emails
+    assert.deepEqual(extractEmails('<a href="mailto:718-852-1111/segulahjudaica@gmail.com">Email</a>'), ['segulahjudaica@gmail.com']);
+    assert.deepEqual(extractEmails('<style>/* licence: info@indiantypefoundry.com */</style><p>deli@newcitykosher.com</p>'), ['deli@newcitykosher.com']);
+    assert.deepEqual(extractEmails('<p>support@gist-apps.com</p>'), []);
+    assert.deepEqual(extractEmails('<p>team@latofonts.com lemonad@jovanny.ru in**@****me.com you@isp.com info@my-domain.com</p>'), []);
+    // The web designer's, app vendor's or certifier's address is never the shop's email.
+    assert.deepEqual(pickEmail(['contact@sansoxygen.com'], 'http://www.judaicacreations.com/', 'Judaica Creations'), { email: '', others: ['contact@sansoxygen.com'] });
+    assert.equal(pickEmail(['newapp@ou.org'], 'https://oukosher.org/restaurants/shoprite', 'Kosher Experience').email, '');
+    // …but a sister domain spelling the name, the site's own domain and freemail are.
+    assert.equal(isThirdPartyEmail('sales@greenfeldjudaica.com', 'http://www.greenfieldjudaica.com/', 'Greenfeld Judaica'), false);
+    assert.equal(isThirdPartyEmail('web@malchutfinejudaica.com', 'http://www.malchutjudaica.com/', 'Malchut Judaica'), false);
+    assert.equal(isThirdPartyEmail('rmasel@earthlink.net', 'http://www.reuvenmasel.com/', 'Reuven Masel Judaica Store'), false);
+    assert.equal(isThirdPartyEmail('ruthsbookstore@cjh.org', 'https://ruthsbookstore.cjh.org/', "Ruth's Bookstore"), false);
+    assert.equal(isThirdPartyEmail('shop@anywhere.com', 'https://www.facebook.com/shop', 'Shop'), false, 'a platform page proves nothing');
+    // Elite Sterling was greeted "Dear Shopping My Account Wish".
+    assert.equal(extractContact('Owner: Shopping My Account Wish List').name, '');
+
+    // Not buyers
+    for (const [business_name, category] of [
+        ['Judaica Gift Shop at Temple Torat Emet', 'Gift shop'],
+        ['National Council of Jewish Women Thrift Shop', 'Thrift Store'],
+        ['The National Council of Jewish Women', 'Thrift Store'],
+        ['Chabad Thrift Store', 'Thrift Store'],
+    ]) assert.equal(isSellable({ business_name, category }).ok, false, business_name);
+    assert.equal(isSellable({ business_name: 'Chabad Judaica Store', category: 'Judaica store' }).ok, true, 'a Chabad-run shop still sells');
+
+    // "Israel" as a person's name, "Jerusalem" alone, halal markets, brand "Menorah", restaurant delis
+    for (const [business_name, category] of [
+        ['Barbara Israel Garden Antiques', 'Antique Store'],
+        ['Israel Rose Jewelry', 'Jeweler'],
+        ['Israel Bien, The Jewelry Insider', 'Jewelry Designer'],
+        ['Jerusalem Market', 'Grocery Store'],
+        ['Jerusalem Mediterranean Market (halal)', 'Grocery Store'],
+        ['Jerusalem International Food Market (سوبر ماركت القدس)', 'Supermarket'],
+        ['Menorah Medical Supply', 'Medical Supply Store'],
+        ['Menorah Collections Inc', 'Clothing Store'],
+        ['Eppes Essen Deli & Restaurant', 'Deli'],
+        ["Sarge's Delicatessen & Diner", 'Deli'],
+    ]) assert.ok(!targetOf({ business_name, category }), business_name);
+    // Its own name on its website is not evidence either.
+    assert.ok(!targetOf({ business_name: 'Menorah Medical Supply', category: 'Medical Supply Store' }, 'Menorah Medical Supply — wheelchairs, walkers. Menorah'));
+    for (const [business_name, category] of [
+        ['Taste of Israel', 'Nut Store'],
+        ['Israel Book Shop', 'Religious Goods Store'],
+        ['Jerusalem Israeli Gift Shop', 'Religious Goods Store'],
+        ['Menorah Judaica & Gifts', 'Store'],
+        ['Menorah', 'Religious Goods Store'],
+        ['Menorah Galleries', 'Antique Store'],
+        ['Menorah.net', 'Manufacturer'],
+        ['Glatt Mart', 'Kosher Grocery Store'],
+    ]) assert.ok(targetOf({ business_name, category }), business_name);
 });

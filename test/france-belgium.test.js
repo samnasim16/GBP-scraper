@@ -6,6 +6,9 @@ import { pickCity, mapsSearchUrl } from '../src/maps.js';
 import { scoreRelevance, isSellable, isTarget } from '../src/relevance.js';
 import { extractContact, greetingFor, rankEmails, shortBusinessName } from '../src/contacts.js';
 
+/** isTarget reads a lead's relevance_tier; scoreRelevance returns { tier }. */
+const targetOf = (lead, siteText = '') => isTarget({ relevance_tier: scoreRelevance(lead, siteText).tier });
+
 test('France and Belgium are their own markets', () => {
     for (const [name, code, dir] of [['France', 'FR', 'output-fr'], ['FR', 'FR', 'output-fr'], ['Belgium', 'BE', 'output-be'], ['Belgique', 'BE', 'output-be']]) {
         const c = resolveCountry({ country: name });
@@ -47,8 +50,8 @@ test('French and Dutch Judaica words', () => {
     assert.equal(scoreRelevance({ business_name: 'Joodse Boekhandel', category: 'Book store' }, 'mezoeza chanoekia').tier, 'Judaica seller');
     assert.equal(scoreRelevance({ business_name: 'Épicerie casher du Marais', category: 'Kosher grocery store' }).tier, 'Jewish / Israeli retail');
     assert.equal(scoreRelevance({ business_name: 'Koosjer Winkel', category: 'Grocery store' }).tier, 'Jewish / Israeli retail');
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'Chez Marianne', category: 'Restaurant' }, 'casher juif')));
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'Ménorah Coiffure', category: 'Hair salon' })));
+    assert.ok(!targetOf({ business_name: 'Chez Marianne', category: 'Restaurant' }, 'casher juif'));
+    assert.ok(!targetOf({ business_name: 'Ménorah Coiffure', category: 'Hair salon' }));
 });
 
 test('French and Belgian organisations are not buyers', () => {
@@ -116,8 +119,8 @@ test('full France run: placeholder emails, media, associations, street names', a
     assert.equal(isSellable({ business_name: 'CENTRE JUDAICA', category: 'Place Of Worship' }).ok, false);
     assert.equal(isSellable({ business_name: 'Judaica Direct', category: 'Public Library' }).ok, true, 'a mis-filed shop still passes');
     // A street called "Rue aux Juifs" is not Jewish context.
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'NORMAL Rouen, Rue aux Juifs', category: 'Discount Store' })));
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'BeKef Sandwich - Traiteur - Shabbat', category: 'Sandwich Shop' })));
+    assert.ok(!targetOf({ business_name: 'NORMAL Rouen, Rue aux Juifs', category: 'Discount Store' }));
+    assert.ok(!targetOf({ business_name: 'BeKef Sandwich - Traiteur - Shabbat', category: 'Sandwich Shop' }));
     // Brunet Elisabeth was greeted "Dear Mr. Team".
     assert.equal(extractContact('Gérant : M. Pascal Chartier Team').name, 'M. Pascal Chartier');
     assert.equal(greetingFor({ contact_name: 'M. Pascal Chartier' }), 'Dear Mr. Chartier');

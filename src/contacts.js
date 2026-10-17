@@ -44,6 +44,13 @@ const JUNK_EMAIL = [
     // The shop software's own addresses, left in page source by the
     // platform: Emet (Paris) came back as license@prestashop.com.
     /@(prestashop|woocommerce|woothemes|shopify|wordpress|wix|jimdo|squarespace|magento|opencart|shopware|oxid|ionos|strato|ovh|o2switch|hostinger|gandi|elementor|wpengine|automattic|alloj|202-ecommerce|presta-module|prestaplugins|webkul|knowband|boostmyshop)\.(com|net|org|io|fr|de|eu)$/i,
+    // A font licence in the stylesheet (New City Kosher Deli came back as
+    // info@indiantypefoundry.com) and app vendors' support inboxes.
+    /@[a-z0-9-]*(fonts?|typefoundry|latinotype|typetype|typotheque|jovanny)\.[a-z.]+$/i,
+    // Masked or placeholder addresses: "in**@****me.com", "you@isp.com".
+    /\*/,
+    /^(you|your\.?name|name|user|username)@|@(isp|my-?domain|domain|email)\.(com|net)$/i,
+    /@(indiantypefoundry|fontawesome|typekit|myfonts|monotype|fontshop|linotype|fontfabric|fontsquirrel|typotheque|gist-apps|shopifyapps|klaviyo|mailchimp|hubspot|zendesk|tawk|tidio|judge|yotpo|okendo)\.(com|net|org|io|me)$/i,
 ];
 
 /** Cloudflare's "email protection" hides addresses as a hex XOR string. */
@@ -74,6 +81,12 @@ export function extractEmails(html) {
     const found = [];
     const add = (e) => {
         let v = clean(decodeURIComponentSafe(e)).toLowerCase().replace(/^mailto:/, '').replace(/[.,;:]+$/, '');
+        // "mailto:718-852-1111/segulahjudaica@gmail.com": keep the address.
+        if (/[\s/\\|]/.test(v)) {
+            const only = v.match(new RegExp(EMAIL_RE.source, 'i'));
+            if (!only) return;
+            v = only[0];
+        }
         // "Tel. 030 25993 300info@jmberlin.de": the phone's last digits run
         // straight into the address once markup is stripped.
         const glued = v.match(/^\d+([a-z][^@]*@.*)$/);
@@ -233,7 +246,7 @@ const ROLE_LABELS = [
 ];
 
 /** Words that look like names but are really the next label or a company. */
-const NOT_A_NAME = /\b(Ltd|Limited|Registered|Company|Director|Founder|England|Wales|London|VAT|Sitz|Kontaktformular|Anrede|Plattform|Online|Redaktion|Leitung|Postanschrift|Hausanschrift|Postfach|Mobil|Handy|Web|Internet|Website|Webseite|Homepage|Hinweis|Datenschutz|Konzept|Gestaltung|Umsetzung|Kontaktdaten|Firma|Name|Vorname|Nachname|Evangelische|Katholische|Jüdische|Bibliothek|GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich)\b/i;
+const NOT_A_NAME = /\b(Ltd|Limited|Registered|Company|Director|Founder|England|Wales|London|VAT|Sitz|Kontaktformular|Anrede|Plattform|Online|Redaktion|Leitung|Postanschrift|Hausanschrift|Postfach|Mobil|Handy|Web|Internet|Website|Webseite|Homepage|Hinweis|Datenschutz|Konzept|Gestaltung|Umsetzung|Kontaktdaten|Firma|Name|Vorname|Nachname|Evangelische|Katholische|Jüdische|Bibliothek|GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich|Shopping|Account|Wish|Wishlist|Cart|Checkout|Login|Menu|Search|Store|Collections?|Products?|Customer|Orders?|Shipping|Returns|Privacy|Policy|Terms)\b/i;
 
 /**
  * French and Dutch field labels and company words that follow a name in a
@@ -658,12 +671,44 @@ export function ownWebsite(websiteUrl, businessName = '') {
     }
 }
 
+/**
+ * An address on someone else's domain that names neither the shop nor its
+ * website: the web designer (contact@sansoxygen.com for Judaica Creations),
+ * an app vendor (support@gist-apps.com), the kosher certifier whose page
+ * Maps linked (newapp@ou.org). Freemail and the site's own domain are never
+ * third-party, and neither is anything when the website is a platform page.
+ */
+export function isThirdPartyEmail(email, websiteUrl, businessName = '') {
+    if (FREEMAIL.test(email)) return false;
+    const [local = '', host = ''] = String(email).split('@');
+    const domain = registrableDomain(host);
+    let site = '';
+    try {
+        const h = new URL(websiteUrl).hostname;
+        if (PLATFORM_DOMAIN.test(h)) return false;
+        site = registrableDomain(h);
+    } catch { return false; }
+    if (!domain || !site || domain === site) return false;
+    const hay = (domain + local).replace(/[^a-z0-9]/g, '');
+    const words = nameTokens(businessName).filter(t => t.length >= 4);
+    const siteWord = site.split('.')[0].replace(/[^a-z0-9]/g, '');
+    return !words.some(w => hay.includes(w)) && !(siteWord.length >= 4 && hay.includes(siteWord));
+}
+
+/** The shop's email (best-ranked that is not third-party) and up to three others. */
+export function pickEmail(ranked, websiteUrl, businessName = '') {
+    const own = ranked.filter(e => !isThirdPartyEmail(e, websiteUrl, businessName));
+    const third = ranked.filter(e => isThirdPartyEmail(e, websiteUrl, businessName));
+    return { email: own[0] || '', others: [...own.slice(1), ...third].slice(0, 3) };
+}
+
 /** Write an enrichment result onto the lead row. */
 export function applyContacts(lead, result) {
     // Rank against where the website really is (after redirects).
-    const ranked = rankEmails(result.emails, result.finalSite || lead.website, lead.business_name);
-    lead.email = ranked[0] || lead.email || '';
-    lead.other_emails = ranked.slice(1, 4).join('; ');
+    const site = result.finalSite || lead.website;
+    const { email, others } = pickEmail(rankEmails(result.emails, site, lead.business_name), site, lead.business_name);
+    lead.email = email || lead.email || '';
+    lead.other_emails = others.join('; ');
     if (result.contactName) {
         lead.contact_name = result.contactName;
         lead.contact_role = result.contactRole || '';
