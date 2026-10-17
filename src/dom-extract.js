@@ -244,7 +244,7 @@ export function extractDetail(phoneCode = '49') {
     }
     category = category.replace(/(Open|Closed|Closes|Opens)(\s|⋅|24|$).*$/i, '').trim();
     // A button label ("Learn More" on sponsored listings) is not a category.
-    if (/^(learn more|more|see more|more info|sponsored|website|directions|details|sign in|overview|reviews?|about|view all|see all|show all|google policies|menu|share|save|nearby|send to phone|suggest an edit|claim this business)$/i.test(category)) category = '';
+    if (/^(learn more|more|see more|more info|sponsored|website|directions|details|sign in|overview|reviews?|about|view all|see all|show all|google policies|about this data|prices|menu|share|save|nearby|send to phone|suggest an edit|claim this business)$/i.test(category)) category = '';
 
     // ── Phone ─────────────────────────────────────────────────────────────
     // International. Maps gives "phone:tel:+4930123456" on most listings, but
