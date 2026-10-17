@@ -268,8 +268,24 @@ export function createHttpClient({
         state.retryEvery = localRetryEvery;
     }
 
+    /**
+     * Load a page in the browser whatever the transport: for sites that send
+     * an empty app shell and draw everything — the email too — with
+     * JavaScript. Never throws.
+     */
+    async function fetchRendered(url) {
+        try {
+            const r = await fetchBrowser(url);
+            state.counts.browser++;
+            return r;
+        } catch (e) {
+            return { ok: false, status: 0, body: '', via: 'browser', error: e.message };
+        }
+    }
+
     return {
         fetchText,
+        fetchRendered,
         markUnusable,
         markUsable,
         forceBrowser,

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import { JSDOM } from 'jsdom';
 
 import { resolveCountry, resolveLocations, buildQueryMatrix } from '../src/config.js';
@@ -8,7 +9,9 @@ import { mapsSearchUrl, cityFromAddress, stateFromAddress, pickCity } from '../s
 import { extractDetail } from '../src/dom-extract.js';
 import { extractWhatsApp, classifyWhatsApp, normaliseNumber, WA, loadWhatsAppTemplate } from '../src/whatsapp.js';
 import { scoreRelevance, isSellable, isPublicBody, isTarget } from '../src/relevance.js';
-import { rankEmails, ContactEnricher, ownWebsite } from '../src/contacts.js';
+import { rankEmails, ContactEnricher, ownWebsite, looksLikeAppShell } from '../src/contacts.js';
+import { createHttpClient } from '../src/http.js';
+import { createBrowserFactory, resolveChromePath } from '../src/browser.js';
 import { prepareLeads } from '../src/output.js';
 
 test('the US is its own market: NY, NJ and FL, each city with its state', () => {
@@ -178,4 +181,47 @@ test('smoke run: Maps lists 1800eichlers.com, which redirects to eichlers.com', 
     assert.equal(lead.email, 'info@eichlers.com');
     assert.equal(result.finalSite, 'https://www.eichlers.com/');
     assert.ok(result.pagesRead[0].includes('→ https://www.eichlers.com/'), 'the probe shows where the link led');
+});
+
+test('a JavaScript app shell is never rendered when the page has real text', async () => {
+    let rendered = 0;
+    const http = fakeHttp({
+        'https://keterjudaica.com/': '<p>' + 'Keter Judaica — tallis, tefillin, menorahs, mezuzah cases and seforim in Borough Park. '.repeat(10) + '</p>',
+    });
+    http.fetchRendered = async () => { rendered++; return { ok: false }; };
+    await new ContactEnricher({ http, config: US_CONTACTS(), log: () => {} }).enrich({ business_name: 'Keter Judaica', website: 'https://keterjudaica.com/' });
+    assert.equal(rendered, 0, 'a normal page with no email is not re-read in the browser');
+    assert.equal(looksLikeAppShell(['<title>Eichlers</title><div id="root"></div><script src="/app.js"></script>']), true);
+    assert.equal(looksLikeAppShell(['<p>x</p>'.repeat(3) + 'a'.repeat(500), 'other page']), false);
+});
+
+test('smoke run: 1800eichlers.com is a JavaScript app; Chrome reads its contact page', async (t) => {
+    const chromePath = await resolveChromePath('');
+    if (!chromePath) { t.skip('no Chrome installed on this machine'); return; }
+    // Every address answers 200 with the same shell; /app.js draws the page,
+    // so the email is nowhere in the HTML a plain download gets.
+    const shell = '<!doctype html><html><head><title>Eichlers Judaica</title></head><body><div id="root"></div><script src="/app.js"></script></body></html>';
+    const app = `const out = ['<a href="/contact">Contact us</a>'];
+        for (const h of ['a', 'b', 'c', 'd']) out.push('<a href="https://' + h + '.example.org/">' + h + '</a>');
+        if (location.pathname === '/contact') out.push('<p>Email: info@1800eichlers.com</p>');
+        document.getElementById('root').innerHTML = out.join(' ');`;
+    const server = http.createServer((req, res) => {
+        if (req.url === '/app.js') { res.writeHead(200, { 'Content-Type': 'application/javascript' }); res.end(app); return; }
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(shell);
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    const site = `http://127.0.0.1:${server.address().port}/`;
+    const factory = await createBrowserFactory({ config: { mode: 'local', headless: true, userDataDir: '' }, log: () => {} });
+    const session = await factory.open();
+    try {
+        const client = createHttpClient({ transport: 'local', getBrowser: async () => session.browser, timeoutMs: 15000 });
+        const lead = { business_name: 'Eichlers Judaica', website: site };
+        const result = await new ContactEnricher({ http: client, config: US_CONTACTS(), log: () => {} }).enrich(lead);
+        assert.equal(lead.email, 'info@1800eichlers.com');
+        assert.ok(result.pagesRead.some(p => p.includes('(rendered)')));
+    } finally {
+        await factory.close(session);
+        server.close();
+    }
 });
