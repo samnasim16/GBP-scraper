@@ -14,6 +14,9 @@ import { scoreRelevance, isSellable, isTarget } from '../src/relevance.js';
 
 const SHOP = path.join(import.meta.dirname, 'fixtures', 'shop-uk');
 
+/** isTarget reads a lead's relevance_tier; scoreRelevance returns { tier }. */
+const targetOf = (lead, siteText = '') => isTarget({ relevance_tier: scoreRelevance(lead, siteText).tier });
+
 test('England is its own market: English terms, English cities, its own output folder', () => {
     for (const name of ['UK', 'uk', 'GB', 'England']) assert.equal(resolveCountry({ country: name }).code, 'UK');
     assert.equal(resolveCountry({}).code, 'DE', 'Germany stays the default');
@@ -84,8 +87,8 @@ test('UK relevance: synagogues, charities and councils out; Judaica and kosher s
     assert.equal(scoreRelevance({ business_name: 'Menorah Gifts', category: 'Gift shop' }).tier, 'Judaica seller');
     assert.equal(scoreRelevance({ business_name: 'Kosher Kingdom', category: 'Kosher grocery store' }).tier, 'Jewish / Israeli retail');
     assert.equal(scoreRelevance({ business_name: 'Brownstein Books', category: 'Book shop' }, 'Hanukkiah and kiddush cups, Jewish books').tier, 'Judaica seller');
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'Kosher Restaurant', category: 'Kosher restaurant' })));
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'Levy & Co Solicitors', category: 'Solicitor' }, 'Jewish Israel')));
+    assert.ok(!targetOf({ business_name: 'Kosher Restaurant', category: 'Kosher restaurant' }));
+    assert.ok(!targetOf({ business_name: 'Levy & Co Solicitors', category: 'Solicitor' }, 'Jewish Israel'));
 });
 
 test('end to end: an English shop site gives its contact-page email and director', async (t) => {
@@ -129,12 +132,12 @@ test('full England run: brand names, bread and barbers are not Judaica sellers',
         ['Menorah Homes', 'Health Consultant'], ['Menorah Center LP', 'Corporate Office'],
         ['Menorah Hotel', ''], ['Menorah Mirielle', 'Home Care Service'],
         ['Jewish Barbers', 'Barber Shop'], ['White Fish', 'Fish & Chips Shop'],
-    ]) assert.ok(!isTarget(scoreRelevance({ business_name, category })), business_name);
+    ]) assert.ok(!targetOf({ business_name, category }), business_name);
     // Challah is bread, kiddush alone is wine: context, not Judaica objects.
     assert.equal(scoreRelevance({ business_name: 'Hendon Bagel Bakery', category: 'Bagel Shop' }, 'challah kosher').tier, 'Not a retailer');
     assert.equal(scoreRelevance({ business_name: 'Kosher Kingdom', category: 'Kosher Food Shop' }, 'challah kiddush').tier, 'Jewish / Israeli retail');
     // "Jaffa" is an orange and a cake in England.
-    assert.ok(!isTarget(scoreRelevance({ business_name: 'Jaffa Food House', category: 'Supermarket' })));
+    assert.ok(!targetOf({ business_name: 'Jaffa Food House', category: 'Supermarket' }));
     // A menorah shop is still a Judaica seller, and so is a Judaica object on a shop's site.
     assert.equal(scoreRelevance({ business_name: 'Menorah Gifts', category: 'Gift shop' }).tier, 'Judaica seller');
     assert.equal(scoreRelevance({ business_name: 'Central Kosher', category: 'Supermarket' }, 'kiddush cup menorah').tier, 'Judaica seller');

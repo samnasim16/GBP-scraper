@@ -92,7 +92,7 @@ export const INSTITUTION_NAME = /(?<![\p{L}])(museum|musée|synagog\p{L}*|school
 
 // American synagogues: "Temple Beth El Gift Shop" is the sisterhood's shop.
 // Only at the start — "Boutique du Temple" is a street in the Marais.
-const TEMPLE_NAME = /^(the\s+)?temple\s+\p{L}/iu;
+const TEMPLE_NAME = /(^(the\s+)?|\b(at|of)\s+)temple\s+\p{L}/iu;
 
 /** Registered non-profit legal forms: Germany's e.V., Belgium's ASBL / VZW. Always dropped. */
 const NONPROFIT_FORM = /(\be\.\s?v\.(?![\w-])|\basbl\b|\bvzw\b)/i;
@@ -158,6 +158,11 @@ export function isSellable(lead) {
         return { ok: false, reason: `non-profit / religious (${category})` };
     }
     if (!retailCategory && NON_PROFIT_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (name)' };
+    // A charity's thrift shop sells donations, not stock: "National Council
+    // of Jewish Women Thrift Shop", "Chabad Thrift Store".
+    if (/thrift|charity shop|resale/i.test(category + ' ' + name) && (NON_PROFIT_NAME.test(name) || /\bncjw\b|hadassah/i.test(name))) {
+        return { ok: false, reason: 'non-profit / religious (charity thrift shop)' };
+    }
     // A radio station or newspaper named "Judaïca" buys nothing.
     if (!retailCategory && /\b(radio|broadcaster|television|tv station|newspaper|magazine|news agency|media company)\b/i.test(category)) {
         return { ok: false, reason: `not a shop (${category})` };
@@ -199,6 +204,29 @@ function countHits(hay, words, { anywhere = false } = {}) {
     return hits;
 }
 
+/** Shop categories that could carry Judaica (for brand words like "Menorah"). */
+const GIFT_LIKE = /judaica|religious|gift|souvenir|art|gallery|glass|home goods|antique|jewel|book|silver|craft|candle|d[eé]cor|furnish|kitchen|housewares|manufacturer|wholesaler|importer|distributor/i;
+
+/** Context words that are only places: "Jerusalem Market" alone says nothing. */
+const PLACE_ONLY = new Set(['jerusalem', 'tel aviv', 'jérusalem']);
+
+/**
+ * "Israel" as a person's name is not Israeli context: "Barbara Israel Garden
+ * Antiques", "Israel Rose Jewelry", "Israel Bien". It stays when the next
+ * word is a trade word ("Israel Book Shop", "Israel Giftware") or a
+ * lowercase word comes before it ("Taste of Israel").
+ */
+function personNamesOut(name) {
+    const TRADE = /^(book|books|bookshop|bookstore|gift|gifts|giftware|judaica|shop|store|products|imports?|foods?|market|bonds|art|tours?|travel|wines?|collection|center|centre|discount|direct|outlet|bookshop's|seforim|sefarim)$/i;
+    const BEFORE_OK = /^(young|eretz|medinat|bnei|bnai|beth|beit|am|greater|little|made|holy|taste|for|from)$/i;
+    return String(name || '').replace(/(\b[A-Z][a-z]+\s+)?\bIsrael\b(\s+[A-Z][\w'’]*)?/g, (m, before, after) => {
+        const prev = before && before.trim();
+        const next = after && after.trim();
+        const person = (prev && !BEFORE_OK.test(prev)) || (next && !TRADE.test(next));
+        return person ? `${before || ''} ${after || ''}` : m;
+    });
+}
+
 function domainWords(url) {
     try {
         const host = new URL(String(url || '')).hostname.replace(/^www\./, '');
@@ -214,17 +242,29 @@ function domainWords(url) {
 export function scoreRelevance(lead, siteText = '') {
     // Street names are not context: "NORMAL Rouen, Rue aux Juifs" is a
     // discount store on the Rue aux Juifs.
-    const listing = clean([lead.business_name, lead.category, lead.maps_description].join(' ')).toLowerCase()
+    const listing = clean([personNamesOut(lead.business_name), lead.category, lead.maps_description].join(' ')).toLowerCase()
         .replace(/\b(rue|place|impasse|all[ée]e|quai|passage)\s+(aux|des|du)\s+juifs?\b|judengasse|judenstra(ss|ß)e|judenhof|old jewry|jewry street|jodenstraat|jodenbreestraat/gi, ' ');
     const site = clean(siteText).toLowerCase().slice(0, 200000);
 
     const retailCat = RETAIL_CATEGORY.test(clean(lead.category));
+    // A brand word counts only for a shop that could sell Judaica:
+    // "Menorah Medical Supply" and "Menorah Collections" (clothing) are shops,
+    // but not that kind.
+    const giftLike = GIFT_LIKE.test(clean(lead.category)) || /gift|judaica|art|silver|glass|book|seforim/i.test(clean(lead.business_name));
     const strongListing = countHits(listing, JUDAICA_STRONG)
-        .filter(w => !BRAND_PRONE.has(w) || retailCat || countHits(listing, RETAIL).length > 0);
-    const strongSite = countHits(site, JUDAICA_STRONG);
+        .filter(w => !BRAND_PRONE.has(w) || ((retailCat || countHits(listing, RETAIL).length > 0) && (giftLike || !clean(lead.category))));
+    // The shop's own name on its website is not evidence: menorahmedical.com
+    // says "Menorah" on every page.
+    const brandInName = countHits(clean(lead.business_name).toLowerCase(), [...BRAND_PRONE]).length > 0;
+    const strongSite = countHits(site, JUDAICA_STRONG).filter(w => !BRAND_PRONE.has(w) || !brandInName || giftLike);
     // The website's domain is on the listing too: "Avenue Wines & Whiskeys"
     // links kosher-wine.eu. Platform hosts (facebook.com…) say nothing.
-    const contextListing = countHits(listing + ' ' + domainWords(lead.website), JEWISH_CONTEXT);
+    let contextListing = countHits(listing + ' ' + domainWords(lead.website), JEWISH_CONTEXT);
+    // "Jerusalem International Food Market", "Jerusalem Mediterranean Market
+    // (halal)": a place name alone is not Jewish context, and a halal or
+    // Arabic-named market is not a Jewish shop.
+    if (/\bhalal\b|[\u0600-\u06FF]/i.test(clean(lead.business_name) + ' ' + clean(lead.maps_description))) contextListing = [];
+    if (contextListing.length && contextListing.every(w => PLACE_ONLY.has(w))) contextListing = [];
     const contextSite = countHits(site, JEWISH_CONTEXT);
     // Retail must show in the LISTING. Every community and institute website
     // has a "Shop" or "Spenden-Shop" link somewhere, which made them retailers.
@@ -247,7 +287,9 @@ export function scoreRelevance(lead, siteText = '') {
     if (!sellable.ok) {
         tier = 'Non-profit / religious';
         score = Math.min(score, 10);
-    } else if (NON_RETAIL_CATEGORY.test(category) && strongListing.length === 0) {
+    } else if ((NON_RETAIL_CATEGORY.test(category) || (/\bdeli/i.test(category) && /restaurant|diner|cater|grill|bistro|pizz|caf[eé]|steakhouse/i.test(clean(lead.business_name))))
+        && strongListing.length === 0) {
+        // A deli that calls itself a restaurant, diner or caterer is one.
         tier = 'Not a retailer';
         score = Math.min(score, 15);
     } else if (strongListing.length || (strongSite.length >= 2 && isRetail)) {
