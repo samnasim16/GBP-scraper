@@ -257,6 +257,47 @@ export const US_CATEGORIES = [
 ];
 
 /**
+ * Israel, by district. Judaica retail is densest in Jerusalem (Mea Shearim,
+ * Geula, the Old City, Ben Yehuda / Mamilla for tourists), Bnei Brak (Rabbi
+ * Akiva Street), Safed's artists' quarter, and the Haredi towns (Beit
+ * Shemesh, Elad, Modi'in Illit, Beitar Illit). Gift and souvenir shops in
+ * Tel Aviv-Jaffa, Eilat and Tiberias sell Judaica to tourists.
+ */
+export const ISRAEL_CITIES = {
+    JM: ['Jerusalem', 'Beit Shemesh', 'Mevaseret Zion'],
+    TA: ['Tel Aviv', 'Jaffa', 'Bnei Brak', 'Ramat Gan', 'Givatayim', 'Holon', 'Bat Yam', 'Herzliya', 'Ramat HaSharon'],
+    CE: ['Petah Tikva', 'Rishon LeZion', 'Rehovot', 'Netanya', "Ra'anana", 'Kfar Saba', 'Hod HaSharon', "Modi'in",
+         'Elad', 'Ness Ziona', 'Lod', 'Ramla', 'Rosh HaAyin', 'Yavne', 'Shoham'],
+    HA: ['Haifa', 'Hadera', "Zikhron Ya'akov", 'Caesarea', 'Kiryat Ata', 'Kiryat Bialik'],
+    NO: ['Safed', 'Tiberias', 'Nof HaGalil', 'Karmiel', 'Afula', 'Nahariya', 'Acre', 'Kiryat Shmona', "Ma'alot-Tarshiha"],
+    SO: ["Be'er Sheva", 'Ashdod', 'Ashkelon', 'Eilat', 'Netivot', 'Ofakim', 'Kiryat Gat', 'Sderot', 'Dimona', 'Arad'],
+    // Israeli towns in the West Bank with large religious communities.
+    JS: ["Modi'in Illit", 'Beitar Illit', "Ma'ale Adumim", 'Efrat', 'Ariel', 'Kiryat Arba', 'Emmanuel'],
+};
+
+export const ISRAEL_DISTRICTS = {
+    Jerusalem: ['Mea Shearim', 'Geula', 'Old City', 'Jewish Quarter', 'Ben Yehuda Street', 'Mamilla', 'Ramot', 'Har Nof', 'Bayit Vegan', 'Ramat Shlomo'],
+    'Bnei Brak': ['Rabbi Akiva Street'],
+    Safed: ['Artists Colony', 'Old City'],
+    Jaffa: ['Old Jaffa', 'Jaffa Flea Market'],
+    'Tel Aviv': ['Dizengoff', 'Nachalat Binyamin'],
+};
+
+// Hebrew first: most Israeli shops list themselves in Hebrew.
+export const ISRAEL_CATEGORIES = [
+    'יודאיקה',
+    'Judaica',
+    'תשמישי קדושה',
+    'כלי קודש',
+    'חנות יודאיקה',
+    'ספרי קודש',
+    'חנות מתנות',
+    'Souvenir shop',
+    'מזכרות',
+    'Art glass gallery',
+];
+
+/**
  * Everything that differs between the markets. `gl` sets the country Maps
  * searches in; `phoneCode` is what a national number starting with 0 gets;
  * `foreign` drops cross-border results.
@@ -355,15 +396,42 @@ export const COUNTRIES = {
         foreign: /(,\s*(Canada|Israel|Mexico|Bahamas|United Kingdom|UK)|\b(ON|QC|BC|AB|MB|NS|NB)\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)\s*$/i,
         script: 'us',
     },
+    IL: {
+        name: 'Israel',
+        gl: 'il',
+        phoneCode: '972',
+        regionLabel: 'district',
+        regions: ISRAEL_CITIES,
+        districts: ISRAEL_DISTRICTS,
+        categories: ISRAEL_CATEGORIES,
+        highYield: ['יודאיקה', 'Judaica', 'תשמישי קדושה', 'כלי קודש'],
+        acceptLanguage: 'he-IL,he;q=0.9,en;q=0.8',
+        // "צור קשר" (contact us), "אודות" (about).
+        contactKeyPage: 'contact|%d7%a6%d7%95%d7%a8|צור',
+        contactPaths: ['/contact', '/contact-us', '/%D7%A6%D7%95%D7%A8-%D7%A7%D7%A9%D7%A8', '/pages/contact', '/about'],
+        outputDir: 'output-il',
+        addressTownWins: true,
+        // Every shop in Israel is Jewish and kosher: context words say nothing.
+        // The targets are Judaica sellers and the gift, souvenir, art and
+        // glass shops that sell Judaica to visitors.
+        contextEverywhere: true,
+        includeTiers: ['Judaica seller', 'Glass & gift shop'],
+        // A Hebrew email and WhatsApp message for Israeli shops.
+        emailTemplate: path.join(TEMPLATES, 'partnership-email-il.txt'),
+        whatsappTemplate: path.join(TEMPLATES, 'whatsapp-message-il.txt'),
+        foreign: /,\s*(Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece)\s*$/i,
+        script: 'israel',
+    },
 };
 
-/** "DE", "UK", "GB", "England", "USA" → a COUNTRIES entry (default Germany). */
+/** "DE", "UK", "GB", "England", "USA", "Israel" → a COUNTRIES entry (default Germany). */
 export function resolveCountry(input = {}) {
     const raw = String(input.country || 'DE').trim().toUpperCase();
     const code = {
         GB: 'UK', ENGLAND: 'UK', 'UNITED KINGDOM': 'UK', GERMANY: 'DE', DEUTSCHLAND: 'DE',
         FRANCE: 'FR', BELGIUM: 'BE', BELGIQUE: 'BE', 'BELGIË': 'BE', BELGIE: 'BE',
         USA: 'US', 'UNITED STATES': 'US', AMERICA: 'US', 'U.S.': 'US', 'U.S.A.': 'US',
+        ISRAEL: 'IL', 'ISRAËL': 'IL', ISR: 'IL',
     }[raw] || raw;
     const c = COUNTRIES[code];
     if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);

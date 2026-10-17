@@ -9,6 +9,7 @@
  */
 
 import { clean } from './util.js';
+import { COUNTRIES } from './config.js';
 
 /** Strong signals — words a shop only uses if it sells Jewish ritual objects. */
 const JUDAICA_STRONG = [
@@ -30,6 +31,27 @@ const JUDAICA_STRONG = [
     'seforim', 'sefarim', 'sforim', 'tzitzis', 'tzitzit', 'esrog', 'etrog', 'lulav', 'shabbos candle',
     'kiddush cups', 'havdalah set', 'mezuzah case', 'mezuzah cases', 'mezuzos', 'tallis bag', 'tefillin bag',
 ];
+
+/**
+ * Hebrew Judaica words. Matched anywhere in a word, because Hebrew glues
+ * prefixes on (ה, ו, ב, ל, מ, ש: "והמזוזות", "לטליתות"). "מנורה" is left out:
+ * in Hebrew it is any lamp, and lighting shops are full of them.
+ */
+const JUDAICA_HE = [
+    'יודאיקה', 'יודאיקא', 'תשמישי קדושה', 'תשמיש קדושה', 'כלי קודש', 'מזוזה', 'מזוזות', 'בית מזוזה', 'בתי מזוזה',
+    'חנוכיה', 'חנוכייה', 'חנוכיות', 'פמוטים', 'גביע קידוש', 'גביעי קידוש', 'קערת סדר', 'קערת פסח', 'צלחת סדר',
+    'מגש חלה', 'מגשי חלה', 'כיסוי חלה', 'סט הבדלה', 'נר הבדלה', 'טלית', 'טליתות', 'תפילין', 'כיפות', 'מגן דוד',
+    'סת"ם', 'סת״ם', 'ספרי קודש', 'ספרי תורה', 'כלי נטילה', 'נטלה', 'קופת צדקה', 'מגילת אסתר', 'קופסת בשמים',
+];
+
+/** Hebrew shop words: shop, gifts, gallery, souvenirs, boutique. */
+const RETAIL_HE = ['חנות', 'מתנות', 'גלריה', 'גלרית', 'מזכרות', 'בוטיק', 'סטודיו'];
+
+/** Hebrew organisations we cannot sell to. */
+const NON_PROFIT_HE = /בית כנסת|בית הכנסת|ישיבת|ישיבה|עמותת|עמותה|גמ["״]?ח|מוזיאון|בית ספר|תלמוד תורה|בית חב["״]ד|מתנ["״]ס|מרכז קהילתי|קהילת/;
+
+/** Categories and names of shops that sell Judaica to visitors (Israel). */
+const GIFT_SHOP = /gift|souvenir|art gallery|gallery|glass|craft|judaica|religious goods|silver|מתנות|מזכרות|גלריה|גלרית|זכוכית/i;
 
 /** Medium signals — Jewish/Israeli context, but not necessarily a shop. */
 /**
@@ -65,7 +87,7 @@ const RETAIL = [
 ];
 
 /** Glass & finish — Jaffa Glass's own product language. */
-const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'cristal', 'verre', 'verrerie', 'vitrail', 'blattgold', 'gold leaf',
+const GLASS = ['glas', 'glass', 'kristall', 'crystal', 'cristal', 'verre', 'verrerie', 'vitrail', 'blattgold', 'gold leaf', 'זכוכית', 'ויטראז',
     "feuille d'or", 'bladgoud', 'mundgeblasen', 'hand-blown', 'handblown', 'soufflé bouche'];
 
 /**
@@ -83,12 +105,12 @@ export const NON_RETAIL_CATEGORY = /\b(restaurant|imbiss|caf[eé]|bistro|bar|hot
 export const NON_PROFIT_CATEGORY = /\b(synagog\w*|religious|place of worship|church|kirche|mosque|moschee|temple|chabad|non-?profit|charity|foundation|stiftung|association|verein|society|community|gemeinde|cultural cent(er|re)|kulturzentrum|research|institut\w*|university|universität|college|hochschule|school|schule|gymnasium|kindergarten|kita|preschool|daycare|library|bibliothek|archive|archiv|museum|memorial|gedenkstätte|monument|denkmal|cemetery|friedhof|embassy|botschaft|consulate|konsulat|government|city hall|rathaus|political|youth|jugend|social services|nursing|hospital|seminary|yeshiva)\b/i;
 
 /** …and against the business name. "e.V." is a registered non-profit. */
-export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b|\basbl\b|\bvzw\b|\bassociation\b|\bconsistoire\b|\bloubavitch\b|\bhabad\b|\bgemeente\b|\bmairie\b|\bfondation\b|\bstichting\b|\bvereniging\b|(?<![\p{L}])(école|musée|bibliothèque|communauté|centre communautaire)(?![\p{L}]))/iu;
+export const NON_PROFIT_NAME = /(\be\.\s?v\.|\bsynagog\w*|\bgemeinde\b|\bchabad\b|\bverein\b|\bstiftung\b|\bfoundation\b|\binstitut\w*|\bschule\b|\bschool\b|\bgymnasium\b|\bkita\b|\bkindergarten\b|\buniversit\w*|\bhochschule\b|\bbibliothek\b|\blibrary\b|\bmuseum\b|\bgedenkstätte\b|\bmemorial\b|\bfriedhof\b|\bcemetery\b|\bbotschaft\b|\bembassy\b|\bzentralrat\b|\bgesellschaft für\b|\bdeutsch-israelische\b|\bfreundeskreis\b|\bförderverein\b|\bcommunity\b|\bcongregation\b|\bjugend\b|\bjeschiwa\b|\byeshiva\b|\bkollel\b|\bgemach\b|\brabbinat\b|\bkirche\b|\bchurch\b|\bcentrum judaicum\b|\bjüdisches zentrum\b|\bjewish cent(er|re)\b|\bshul\b|\blubavitch\b|\bcharity\b|\bfederation\b|\bcouncil\b|\bjcc\b|\bcollege\b|\bacademy\b|\bnursery\b|\bhebrew congregation\b|\bboard of deputies\b|\basbl\b|\bvzw\b|\bassociation\b|\bconsistoire\b|\bloubavitch\b|\bhabad\b|\bgemeente\b|\bmairie\b|\bfondation\b|\bstichting\b|\bvereniging\b|(?<![\p{L}])(école|musée|bibliothèque|communauté|centre communautaire)(?![\p{L}]))/iu;
 
 /** A trading company or a bookshop, whatever else its name says. */
-const COMMERCIAL_NAME = /(\bGmbH\b|\bKG\b|\bAG\b|\bUG\b|\bLtd\b|\bplc\b|\bLLC\b|\bSARL\b|\bSASU?\b|\bEURL\b|\bSRL\b|\bSPRL\b|\bBVBA\b|\bBV\b|\bNV\b|book ?store|bookshop|buchhandlung|literaturhandlung|buchladen|unibuch|librairie|boekhandel)/i;
+const COMMERCIAL_NAME = /(בע["״]?מ|\bGmbH\b|\bKG\b|\bAG\b|\bUG\b|\bLtd\b|\bplc\b|\bLLC\b|\bSARL\b|\bSASU?\b|\bEURL\b|\bSRL\b|\bSPRL\b|\bBVBA\b|\bBV\b|\bNV\b|book ?store|bookshop|buchhandlung|literaturhandlung|buchladen|unibuch|librairie|boekhandel)/i;
 
-export const INSTITUTION_NAME = /(?<![\p{L}])(museum|musée|synagog\p{L}*|school|schule|école|college|university|universität|université|library|bibliothek|bibliothèque|charity|foundation|fondation|stiftung|stichting|e\.\s?v\.|congregation|sisterhood|hadassah)(?![\p{L}\p{N}-])/iu;
+export const INSTITUTION_NAME = /(?<![\p{L}])(museum|musée|synagog\p{L}*|school|schule|école|college|university|universität|université|library|bibliothek|bibliothèque|charity|foundation|fondation|stiftung|stichting|e\.\s?v\.|congregation|sisterhood|hadassah|gemach|gemmach)(?![\p{L}\p{N}-])/iu;
 
 // American synagogues: "Temple Beth El Gift Shop" is the sisterhood's shop.
 // Only at the start — "Boutique du Temple" is a street in the Marais.
@@ -109,7 +131,7 @@ export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|su
  * stadt-oldenburg.de, *.rlp.de. A city library or municipal gallery is not a
  * customer, even when Maps files it as an "Art Gallery".
  */
-const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$|\.gouv\.fr$|(^|\.)(ville|mairie|commune|agglo|metropole)-[a-z-]+\.fr$|(^|\.)[a-z-]+-(ville|mairie)\.fr$|(^|\.)(belgium|fgov|vlaanderen|wallonie|irisnet)\.be$|(^|\.)(stad|gemeente|commune|ville)-?[a-z-]*\.be$|\.(gov|mil)$|\.[a-z]{2}\.us$/;
+const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$|\.gouv\.fr$|(^|\.)(ville|mairie|commune|agglo|metropole)-[a-z-]+\.fr$|(^|\.)[a-z-]+-(ville|mairie)\.fr$|(^|\.)(belgium|fgov|vlaanderen|wallonie|irisnet)\.be$|(^|\.)(stad|gemeente|commune|ville)-?[a-z-]*\.be$|\.(gov|mil)$|\.[a-z]{2}\.us$|(^|\.)(gov|muni|ac|k12|idf)\.il$/;
 
 const slug = (s) => clean(s).toLowerCase()
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
@@ -158,6 +180,9 @@ export function isSellable(lead) {
         return { ok: false, reason: `non-profit / religious (${category})` };
     }
     if (!retailCategory && NON_PROFIT_NAME.test(name)) return { ok: false, reason: 'non-profit / religious (name)' };
+    // Hebrew: a synagogue, yeshiva, gemach or non-profit is one under any
+    // category, unless the name also says it is a company (בע"מ).
+    if (NON_PROFIT_HE.test(name) && !/בע["״]?מ/.test(name)) return { ok: false, reason: 'non-profit / religious (Hebrew name)' };
     // A charity's thrift shop sells donations, not stock: "National Council
     // of Jewish Women Thrift Shop", "Chabad Thrift Store".
     if (/thrift|charity shop|resale/i.test(category + ' ' + name) && (NON_PROFIT_NAME.test(name) || /\bncjw\b|hadassah/i.test(name))) {
@@ -251,12 +276,15 @@ export function scoreRelevance(lead, siteText = '') {
     // "Menorah Medical Supply" and "Menorah Collections" (clothing) are shops,
     // but not that kind.
     const giftLike = GIFT_LIKE.test(clean(lead.category)) || /gift|judaica|art|silver|glass|book|seforim/i.test(clean(lead.business_name));
-    const strongListing = countHits(listing, JUDAICA_STRONG)
+    const strongListing = [...countHits(listing, JUDAICA_STRONG), ...countHits(listing, JUDAICA_HE, { anywhere: true })]
         .filter(w => !BRAND_PRONE.has(w) || ((retailCat || countHits(listing, RETAIL).length > 0) && (giftLike || !clean(lead.category))));
     // The shop's own name on its website is not evidence: menorahmedical.com
     // says "Menorah" on every page.
     const brandInName = countHits(clean(lead.business_name).toLowerCase(), [...BRAND_PRONE]).length > 0;
-    const strongSite = countHits(site, JUDAICA_STRONG).filter(w => !BRAND_PRONE.has(w) || !brandInName || giftLike);
+    const strongSite = [...countHits(site, JUDAICA_STRONG), ...countHits(site, JUDAICA_HE, { anywhere: true })]
+        .filter(w => !BRAND_PRONE.has(w) || !brandInName || giftLike);
+    // In Israel every shop is Jewish and kosher, so context says nothing.
+    const profile = COUNTRIES[lead.country] || {};
     // The website's domain is on the listing too: "Avenue Wines & Whiskeys"
     // links kosher-wine.eu. Platform hosts (facebook.com…) say nothing.
     let contextListing = countHits(listing + ' ' + domainWords(lead.website), JEWISH_CONTEXT);
@@ -265,10 +293,11 @@ export function scoreRelevance(lead, siteText = '') {
     // Arabic-named market is not a Jewish shop.
     if (/\bhalal\b|[\u0600-\u06FF]/i.test(clean(lead.business_name) + ' ' + clean(lead.maps_description))) contextListing = [];
     if (contextListing.length && contextListing.every(w => PLACE_ONLY.has(w))) contextListing = [];
-    const contextSite = countHits(site, JEWISH_CONTEXT);
+    if (profile.contextEverywhere) contextListing = [];
+    const contextSite = profile.contextEverywhere ? [] : countHits(site, JEWISH_CONTEXT);
     // Retail must show in the LISTING. Every community and institute website
     // has a "Shop" or "Spenden-Shop" link somewhere, which made them retailers.
-    const retail = countHits(listing, RETAIL);
+    const retail = [...countHits(listing, RETAIL), ...countHits(listing, RETAIL_HE, { anywhere: true })];
     const retailCategory = RETAIL_CATEGORY.test(clean(lead.category));
     const glass = countHits(listing + ' ' + site, GLASS, { anywhere: true });
 
@@ -301,6 +330,9 @@ export function scoreRelevance(lead, siteText = '') {
         // object named on the site.
         tier = 'Jewish / Israeli retail';
     } else if (glass.length && isRetail) {
+        tier = 'Glass & gift shop';
+    } else if (profile.contextEverywhere && isRetail && GIFT_SHOP.test(category + ' ' + clean(lead.business_name))) {
+        // Israel: the gift, souvenir and art shops that sell Judaica to visitors.
         tier = 'Glass & gift shop';
     } else {
         tier = 'Unrelated';

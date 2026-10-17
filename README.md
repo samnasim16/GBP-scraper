@@ -1,6 +1,6 @@
-# Judaica Retailer Scraper (Germany, England, France, Belgium & USA) — Jaffa Glass
+# Judaica Retailer Scraper (Germany, England, France, Belgium, USA & Israel) — Jaffa Glass
 
-Finds every Google Business Profile in **Germany**, **England**, **France**, **Belgium** or the **United States** that sells **Judaica**, plus the Jewish and Israeli gift, book and museum shops around them. It reads each shop's website (the **Impressum** in Germany, the **Contact** page in England) to get an **email address** and the **owner's name**, then writes a spreadsheet and a mail-merge file with the Jaffa Glass partnership email already filled in for each shop.
+Finds every Google Business Profile in **Germany**, **England**, **France**, **Belgium**, the **United States** or **Israel** that sells **Judaica**, plus the Jewish and Israeli gift, book and museum shops around them. It reads each shop's website (the **Impressum** in Germany, the **Contact** page in England) to get an **email address** and the **owner's name**, then writes a spreadsheet and a mail-merge file with the Jaffa Glass partnership email already filled in for each shop.
 
 It runs on your own computer with Node and your own Chrome. No accounts, no API keys, and no cost per lead.
 
@@ -106,6 +106,30 @@ Put your name and title in `"sender"` in `input.us.json`.
 
 To add more states later, add them to `US_CITIES` in `src/config.js` and to `"states"` in `input.us.json`.
 
+## Israel
+
+```bash
+npm run smoke:israel     # Geula (Jerusalem) only, 2 search terms, 10 shops → output-il-smoke/
+npm run israel           # all of Israel → output-il/   (input.israel.json)
+```
+
+Put your name and title in `"sender"` in `input.israel.json`. You can write it in Hebrew.
+
+- **Places:** 76 searches per term across every district.
+  - Jerusalem, searched neighbourhood by neighbourhood: Mea Shearim, Geula, the Old City and Jewish Quarter, Ben Yehuda, Mamilla, Har Nof…
+  - Bnei Brak (Rabbi Akiva Street), Safed (the Artists' Colony), Tel Aviv-Jaffa and the coastal and southern cities.
+  - The Haredi towns: Beit Shemesh, Elad, Modi'in Illit, Beitar Illit.
+- **Search terms:** Hebrew first, since most shops list themselves in Hebrew: `יודאיקה`, `תשמישי קדושה`, `כלי קודש`, `חנות יודאיקה`, `ספרי קודש`, `חנות מתנות`, `מזכרות`. English terms too: `Judaica`, `Souvenir shop`, `Art glass gallery`. About 760 searches in total.
+- **Who is a target:**
+  - Every shop in Israel is Jewish and kosher, so "Jewish context" doesn't count. A kosher supermarket is not a target.
+  - The targets are **Judaica sellers** (Hebrew or English Judaica words in the listing or on the site) and **gift, souvenir, art and glass shops**, which sell Judaica to visitors.
+  - Hebrew prefixes are understood ("והמזוזות" counts as מזוזות).
+  - "מנורה" doesn't count, because in Hebrew it is any lamp.
+- **Not buyers:** synagogues (בית כנסת), yeshivas (ישיבה), gemachs (גמ"ח), non-profits (עמותה), museums, schools, and `gov.il` / `muni.il` sites. A name with בע"מ (Ltd) is treated as a company.
+- **Contact pages:** "צור קשר" / "אודות". Israeli inboxes (walla, netvision, bezeqint, 012/013) count as the shop's own.
+- **Phones** are `+972`. Mobiles (`05…`) show as **Likely** on WhatsApp.
+- **The email and WhatsApp message are in Hebrew** (`templates/partnership-email-il.txt`, `templates/whatsapp-message-il.txt`). They follow your English email, but read as selling in Israel, not exporting. **Read them before sending**, especially the Hebrew street names of your facilities.
+
 ## WhatsApp: which shops have it, and who to contact first
 
 Every row gets three WhatsApp columns. The **WhatsApp** sheet lists every target you can message, best evidence first. In every sheet, shops with WhatsApp come before the rest.
@@ -177,7 +201,7 @@ All fields are optional.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `country` | `"DE"` | `"DE"` Germany, `"UK"` England, `"FR"` France, `"BE"` Belgium, `"US"` United States. It sets the city list, search terms, phone code, contact pages and output folder. |
+| `country` | `"DE"` | `"DE"` Germany, `"UK"` England, `"FR"` France, `"BE"` Belgium, `"US"` United States, `"IL"` Israel. It sets the city list, search terms, phone code, contact pages and output folder. |
 | `sender` | – | `{ "name", "title" }` for the email signature. |
 | `states` | all | Bundesland codes to limit the run, e.g. `["BE","BY","HE"]`. Codes: BE HH HB BY BW HE NW NI RP SL SH MV BB SN ST TH. |
 | `cities` | built-in list | An explicit list of cities, which replaces the built-in one. |
@@ -198,7 +222,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 112 offline tests
+npm test                                                               # 119 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)
@@ -230,6 +254,16 @@ The scraper detects Google's "unusual traffic" page and says so, rather than rep
 - **France:** the CNIL lets you email professionals without prior consent, provided the message relates to their trade (Judaica for a Judaica shop qualifies) and every message has a simple way to opt out.
 - **Belgium:** this is stricter. Without prior consent, you may email a company only at a **generic** address (`info@`, `contact@`, `winkel@`), not a named person's address.
 - **WhatsApp messages** follow the same rules as email in both countries. WhatsApp also bans accounts that get reported for unwanted messages. Send each message yourself, keep it personal, and stop at the first "no".
+
+This isn't legal advice.
+
+## A note on sending (Israel)
+
+Israel's anti-spam law (Communications Law, section 30A) covers email, SMS and messages like WhatsApp:
+- **Consent first.** Advertising needs prior consent. One exception: you may contact a *business* once, to ask whether it wants to receive your offers. The Hebrew templates are written as that one-time request: "may we send you our catalogue?"
+- **Label it.** The subject line starts with the word **"פרסומת"** (advertisement).
+- **Identify yourself and let them refuse.** The message gives your name and contact details, and a way to opt out (the "השיבו 'הסר'" line). Remove anyone who replies "הסר" at once.
+- **Don't follow up without consent.** Send each message once, by hand, and only follow up with shops that answered yes. Fines can be up to ₪1,000 per message without proof of damage.
 
 This isn't legal advice.
 

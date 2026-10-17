@@ -94,7 +94,7 @@ async function refresh(file) {
         template: loadTemplate(input.emailTemplate || country.emailTemplate || DEFAULT_TEMPLATE_PATH),
         ...(waFile ? { whatsappTemplate: loadWhatsAppTemplate(waFile) } : {}),
         sender: input.sender || {},
-        includeTiers: input.includeTiers || TARGET_TIERS.slice(0, 2),
+        includeTiers: input.includeTiers || country.includeTiers || TARGET_TIERS.slice(0, 2),
     });
     await save(leads);
     await chrome.close();

@@ -48,6 +48,16 @@ const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
 export function cityFromAddress(address, countryCode = 'DE') {
     const parts = addressParts(address);
     if (!parts.length) return '';
+    if (countryCode === 'IL') {
+        // "King George St 20, Jerusalem, 9414205" / "HaMelacha St 39, Holon":
+        // the town is the last part once the 7-digit postcode is gone.
+        for (let i = parts.length - 1; i >= 0; i--) {
+            const town = parts[i].replace(/\b\d{5,7}\b/g, '').trim();
+            if (town && !/\d/.test(town)) return town;
+            if (i < parts.length - 1 || !/^\d{5,7}$/.test(parts[i])) return '';
+        }
+        return '';
+    }
     if (countryCode === 'US') {
         for (let i = parts.length - 1; i > 0; i--) {
             if (US_STATE_ZIP.test(parts[i]) && !/\d/.test(parts[i - 1])) return parts[i - 1];
@@ -76,7 +86,7 @@ const US_STATE_ZIP = /^[A-Z]{2}(\s+\d{5}(-\d{4})?)?$/;
 
 function addressParts(address) {
     return String(address || '').split(',').map(p => p.trim()).filter(Boolean)
-        .filter(p => !/^(germany|deutschland|united kingdom|uk|england|france|belgium|belgique|belgië|belgie|united states|usa|us)$/i.test(p));
+        .filter(p => !/^(germany|deutschland|united kingdom|uk|england|france|belgium|belgique|belgië|belgie|united states|usa|us|israel|ישראל)$/i.test(p));
 }
 
 /** "…, Brooklyn, NY 11219" → "NY". Only US addresses carry the state. */

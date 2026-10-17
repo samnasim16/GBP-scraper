@@ -155,7 +155,7 @@ function decodeURIComponentSafe(s) {
 export function registrableDomain(host) {
     const parts = String(host || '').toLowerCase().replace(/^www\./, '').split('.').filter(Boolean);
     if (parts.length <= 2) return parts.join('.');
-    const twoLevel = /^(co|com|org|net|gov|ac|ltd|plc|me|sch|nhs)$/.test(parts[parts.length - 2]);
+    const twoLevel = /^(co|com|org|net|gov|ac|ltd|plc|me|sch|nhs|muni|k12|idf)$/.test(parts[parts.length - 2]);
     return parts.slice(twoLevel ? -3 : -2).join('.');
 }
 
@@ -170,7 +170,7 @@ const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service
 const BAD_PREFIX = /^(no-?reply|donotreply|datenschutz|privacy|dsgvo|abuse|postmaster|hostmaster|webmaster|bewerbung|jobs|karriere|presse|press|newsletter|rechnung|invoice|buchhaltung|rgpd|dpo|recrutement|emploi|facturation|comptabilite|factuur|boekhouding|vacatures)@/;
 /** "Made by pixelagentur.de" — the site's builder, not the shop. */
 const AGENCY_DOMAIN = /(agentur|agency|webdesign|design|werbung|media|medien|digital|marketing|hosting|studio|webservice|internet|-it\.|software|wix|jimdo|shopify|strato|ionos)/;
-const FREEMAIL = /@(gmail|googlemail|gmx|web|t-online|yahoo|hotmail|outlook|icloud|aol|freenet|posteo|mail|arcor|live|me|btinternet|btopenworld|sky|virginmedia|talktalk|blueyonder|ntlworld|tiscali|orange|wanadoo|free|sfr|laposte|neuf|club-internet|skynet|telenet|proximus|scarlet|voo|optonline|optimum|verizon|comcast|att|sbcglobal|bellsouth|earthlink|msn|ymail|rocketmail|aim|juno|netzero|cox|charter|spectrum|frontier|protonmail|[a-z]+\.rr)\./;
+const FREEMAIL = /@(gmail|googlemail|gmx|web|t-online|yahoo|hotmail|outlook|icloud|aol|freenet|posteo|mail|arcor|live|me|btinternet|btopenworld|sky|virginmedia|talktalk|blueyonder|ntlworld|tiscali|orange|wanadoo|free|sfr|laposte|neuf|club-internet|skynet|telenet|proximus|scarlet|voo|optonline|optimum|verizon|comcast|att|sbcglobal|bellsouth|earthlink|msn|ymail|rocketmail|aim|juno|netzero|cox|charter|spectrum|frontier|protonmail|[a-z]+\.rr|walla|netvision|bezeqint|zahav|smile|012|013|013net|actcom|barak|inter)\./;
 
 /**
  * Rank addresses and return the best one first.
@@ -379,7 +379,8 @@ export function extractContactRole(text) {
 
 // ─── Link discovery ───────────────────────────────────────────────────────
 
-const CONTACT_LINK = /(impressum|imprint|legal[-_ ]?notice|kontakt|contact|about|ueber[-_]?uns|über[-_]?uns|uber[-_]?uns|wir|team|anbieterkennzeichnung)/i;
+// Hebrew: צור קשר / צרו קשר / יצירת קשר (contact), אודות (about); %d7%a6%d7%95%d7%a8 is צור in a URL.
+const CONTACT_LINK = /(impressum|imprint|legal[-_ ]?notice|kontakt|contact|about|ueber[-_]?uns|über[-_]?uns|uber[-_]?uns|wir|team|anbieterkennzeichnung|צור קשר|צרו קשר|יצירת קשר|אודות|%d7%a6%d7%95%d7%a8|%d7%90%d7%95%d7%93%d7%95%d7%aa)/i;
 
 /** Same-site links to the Impressum, Kontakt and About pages, best first. */
 export function findContactLinks(html, baseUrl, { max = 4 } = {}) {
