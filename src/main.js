@@ -44,11 +44,12 @@ const {
     delayBetweenListings = 1800,
     keepNonProfits       = false,
     contacts             = {},
-    includeTiers         = TARGET_TIERS.slice(0, 2),
     sender               = {},
 } = input;
 
 const COUNTRY = resolveCountry(input);
+// Which tiers get the email. Israel targets gift and souvenir shops too.
+const includeTiers = input.includeTiers || COUNTRY.includeTiers || TARGET_TIERS.slice(0, 2);
 // A market can carry its own wording (the US email doesn't say "we export
 // throughout Europe" alone); "emailTemplate" in the input file still wins.
 const emailTemplate = input.emailTemplate || COUNTRY.emailTemplate || DEFAULT_TEMPLATE_PATH;
@@ -241,7 +242,7 @@ async function main() {
     }
 
     await saveResults(allLeads);
-    const rows = prepareLeads(allLeads, whatsappTemplate !== undefined ? { whatsappTemplate } : {});
+    const rows = prepareLeads(allLeads, { includeTiers, ...(whatsappTemplate !== undefined ? { whatsappTemplate } : {}) });
     const targets = rows.filter(r => isTarget(r, includeTiers));
     const byTier = (t) => rows.filter(r => r.relevance_tier === t).length;
 

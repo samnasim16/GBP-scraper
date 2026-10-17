@@ -4,13 +4,13 @@
  * The template lives in templates/partnership-email.txt so it can be edited
  * without touching code. Its first line is "Subject: …"; everything after the
  * blank line is the body. Placeholders are {{like_this}} and may be any lead
- * field plus greeting, sender_name and sender_title.
+ * field plus greeting, shop_name, sender_name and sender_title.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { greetingFor } from './contacts.js';
+import { greetingFor, shortBusinessName } from './contacts.js';
 
 export const DEFAULT_TEMPLATE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates', 'partnership-email.txt');
 
@@ -34,6 +34,7 @@ export function renderEmail(lead, template, sender = {}) {
     const vars = {
         ...lead,
         greeting: greetingFor(lead),
+        shop_name: shortBusinessName(lead.business_name) || lead.business_name,
         sender_name: sender.name || '[Your Name]',
         sender_title: sender.title || '[Title]',
     };

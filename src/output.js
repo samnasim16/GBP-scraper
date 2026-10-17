@@ -86,7 +86,7 @@ function flatCell(v) {
 }
 
 /** Dedupe by place id, then by website domain + city; best relevance first. */
-export function prepareLeads(leads, { template = null, sender = {}, whatsappTemplate = loadWhatsAppTemplate() } = {}) {
+export function prepareLeads(leads, { template = null, sender = {}, whatsappTemplate = loadWhatsAppTemplate(), includeTiers = null } = {}) {
     const sorted = (leads || []).filter(Boolean).slice().sort((a, b) =>
         (tierRank(a.relevance_tier) - tierRank(b.relevance_tier))
         || ((b.relevance_score || 0) - (a.relevance_score || 0))
@@ -118,9 +118,10 @@ export function prepareLeads(leads, { template = null, sender = {}, whatsappTemp
             ? whatsappLink(wa.number, fillWhatsApp(whatsappTemplate, row, sender)) : '';
         out.push(row);
     }
-    // WhatsApp first: among the likely buyers (the top two tiers), shops with
-    // WhatsApp come before the rest, then by tier and score as before.
-    const group = (r) => (tierRank(r.relevance_tier) < 2 ? 0 : 1);
+    // WhatsApp first: among the likely buyers (the outreach tiers, by default
+    // the top two), shops with WhatsApp come before the rest, then by tier
+    // and score as before.
+    const group = (r) => ((includeTiers ? includeTiers.includes(r.relevance_tier) : tierRank(r.relevance_tier) < 2) ? 0 : 1);
     return out
         .map((r, i) => ({ r, i }))
         .sort((a, b) => (group(a.r) - group(b.r))
@@ -290,7 +291,7 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
         if (saving) return;
         saving = true;
         try {
-            const rows = prepareLeads(leads, { template, sender, ...(whatsappTemplate !== undefined ? { whatsappTemplate } : {}) });
+            const rows = prepareLeads(leads, { template, sender, includeTiers, ...(whatsappTemplate !== undefined ? { whatsappTemplate } : {}) });
             fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows, LEADS_CSV_COLUMNS, { flat: true }), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'leads.json'), JSON.stringify(rows, null, 2), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'mail-merge.csv'), buildMailMerge(rows, includeTiers), 'utf8');
