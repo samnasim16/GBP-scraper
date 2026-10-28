@@ -19,6 +19,8 @@
         "smoke:us": "node src/main.js --input ./input.us-smoke.json",
         "israel": "node src/main.js --input ./input.israel.json",
         "smoke:israel": "node src/main.js --input ./input.israel-smoke.json",
+        "sushi:israel": "node src/main.js --input ./input.israel-sushi.json",
+        "smoke:sushi:israel": "node src/main.js --input ./input.israel-sushi-smoke.json",
         "contacts": "node src/contacts-cli.js",
         "test": "node --test test/*.test.js"
     },

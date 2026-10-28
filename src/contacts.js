@@ -161,12 +161,14 @@ export function registrableDomain(host) {
 
 /**
  * Marketplaces, platforms and directories (Israel's Dapei Zahav is d.co.il:
- * 18 shops listed its page as their website and came back as 1800@d.co.il).
+ * 18 shops listed its page as their website and came back as 1800@d.co.il),
+ * and the ordering and table-booking sites restaurants link instead of a
+ * website (Wolt, 10bis, Mishloha, Ontopo, Tabit, rest.co.il, Uber Eats…).
  * A shop whose "website" is its page on one of
  * these has no Impressum of its own — crawling it yields the platform's
  * legal inbox (behoerdenanfragen@kleinanzeigen.de), never the shop's.
  */
-export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen|livre-rare-book|leboncoin|pagesjaunes|2ememain|2dehands|marktplaats|goudengids|pagesdor|infobel|mappy)\.[a-z.]+$|(^|\.)(d|b144|easy|zap|2all|dapeizahav|bizportal)\.co\.il$/;
+export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen|livre-rare-book|leboncoin|pagesjaunes|2ememain|2dehands|marktplaats|goudengids|pagesdor|infobel|mappy|wolt|ontopo|tabit|tabitisrael|ubereats|doordash|grubhub|seamless|deliveroo|just-eat|justeat|lieferando|thefork|opentable|resy|zomato|toasttab|chownow)\.[a-z.]+$|(^|\.)(d|b144|easy|zap|2all|dapeizahav|bizportal|10bis|mishloha|rest|cibus)\.co\.il$/;
 
 const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service|bestellung|order|orders|verkauf|sales|laden|store|post|team|enquiries|enquiry|admin|bonjour|commande|commandes|vente|ventes|boutique|magasin|librairie|accueil|winkel|bestelling|bestellingen)@/;
 const BAD_PREFIX = /^(no-?reply|donotreply|datenschutz|privacy|dsgvo|abuse|postmaster|hostmaster|webmaster|bewerbung|jobs|karriere|presse|press|newsletter|rechnung|invoice|buchhaltung|rgpd|dpo|recrutement|emploi|facturation|comptabilite|factuur|boekhouding|vacatures)@/;

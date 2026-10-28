@@ -3,6 +3,7 @@
  *
  *   npm run contacts -- output/leads.json          refresh every row, rewrite output/
  *   npm run contacts -- output-uk/leads.json --input input.england.json
+ *   npm run contacts -- output-il-sushi/leads.json --input input.israel-sushi.json
  *   npm run contacts -- --probe https://shop.de "Shop Name"   check one website and print what it finds
  */
 
@@ -56,8 +57,11 @@ function countryContacts(input) {
 async function probe(url, name) {
     const chrome = lazyBrowser();
     const http = createHttpClient({ transport: 'local', getBrowser: chrome.get });
-    const enricher = new ContactEnricher({ http, config: { ...countryContacts(loadInput(() => {})), delayMs: 0 } });
-    const lead = { business_name: name || new URL(url).hostname, website: url };
+    const input = loadInput(() => {});
+    const enricher = new ContactEnricher({ http, config: { ...countryContacts(input), delayMs: 0 } });
+    // Scored as the configured market and campaign (--input input.israel-sushi.json).
+    const { code, campaign } = resolveCountry(input);
+    const lead = { business_name: name || new URL(url).hostname, website: url, country: code, ...(campaign ? { campaign } : {}) };
     const result = await enricher.enrich(lead);
     Object.assign(lead, relevanceFields(lead, lead._siteText));
     console.log(JSON.stringify({
@@ -95,6 +99,7 @@ async function refresh(file) {
         ...(waFile ? { whatsappTemplate: loadWhatsAppTemplate(waFile) } : {}),
         sender: input.sender || {},
         includeTiers: input.includeTiers || country.includeTiers || TARGET_TIERS.slice(0, 2),
+        ...(country.workbook ? { workbook: country.workbook } : {}),
     });
     await save(leads);
     await chrome.close();

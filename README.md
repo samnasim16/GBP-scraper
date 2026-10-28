@@ -132,6 +132,36 @@ Put your name and title in `"sender"` in `input.israel.json`. You can write it i
 - **Phones** are `+972`. Mobiles (`05…`) show as **Likely** on WhatsApp.
 - **The email and WhatsApp message are in Hebrew** (`templates/partnership-email-il.txt`, `templates/whatsapp-message-il.txt`). They follow your English email, but read as selling in Israel, not exporting. **Read them before sending**, especially the Hebrew street names of your facilities.
 
+## Sushi restaurants in Israel (glass plates and cups)
+
+A separate campaign: the same scraper, looking for every **sushi place in Israel** to offer Jaffa Glass's hand-made glass plates and cups. It has its own config, folder and templates, so it never touches the Judaica results.
+
+```bash
+npm run smoke:sushi:israel   # Dizengoff (Tel Aviv) only, 2 search terms, 10 places → output-il-sushi-smoke/
+npm run sushi:israel         # all of Israel → output-il-sushi/   (input.israel-sushi.json)
+```
+
+Put your name and title in `"sender"` in `input.israel-sushi.json`. The results are in **`sushi-leads.xlsx`** and `mail-merge.csv`.
+
+- **Places:** 85 towns, plus the restaurant streets of the big cities searched one by one, since Maps shows at most about 120 places per search:
+  - Tel Aviv: the Old North, New North, Dizengoff, Rothschild, Florentin, Neve Tzedek, Sarona, Ramat Aviv, Ramat HaHayal, the Port and more.
+  - Jerusalem: the City Center, Mahane Yehuda, the German Colony, Talpiot, Mamilla and more.
+  - Haifa: the Carmel Center, the German Colony and Downtown.
+  - Herzliya Pituach, Ramat Gan's Diamond Exchange, Jaffa.
+- **Search terms:** `סושי`, `Sushi`, `מסעדת סושי` (across every place first), then `משלוחי סושי`, `מסעדה יפנית`, `Japanese restaurant`, `מסעדה אסייתית`, `Asian restaurant`. That's 984 searches; expect the full run to take most of a day. A restart carries on where it stopped.
+- **Who is a target:**
+
+| Tier | Meaning | Gets the email? |
+|---|---|---|
+| **Sushi place** | Sushi in the name, category or Maps description (restaurant, bar, takeaway, delivery, caterer), or on the menu of its website | ✅ |
+| **Japanese / Asian restaurant** | Japanese, Asian, ramen, poke, wok, Chinese, Thai… with no sushi seen yet (in Israel most of them serve it) | ✅ |
+| Other restaurant | A restaurant, café or bar with no sushi on its listing and at most one mention on its site | ❌ |
+| Not a restaurant | Supermarket sushi counters, fish shops, sushi-supply wholesalers, cooking schools, malls (dropped before they are opened) | ❌ |
+
+  To email only the sushi places, set `"includeTiers": ["Sushi place"]` in `input.israel-sushi.json`.
+- **Ordering and booking pages** (Wolt, 10bis, Mishloha, Ontopo, Tabit, rest.co.il, Uber Eats…) are not read as a restaurant's website, so their inboxes never show up as the restaurant's email.
+- **The email and WhatsApp message are in Hebrew** (`templates/sushi-email-il.txt`, `templates/sushi-whatsapp-il.txt`). They offer hand-made glass serving plates and cups, and ask whether you may send the catalogue or set up a short meeting, at the restaurant or at the Jaffa showroom. They carry the same "פרסומת" label and opt-out line as the Judaica ones (see *A note on sending (Israel)*). **Read them before sending** and change anything that doesn't match what you make.
+
 ## WhatsApp: which shops have it, and who to contact first
 
 Every row gets three WhatsApp columns. The **WhatsApp** sheet lists every target you can message, best evidence first. In every sheet, shops with WhatsApp come before the rest.
@@ -204,6 +234,7 @@ All fields are optional.
 | Field | Default | Meaning |
 |---|---|---|
 | `country` | `"DE"` | `"DE"` Germany, `"UK"` England, `"FR"` France, `"BE"` Belgium, `"US"` United States, `"IL"` Israel. It sets the city list, search terms, phone code, contact pages and output folder. |
+| `campaign` | Judaica | `"sushi"` (Israel only) looks for sushi restaurants instead: its own places, search terms, tiers, templates and `output-il-sushi/` folder. |
 | `sender` | – | `{ "name", "title" }` for the email signature. |
 | `states` | all | Bundesland codes to limit the run, e.g. `["BE","BY","HE"]`. Codes: BE HH HB BY BW HE NW NI RP SL SH MV BB SN ST TH. |
 | `cities` | built-in list | An explicit list of cities, which replaces the built-in one. |
@@ -224,7 +255,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 122 offline tests
+npm test                                                               # 131 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)

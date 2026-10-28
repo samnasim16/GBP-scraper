@@ -10,6 +10,7 @@
 
 import { clean } from './util.js';
 import { COUNTRIES } from './config.js';
+import { scoreSushi, SUSHI_TIERS } from './sushi.js';
 
 /** Strong signals — words a shop only uses if it sells Jewish ritual objects. */
 const JUDAICA_STRONG = [
@@ -278,6 +279,8 @@ function domainWords(url) {
  * @returns {{ score:number, tier:string, evidence:string }}
  */
 export function scoreRelevance(lead, siteText = '') {
+    // A campaign looks for a different buyer: "sushi" scores restaurants.
+    if (lead.campaign === 'sushi') return scoreSushi(lead, siteText, isSellable(lead));
     // Street names are not context: "NORMAL Rouen, Rue aux Juifs" is a
     // discount store on the Rue aux Juifs.
     const listing = clean([personNamesOut(lead.business_name), lead.category, lead.maps_description].join(' ')).toLowerCase()
@@ -360,6 +363,9 @@ export function scoreRelevance(lead, siteText = '') {
 
 /** Tiers worth emailing, best first. */
 export const TARGET_TIERS = ['Judaica seller', 'Jewish / Israeli retail', 'Glass & gift shop'];
+
+/** Sort order of the tiers, the sushi campaign's included; the rest rank last, by score. */
+export const RANKED_TIERS = [...TARGET_TIERS, ...SUSHI_TIERS.slice(0, 3)];
 
 /**
  * Should this row go on the outreach sheet?

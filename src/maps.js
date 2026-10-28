@@ -221,15 +221,20 @@ export async function scrapeQuery(page, query, ctx, opts) {
         if (!opts.keepNonProfits && !isSellable({ business_name: c.name, category: c.category }).ok) {
             drop.nonProfit++; continue;
         }
-        // Cheap pre-screen: a kosher restaurant is not a buyer. Only drop when
-        // the name carries no Judaica word at all.
-        if (c.category && NON_RETAIL_CATEGORY.test(c.category) && scoreRelevance({ business_name: c.name }).tier !== 'Judaica seller') {
+        // Cheap pre-screen: a kosher restaurant is not a Judaica buyer. Only
+        // drop when the name carries no Judaica word at all. A campaign
+        // (sushi) wants restaurants and drops its own tiers instead: a
+        // supermarket's sushi counter, a fish shop.
+        const notBuyer = country.campaign
+            ? country.dropAtFeed && country.dropAtFeed.includes(scoreRelevance({ business_name: c.name, category: c.category, campaign: country.campaign, country: country.code }).tier)
+            : NON_RETAIL_CATEGORY.test(c.category) && scoreRelevance({ business_name: c.name }).tier !== 'Judaica seller';
+        if (c.category && notBuyer) {
             drop.notRetail++; continue;
         }
         if (opts.minReviews > 0 && c.reviewCount > 0 && c.reviewCount < opts.minReviews) { drop.reviews++; continue; }
         survivors.push({ ...c, pk, nk });
     }
-    log(`  Feed: ${cards.length} places | new: ${survivors.length} | dropped — dup:${drop.dup} non-profit:${drop.nonProfit} not-retail:${drop.notRetail} closed:${drop.closed}${drop.reviews ? ` reviews:${drop.reviews}` : ''}`);
+    log(`  Feed: ${cards.length} places | new: ${survivors.length} | dropped — dup:${drop.dup} non-profit:${drop.nonProfit} ${country.campaign ? 'not-restaurant' : 'not-retail'}:${drop.notRetail} closed:${drop.closed}${drop.reviews ? ` reviews:${drop.reviews}` : ''}`);
 
     for (const c of survivors) {
         if (allLeads.length >= opts.maxLeads) return;
@@ -300,6 +305,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 maps_url:           c.href || page.url(),
                 source_query:       query.text,
                 country:            country.code,
+                ...(country.campaign ? { campaign: country.campaign } : {}),
                 observed_date:      new Date().toISOString().split('T')[0],
             };
             // The feed card may have had no category; the detail page does.

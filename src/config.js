@@ -283,6 +283,45 @@ export const ISRAEL_DISTRICTS = {
     'Tel Aviv': ['Dizengoff', 'Nachalat Binyamin'],
 };
 
+/**
+ * The sushi campaign in Israel: every sushi place, to sell glass plates and
+ * cups. Restaurants are everywhere, so the Judaica towns plus the rest of the
+ * country's sizeable towns, and the restaurant streets of the big cities
+ * (Maps shows at most ~120 places per search, and Tel Aviv alone has more).
+ */
+const ISRAEL_MORE_TOWNS = {
+    JM: [],
+    TA: ['Kiryat Ono', 'Or Yehuda', 'Yehud'],
+    CE: ['Kadima-Zoran', 'Even Yehuda', 'Kfar Yona', 'Tel Mond', 'Gedera', 'Mazkeret Batya', 'Ganei Tikva'],
+    HA: ['Kiryat Motzkin', 'Kiryat Yam', 'Nesher', 'Tirat Carmel', "Yokne'am Illit", 'Pardes Hanna-Karkur', 'Binyamina', 'Or Akiva'],
+    NO: ['Nazareth', 'Migdal HaEmek', "Beit She'an", 'Katzrin', 'Rosh Pina'],
+    SO: ['Kiryat Malakhi', 'Yeruham', 'Mitzpe Ramon'],
+    JS: [],
+};
+export const ISRAEL_SUSHI_CITIES = Object.fromEntries(Object.entries(ISRAEL_CITIES)
+    .map(([district, towns]) => [district, [...towns, ...(ISRAEL_MORE_TOWNS[district] || [])]]));
+export const ISRAEL_SUSHI_DISTRICTS = {
+    'Tel Aviv': ['Old North', 'New North', 'Dizengoff', 'Rothschild Boulevard', 'Florentin', 'Neve Tzedek', 'Sarona',
+        'Ramat Aviv', 'Ramat HaHayal', 'Tel Aviv Port', 'Kerem HaTeimanim', 'Ibn Gabirol Street', 'Yad Eliyahu', 'Bavli'],
+    Jerusalem: ['City Center', 'Mahane Yehuda', 'German Colony', 'Talpiot', 'Mamilla', 'Ramot', "Pisgat Ze'ev", 'Malha',
+        'Givat Shaul', 'Baka', 'Har Hotzvim', 'Kiryat Yovel'],
+    Haifa: ['Carmel Center', 'German Colony', 'Downtown', 'Ahuza', 'Hadar', 'Kiryat Haim'],
+    'Ramat Gan': ['Diamond Exchange District'],
+    Herzliya: ['Herzliya Pituach'],
+    'Petah Tikva': ['Kiryat Arye'],
+    Netanya: ['Poleg'],
+    Jaffa: ['Old Jaffa', 'Jaffa Flea Market'],
+};
+export const ISRAEL_SUSHI_CATEGORIES = [
+    'סושי',
+    'Sushi',
+    'מסעדת סושי',
+    'משלוחי סושי',
+    'מסעדה יפנית',
+    'Japanese restaurant',
+    'מסעדה אסייתית',
+    'Asian restaurant',
+];
 // Hebrew first: most Israeli shops list themselves in Hebrew.
 export const ISRAEL_CATEGORIES = [
     'יודאיקה',
@@ -427,6 +466,34 @@ export const COUNTRIES = {
     },
 };
 
+/**
+ * Campaigns: the same scraper pointed at another kind of buyer. A campaign
+ * replaces a market's search terms, places, scoring, templates, outreach
+ * tiers and output folder; "campaign": "sushi" in the input file picks it.
+ * The scoring is chosen by lead.campaign (relevance.js → sushi.js).
+ */
+export const CAMPAIGNS = {
+    sushi: {
+        IL: {
+            title: 'Sushi Restaurant Scraper',
+            regions: ISRAEL_SUSHI_CITIES,
+            districts: ISRAEL_SUSHI_DISTRICTS,
+            categories: ISRAEL_SUSHI_CATEGORIES,
+            highYield: ['סושי', 'Sushi', 'מסעדת סושי'],
+            outputDir: 'output-il-sushi',
+            workbook: 'sushi-leads.xlsx',
+            includeTiers: ['Sushi place', 'Japanese / Asian restaurant'],
+            // For the end-of-run summary (the tiers are in sushi.js).
+            tiers: ['Sushi place', 'Japanese / Asian restaurant', 'Other restaurant', 'Not a restaurant', 'Non-profit / religious'],
+            // Dropped from the feed before the place is opened.
+            dropAtFeed: ['Not a restaurant'],
+            emailTemplate: path.join(TEMPLATES, 'sushi-email-il.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-il.txt'),
+            script: 'sushi:israel',
+        },
+    },
+};
+
 /** "DE", "UK", "GB", "England", "USA", "Israel" → a COUNTRIES entry (default Germany). */
 export function resolveCountry(input = {}) {
     const raw = String(input.country || 'DE').trim().toUpperCase();
@@ -438,7 +505,14 @@ export function resolveCountry(input = {}) {
     }[raw] || raw;
     const c = COUNTRIES[code];
     if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);
-    return { code, ...c };
+    const campaign = String(input.campaign || '').trim().toLowerCase();
+    if (!campaign || campaign === 'judaica') return { code, ...c };
+    const markets = CAMPAIGNS[campaign];
+    if (!markets) throw new Error(`Unknown campaign "${input.campaign}". Use one of: ${Object.keys(CAMPAIGNS).join(', ')}`);
+    if (!markets[code]) {
+        throw new Error(`The ${campaign} campaign is set up for ${Object.keys(markets).map(k => COUNTRIES[k].name).join(', ')} only, not ${c.name}`);
+    }
+    return { code, ...c, ...markets[code], campaign };
 }
 
 /**

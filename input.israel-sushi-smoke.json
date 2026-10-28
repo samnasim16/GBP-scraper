@@ -1,0 +1,22 @@
+{
+    "country": "IL",
+    "campaign": "sushi",
+    "cities": [
+        "Dizengoff, Tel Aviv"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "סושי",
+        "Sushi"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-il-sushi-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}
