@@ -1,0 +1,32 @@
+{
+    "country": "IL",
+    "campaign": "sushi",
+    "sender": {
+        "name": "",
+        "title": ""
+    },
+    "states_comment": "Leave empty for all of Israel, or pick districts: JM TA CE HA NO SO JS",
+    "states": [],
+    "cities": [],
+    "districts": true,
+    "searchCategories": [],
+    "includeTiers": [
+        "Sushi place",
+        "Japanese / Asian restaurant"
+    ],
+    "maxLeads": 8000,
+    "maxResultsPerQuery": 120,
+    "maxScrolls": 20,
+    "delayBetweenQueries": 4000,
+    "delayBetweenListings": 1800,
+    "browser": {
+        "mode": "local",
+        "headless": false,
+        "userDataDir": ".cache/chrome-profile"
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 3,
+        "maxPagesPerSite": 4
+    }
+}

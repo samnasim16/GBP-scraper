@@ -10,6 +10,8 @@
  *   output/mail-merge.csv       To / Greeting / Subject / Body, ready to send
  *
  * Runs on this machine with your own Chrome. No accounts, no per-lead cost.
+ * "campaign": "sushi" in the input file looks for sushi restaurants instead
+ * (Israel), to sell glass plates and cups; see CAMPAIGNS in config.js.
  *
  * Run:  npm start               (reads ./input.json, writes ./output/)
  */
@@ -60,7 +62,10 @@ const FRESH = process.argv.includes('--fresh');
 // the Germany results.
 const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
 const template = loadTemplate(emailTemplate);
-const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate });
+const WORKBOOK = COUNTRY.workbook || 'judaica-leads.xlsx';
+const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK });
+// What progress.json belongs to: a sushi run never resumes a Judaica one.
+const RUN_KEY = COUNTRY.campaign ? `${COUNTRY.code}-${COUNTRY.campaign}` : COUNTRY.code;
 
 // ─── CRASH SAFETY NET ─────────────────────────────────────────────────────
 let LEADS_REF = [];
@@ -128,7 +133,7 @@ async function main() {
     });
 
     try {
-        console.log(`🚀 Judaica Retailer Scraper — ${COUNTRY.name} — Jaffa Glass`);
+        console.log(`🚀 ${COUNTRY.title || 'Judaica Retailer Scraper'} — ${COUNTRY.name} — Jaffa Glass`);
         factory = await createBrowserFactory({ config: browserConfig, wssEndpoint, log: console.log });
         const queries = buildQueryMatrix(LOCATIONS, CATEGORIES, COUNTRY.highYield);
         console.log(`   ${CATEGORIES.length} search terms × ${LOCATIONS.length} locations = ${queries.length} queries`);
@@ -148,9 +153,9 @@ async function main() {
             const previous = loadPrevious(OUTPUT_DIR);
             const progress = readProgress(OUTPUT_DIR);
             if (previous.length || progress) {
-                startAt = resumePoint(queries, previous, progress, COUNTRY.code);
+                startAt = resumePoint(queries, previous, progress, RUN_KEY);
                 if (startAt >= queries.length) {
-                    console.log(`   ✅ The previous ${COUNTRY.name} run already finished all ${queries.length} queries (${previous.length} places).`);
+                    console.log(`   ✅ The previous ${COUNTRY.name}${COUNTRY.campaign ? ` ${COUNTRY.campaign}` : ''} run already finished all ${queries.length} queries (${previous.length} places).`);
                     console.log('      Nothing to resume. To search again from the start, add --fresh:');
                     console.log(`        npm run ${COUNTRY.script || 'start'} -- --fresh`);
                     process.exit(0);
@@ -224,7 +229,7 @@ async function main() {
                 }
             }
 
-            writeProgress(OUTPUT_DIR, { country: COUNTRY.code, queries: queries.length, next: qi + 1, last: queries[qi].text });
+            writeProgress(OUTPUT_DIR, { country: RUN_KEY, queries: queries.length, next: qi + 1, last: queries[qi].text });
             if (allLeads.length - lastSavedCount >= SAVE_EVERY) {
                 await saveResults(allLeads);
                 lastSavedCount = allLeads.length;
@@ -248,12 +253,12 @@ async function main() {
 
     console.log('\n📊 DONE');
     console.log(`   Places scraped: ${rows.length}`);
-    for (const t of [...TARGET_TIERS, 'Unrelated', 'Not a retailer', 'Non-profit / religious']) console.log(`     ${t}: ${byTier(t)}`);
+    for (const t of COUNTRY.tiers || [...TARGET_TIERS, 'Unrelated', 'Not a retailer', 'Non-profit / religious']) console.log(`     ${t}: ${byTier(t)}`);
     console.log(`   Outreach targets: ${targets.length} — ${targets.filter(r => r.email).length} with email, ${targets.filter(r => r.contact_name).length} with a named contact`);
     console.log(`   WhatsApp: ${targets.filter(r => r.whatsapp_priority === 1).length} confirmed on website/listing, ${targets.filter(r => r.whatsapp_priority === 2).length} likely (mobile / mentioned), ${targets.filter(r => r.whatsapp_priority === 3).length} to check by hand (landlines / US numbers)`);
     const s = enricher.stats;
     console.log(`   Websites read: ${s.sites} (${s.pages} pages)`);
-    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/judaica-leads.xlsx and mail-merge.csv`);
+    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/${WORKBOOK} and mail-merge.csv`);
     process.exit(0);
 }
 

@@ -2,6 +2,7 @@
  * Dedupe, sort, and write the deliverables.
  *
  *   output/judaica-leads.xlsx   Outreach · No email found · All results
+ *                               (sushi-leads.xlsx for the sushi campaign)
  *   output/mail-merge.csv       one row per address: To, Subject, Body — ready
  *                               for Gmail/Outlook mail merge (YAMM, GMass, Word)
  *   output/leads.csv / .json    every scraped row
@@ -14,7 +15,7 @@ import ExcelJS from 'exceljs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { placeKey } from './maps.js';
-import { isTarget, TARGET_TIERS } from './relevance.js';
+import { isTarget, RANKED_TIERS } from './relevance.js';
 import { greetingFor, shortBusinessName } from './contacts.js';
 import { classifyWhatsApp, whatsappLink, loadWhatsAppTemplate } from './whatsapp.js';
 import { renderEmail } from './email-template.js';
@@ -142,8 +143,8 @@ function fillWhatsApp(text, row, sender) {
 }
 
 function tierRank(t) {
-    const i = TARGET_TIERS.indexOf(t);
-    return i === -1 ? TARGET_TIERS.length : i;
+    const i = RANKED_TIERS.indexOf(t);
+    return i === -1 ? RANKED_TIERS.length : i;
 }
 
 /**
@@ -184,6 +185,11 @@ const XL = {
         'Unrelated':               { fill: 'FFEDEDED', font: 'FF595959' },
         'Not a retailer':          { fill: 'FFEDEDED', font: 'FF595959' },
         'Non-profit / religious':  { fill: 'FFFCE4D6', font: 'FF833C0B' },
+        // The sushi campaign.
+        'Sushi place':                 { fill: 'FFC6EFCE', font: 'FF006100' },
+        'Japanese / Asian restaurant': { fill: 'FFDDEBF7', font: 'FF1F4E79' },
+        'Other restaurant':            { fill: 'FFEDEDED', font: 'FF595959' },
+        'Not a restaurant':            { fill: 'FFEDEDED', font: 'FF595959' },
     },
     whatsapp: {
         1: { fill: 'FFC6EFCE', font: 'FF006100' },
@@ -283,7 +289,7 @@ async function writeXlsx(rows, file, includeTiers) {
  * Create a saver bound to an output directory. Serialised so overlapping
  * writes can't clobber each other.
  */
-export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, log = console.log } = {}) {
+export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', log = console.log } = {}) {
     fs.mkdirSync(outputDir, { recursive: true });
     let saving = false;
 
@@ -296,7 +302,7 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
             fs.writeFileSync(path.join(outputDir, 'leads.json'), JSON.stringify(rows, null, 2), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'mail-merge.csv'), buildMailMerge(rows, includeTiers), 'utf8');
             try {
-                await writeXlsx(rows, path.join(outputDir, 'judaica-leads.xlsx'), includeTiers);
+                await writeXlsx(rows, path.join(outputDir, workbook), includeTiers);
             } catch (e) {
                 if (!quiet) log(`⚠️  XLSX write skipped (${e.message}) — CSV still saved.`);
             }
