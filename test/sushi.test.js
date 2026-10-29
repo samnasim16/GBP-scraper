@@ -4,9 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { JSDOM } from 'jsdom';
+
 import { resolveCountry, resolveLocations, buildQueryMatrix } from '../src/config.js';
 import { scoreRelevance, isTarget } from '../src/relevance.js';
-import { PLATFORM_DOMAIN } from '../src/contacts.js';
+import { PLATFORM_DOMAIN, extractEmails } from '../src/contacts.js';
+import { pickCity } from '../src/maps.js';
+import { extractDetail, extractFeedCards } from '../src/dom-extract.js';
+import { classifyWhatsApp, WA } from '../src/whatsapp.js';
 import { loadTemplate, renderEmail } from '../src/email-template.js';
 import { loadWhatsAppTemplate } from '../src/whatsapp.js';
 import { createSaver, prepareLeads, buildMailMerge } from '../src/output.js';
@@ -135,4 +140,87 @@ test('sushi output: sushi places first, its own workbook, and the mail merge hol
     assert.ok(fs.existsSync(path.join(dir, 'sushi-leads.xlsx')));
     assert.ok(!fs.existsSync(path.join(dir, 'judaica-leads.xlsx')));
     fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/** Read a Maps detail panel with the Israeli phone code. */
+const detail = (inner) => {
+    const dom = new JSDOM(`<div role="main"><h1 class="DUwDvf">X</h1>${inner}</div>`, { url: 'https://www.google.com/maps/place/x' });
+    const prev = global.document;
+    global.document = dom.window.document;
+    try { return extractDetail('972'); } finally { global.document = prev; }
+};
+
+test('full sushi run: a 1-700 number is Israeli, not American, and has no WhatsApp', () => {
+    // 1-700-500-876 came back as +1 1700500876, "Check — US number".
+    const phone = detail('<button data-item-id="phone:tel:1700500876"></button>').phone;
+    assert.equal(phone, '+9721700500876');
+    assert.equal(detail('<button data-item-id="phone:tel:1599504917"></button>').phone, '+9721599504917');
+    const wa = classifyWhatsApp({ phone });
+    assert.equal(wa.status, WA.SERVICE);
+    assert.equal(wa.number, '');
+    // A WhatsApp link on the site still wins.
+    assert.equal(classifyWhatsApp({ phone, whatsapp_site_numbers: '+972541234567' }).status, WA.LINK_SITE);
+    // Ordinary Israeli numbers are unchanged.
+    assert.equal(detail('<button data-item-id="phone:tel:054-123-4567"></button>').phone, '+972541234567');
+});
+
+test('full sushi run: Arad, Romania, Canada, Hebron and Bethlehem are outside Israel', () => {
+    for (const a of ['Strada Pădurii 65, 310123 Arad, Romania', '3017 St Johns St, Port Moody, BC V3H 2C4, Canada',
+        'H33R+57H, Hebron', 'Hebron', 'P6C3+3HJ, Caritas St. Qubbet Raheel,, Bethlehem', 'Star St 171, Bethlehem']) {
+        assert.ok(SUSHI.foreign.test(a), a);
+    }
+    for (const a of ['Derech Levi Eshkol 93, Kiryat Ono', 'Kiryat Arba', 'HaMa\'ayan St 1, Efrat', 'Kakal St 18, Arad']) {
+        assert.ok(!SUSHI.foreign.test(a), a);
+    }
+    // Arad is searched as "Arad, Israel"; the City column still says Arad.
+    const locs = resolveLocations({ country: 'IL', campaign: 'sushi' }, () => {});
+    assert.ok(locs.some(l => l.city === 'Arad, Israel'));
+    assert.equal(pickCity('', 'Arad, Israel', SUSHI), 'Arad');
+});
+
+test('full sushi run: Asian words need a kitchen — spas, clinics and a park are not restaurants', () => {
+    assert.equal(tierOf(place('ספא יוקרתי בהרצליה - Tomoko Japanese Spa', 'Spa')), 'Not a restaurant');
+    assert.equal(tierOf(place('o spa - ספא ראש יפני', 'Spa')), 'Not a restaurant');
+    assert.equal(tierOf(place('קליניקה לרפואה סינית', 'Chinese Medicine Clinic')), 'Not a restaurant');
+    assert.equal(tierOf(place('Japanese Garden', 'Garden'), 'sushi sushi'), 'Not a restaurant');
+    // A name that says it serves food wins over a shop category.
+    assert.equal(tierOf(place('Sushi restaurant 🍣', 'Grocery Store')), 'Sushi place');
+    assert.equal(tierOf(place('צ׳ילי בייבי - מכולת ובית אוכל אסייתי', 'Asian Grocery Store')), 'Japanese / Asian restaurant');
+    assert.equal(tierOf(place('Sumo Asian kitchen', 'Food And Beverage Consultant')), 'Japanese / Asian restaurant');
+    assert.equal(tierOf(place('תאי אסיאן פוד - חנות בוטיק למוצרי מזון אסיאתי', 'Asian Grocery Store')), 'Not a restaurant');
+    // A gastropub and a Hebrew category are restaurants.
+    assert.equal(tierOf(place('מסעדת מיה ביץ', 'Gastropub'), 'סושי וסושי'), 'Sushi place');
+    assert.equal(tierOf(place('Loco Roll Express', 'מסעדה'), 'פוטומאקי, סושי'), 'Sushi place');
+    // Sushi in the name still counts under an odd category.
+    assert.equal(tierOf(place('Tzalil Taim Sushi', 'Shipping Service')), 'Sushi place');
+});
+
+test('full sushi run: directory and delivery-site inboxes are not the restaurant\'s', () => {
+    // israelbusinessguide.com put its own gmail on 23 restaurants; Bali B Click
+    // its eilat.bali@ on two; Valuecard dan@valuecard.co.il on one.
+    for (const host of ['israelbusinessguide.com', 'balibclick.co.il', 'valuecard.co.il', 'el-gaucho-na.rol.co.il', 'www.happycow.net']) {
+        assert.ok(PLATFORM_DOMAIN.test(host), host);
+    }
+    // Mishlohim pages are read: the restaurant's address on them counts, Mishlohim's own never does.
+    assert.deepEqual(extractEmails('<a href="mailto:info@mishlohim.co.il">x</a> <a href="mailto:karmela17262@gmail.com">y</a>'), ['karmela17262@gmail.com']);
+    assert.ok(!PLATFORM_DOMAIN.test('www.mishlohim.co.il'));
+});
+
+test('full sushi run: "No reviews", an address and a hotel blurb are not categories', () => {
+    assert.equal(detail('<button class="DkEaL">HotelSlick hostel with a trendy bistro</button>').category, 'Hotel');
+    assert.equal(detail('<button class="DkEaL">RestaurantModern hotel with sea views &amp; a pool</button>').category, 'Restaurant');
+    assert.equal(detail('<button class="DkEaL">No Reviews</button>').category, '');
+    assert.equal(detail('<button class="DkEaL">Kosher Restaurant</button>').category, 'Kosher Restaurant');
+
+    // The same in a feed card: a rating row reading "No reviews", a row with only an address.
+    const card = (rows) => `<div class="Nv2PK"><a class="hfpxzc" href="https://www.google.com/maps/place/A/data=!1s0x1" aria-label="A"></a>
+        <div class="qBF1Pd fontHeadlineSmall">A</div>${rows.map(r => `<div class="W4Efsd">${r}</div>`).join('')}</div>`;
+    const feed = (rows) => {
+        const dom = new JSDOM(`<div role="feed">${card(rows)}</div>`, { url: 'https://www.google.com/maps/search/x' });
+        const prev = global.document;
+        global.document = dom.window.document;
+        try { return extractFeedCards()[0].category; } finally { global.document = prev; }
+    };
+    assert.equal(feed(['No reviews', "שד' הרצל 39", 'Sushi restaurant · שד\' הרצל 39']), 'Sushi restaurant');
+    assert.equal(feed(['HotelSlick hostel with a trendy bistro']), 'Hotel');
 });

@@ -159,7 +159,9 @@ Put your name and title in `"sender"` in `input.israel-sushi.json`. The results 
 | Not a restaurant | Supermarket sushi counters, fish shops, sushi-supply wholesalers, cooking schools, malls (dropped before they are opened) | ❌ |
 
   To email only the sushi places, set `"includeTiers": ["Sushi place"]` in `input.israel-sushi.json`.
-- **Ordering and booking pages** (Wolt, 10bis, Mishloha, Ontopo, Tabit, rest.co.il, Uber Eats…) are not read as a restaurant's website, so their inboxes never show up as the restaurant's email.
+- **Ordering and booking pages** (Wolt, 10bis, Mishloha, Ontopo, Tabit, rest.co.il, Uber Eats…) and restaurant directories (israelbusinessguide.com, rol.co.il, Bali B Click) are not read as a restaurant's website, so their inboxes never show up as the restaurant's email. Mishlohim pages are read, but Mishlohim's own address is ignored.
+- **Not targets:** Japanese spas, Chinese-medicine clinics and parks, even with "Japanese" or "Chinese" in the name. Restaurants in Hebron, Bethlehem and abroad (Arad in Romania, Sushi Modo in Canada) are dropped.
+- **1-700 / 1-800 numbers** show as **No — 1-700 / 1-800 service number** in the WhatsApp column, with no chat link: nobody can message them.
 - **The email and WhatsApp message are in Hebrew** (`templates/sushi-email-il.txt`, `templates/sushi-whatsapp-il.txt`). They offer hand-made glass serving plates and cups, and ask whether you may send the catalogue or set up a short meeting, at the restaurant or at the Jaffa showroom. They carry the same "פרסומת" label and opt-out line as the Judaica ones (see *A note on sending (Israel)*). **Read them before sending** and change anything that doesn't match what you make.
 
 ## WhatsApp: which shops have it, and who to contact first
@@ -255,7 +257,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 131 offline tests
+npm test                                                               # 136 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)
