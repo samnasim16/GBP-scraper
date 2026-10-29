@@ -31,7 +31,15 @@ const ASIAN = ['japanese', 'japan', 'asian', 'pan-asian', 'izakaya', 'ramen', 't
 const ASIAN_WHOLE = ['wok', 'ווק', 'poke', 'poké', 'פוקי', 'bento', 'בנטו', 'סיני'];
 
 /** Places that serve food: restaurants, bars, takeaways, delivery kitchens, caterers. */
-const FOOD_SERVICE = /restaurant|takeaway|take-?out|meal delivery|food delivery|caterer|catering|\bbar\b|\bpub\b|bistro|brasserie|caf[eé]|coffee shop|diner|eatery|food court|izakaya|\bdeli\b|grill|lounge|buffet|steakhouse/i;
+const FOOD_SERVICE = /restaurant|מסעד|takeaway|take-?out|meal delivery|food delivery|caterer|catering|\bbar\b|pub\b|bistro|brasserie|caf[eé]|coffee shop|diner|eatery|food court|izakaya|\bdeli\b|grill|lounge|buffet|steakhouse/i;
+
+/**
+ * A name that says it serves food, whatever Maps files it under: "Sushi
+ * restaurant 🍣" is a "Grocery Store", "צ׳ילי בייבי - מכולת ובית אוכל אסייתי"
+ * (grocery and Asian eatery) an "Asian Grocery Store", "Sumo Asian kitchen"
+ * a "Food And Beverage Consultant".
+ */
+const EATERY_NAME = /restaurant|מסעד|kitchen|מטבח|בית אוכל|sushi bar|סושי בר|bistro|ביסטרו|eatery/i;
 
 /**
  * Not a buyer of plates: a supermarket's sushi counter, a fish shop, a
@@ -83,8 +91,12 @@ export function scoreSushi(lead, siteText = '', sellable = { ok: true }) {
     const sushiSite = find(SUSHI_RE, site);
     const asianListing = find(ASIAN_RE, [name, category, description].join(' '));
     const sushiListing = sushiName.count + sushiCategory.count + sushiDescription.count > 0;
-    const notRestaurant = NOT_RESTAURANT.test(category) || (SHOP.test(category) && !FOOD_SERVICE.test(category));
+    const eateryName = EATERY_NAME.test(name) && !NOT_RESTAURANT.test(name);
+    const notRestaurant = (NOT_RESTAURANT.test(category) || (SHOP.test(category) && !FOOD_SERVICE.test(category))) && !eateryName;
     const foodService = FOOD_SERVICE.test(category) && !notRestaurant;
+    // Asian words alone don't make a kitchen: a "Japanese head spa", a
+    // Chinese-medicine clinic and Holon's Japanese Garden (a park) came back.
+    const eatery = foodService || eateryName || !category;
 
     let score = 0;
     if (sushiName.count) score += 40;
@@ -107,19 +119,20 @@ export function scoreSushi(lead, siteText = '', sellable = { ok: true }) {
         score = Math.min(score, 15);
     } else if (sushiListing) {
         tier = 'Sushi place';
+    } else if (!eatery) {
+        tier = 'Not a restaurant';
+        score = Math.min(score, 15);
     } else if (asianListing.count && sushiSite.count) {
         // An Asian kitchen whose menu has sushi.
         tier = 'Sushi place';
     } else if (asianListing.count) {
         tier = 'Japanese / Asian restaurant';
-    } else if (sushiSite.count >= 2 && (foodService || !category)) {
+    } else if (sushiSite.count >= 2) {
         // A bar or restaurant with a sushi section on its menu. One mention
         // ("salmon, like in sushi") is not a menu.
         tier = 'Sushi place';
-    } else if (foodService || !category) {
-        tier = 'Other restaurant';
     } else {
-        tier = 'Not a restaurant';
+        tier = 'Other restaurant';
     }
 
     score = Math.max(0, Math.min(100, score));

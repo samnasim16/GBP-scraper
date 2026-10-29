@@ -139,14 +139,17 @@ export function extractFeedCards() {
             const first = (row.textContent || '').split('·')[0].trim();
             if (!first) continue;
             if (/^[\d.,()\s]+$/.test(first)) continue;
-            if (/^\d/.test(first)) continue;
-            if (/^(open|closed|closes|opens|temporarily|permanently)/i.test(first)) continue;
+            // An address ("שד' הרצל 39") is not a category; "Towing serviceOpen 24 hours" is one.
+            if (/\d/.test(first.replace(/(Open|Closed|Closes|Opens)(\s|⋅|24|$).*$/i, ''))) continue;
+            if (/^(open|closed|closes|opens|temporarily|permanently|no reviews)/i.test(first)) continue;
             category = first;
             break;
         }
         // Strip a status word that got concatenated onto the category, e.g.
         // "Car Detailing ServiceOpen 24 hours".
         category = category.replace(/(Open|Closed|Closes|Opens)(\s|⋅|24|$).*$/i, '').trim();
+        // A hotel's blurb glued onto its category: "HotelSlick hostel with a trendy bistro".
+        category = category.replace(/^(.{2,}?[a-z\u05D0-\u05EA])[A-Z][a-z]+ .*$/, '$1');
 
         out.push({
             name,
@@ -243,8 +246,9 @@ export function extractDetail(phoneCode = '49') {
         if (catLink) category = clean(catLink.textContent);
     }
     category = category.replace(/(Open|Closed|Closes|Opens)(\s|⋅|24|$).*$/i, '').trim();
+    category = category.replace(/^(.{2,}?[a-z\u05D0-\u05EA])[A-Z][a-z]+ .*$/, '$1');
     // A button label ("Learn More" on sponsored listings) is not a category.
-    if (/^(learn more|more|see more|more info|sponsored|website|directions|details|sign in|overview|reviews?|about|view all|see all|show all|google policies|about this data|prices|menu|share|save|nearby|send to phone|suggest an edit|claim this business)$/i.test(category)) category = '';
+    if (/^(learn more|more|see more|more info|sponsored|website|directions|details|sign in|overview|reviews?|about|view all|see all|show all|google policies|about this data|prices|menu|share|save|nearby|send to phone|suggest an edit|claim this business|no reviews)$/i.test(category)) category = '';
 
     // ── Phone ─────────────────────────────────────────────────────────────
     // International. Maps gives "phone:tel:+4930123456" on most listings, but
@@ -259,7 +263,9 @@ export function extractDetail(phoneCode = '49') {
         if (/^\+/.test(s)) { /* already international */ }
         else if (d.startsWith('00')) d = d.slice(2);
         else if (d.startsWith('0')) d = phoneCode + d.slice(1);
-        else if (d.length === 10 && !d.startsWith(phoneCode)) d = '1' + d;   // bare US number
+        // Ten digits with no trunk 0: a US number in the US, a national
+        // service number elsewhere (Israel's 1-700 / 1-599 lines).
+        else if (d.length === 10 && !d.startsWith(phoneCode)) d = (phoneCode === '1' ? '1' : phoneCode) + d;
         if (d.length < 8 || d.length > 15) return null;
         return '+' + d;
     };

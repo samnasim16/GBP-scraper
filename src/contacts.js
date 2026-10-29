@@ -94,7 +94,7 @@ export function extractEmails(html) {
         v = repairTld(v);
         if (!v || !v.includes('@') || v.length > 80) return;
         if (JUNK_EMAIL.some(re => re.test(v))) return;
-        if (PLATFORM_DOMAIN.test(v.split('@')[1] || '')) return;
+        if (PLATFORM_DOMAIN.test(v.split('@')[1] || '') || PLATFORM_INBOX.test(v.split('@')[1] || '')) return;
         if (!found.includes(v)) found.push(v);
     };
 
@@ -168,7 +168,15 @@ export function registrableDomain(host) {
  * these has no Impressum of its own — crawling it yields the platform's
  * legal inbox (behoerdenanfragen@kleinanzeigen.de), never the shop's.
  */
-export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen|livre-rare-book|leboncoin|pagesjaunes|2ememain|2dehands|marktplaats|goudengids|pagesdor|infobel|mappy|wolt|ontopo|tabit|tabitisrael|ubereats|doordash|grubhub|seamless|deliveroo|just-eat|justeat|lieferando|thefork|opentable|resy|zomato|toasttab|chownow)\.[a-z.]+$|(^|\.)(d|b144|easy|zap|2all|dapeizahav|bizportal|10bis|mishloha|rest|cibus)\.co\.il$/;
+export const PLATFORM_DOMAIN = /(^|\.)(kleinanzeigen|ebay|ebay-kleinanzeigen|etsy|amazon|abebooks|booklooker|zvab|dawanda|facebook|instagram|linktr|linkedin|youtube|tiktok|twitter|google|business\.site|wixsite|jimdosite|yelp|tripadvisor|gelbeseiten|dasoertliche|11880|meinestadt|golocal|cylex|kennstdueinen|livre-rare-book|leboncoin|pagesjaunes|2ememain|2dehands|marktplaats|goudengids|pagesdor|infobel|mappy|wolt|ontopo|tabit|tabitisrael|ubereats|doordash|grubhub|seamless|deliveroo|just-eat|justeat|lieferando|thefork|opentable|resy|zomato|toasttab|chownow|israelbusinessguide|happycow)\.[a-z.]+$|(^|\.)(d|b144|easy|zap|2all|dapeizahav|bizportal|10bis|mishloha|rest|rol|cibus|balibclick|valuecard)\.co\.il$/;
+
+/**
+ * Sites whose restaurant pages do show the restaurant's own address, next to
+ * the site's: Mishlohim (a delivery site) gave karmela17262@gmail.com for one
+ * sushi bar and info@mishlohim.co.il for seven others. They are read, but
+ * their own inbox is never the business's.
+ */
+const PLATFORM_INBOX = /(^|\.)mishlohim\.co\.il$/;
 
 const GOOD_PREFIX = /^(info|kontakt|contact|shop|office|mail|hello|hallo|service|bestellung|order|orders|verkauf|sales|laden|store|post|team|enquiries|enquiry|admin|bonjour|commande|commandes|vente|ventes|boutique|magasin|librairie|accueil|winkel|bestelling|bestellingen)@/;
 const BAD_PREFIX = /^(no-?reply|donotreply|datenschutz|privacy|dsgvo|abuse|postmaster|hostmaster|webmaster|bewerbung|jobs|karriere|presse|press|newsletter|rechnung|invoice|buchhaltung|rgpd|dpo|recrutement|emploi|facturation|comptabilite|factuur|boekhouding|vacatures)@/;

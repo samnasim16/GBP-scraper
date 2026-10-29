@@ -107,8 +107,8 @@ export function stateFromAddress(address) {
  * the searched city. UK addresses carry the real post town and always win.
  */
 export function pickCity(address, queryCity, country = {}) {
-    // "Borough Park, Brooklyn, NY" → "Brooklyn"; "Paris" stays "Paris".
-    const searched = String(queryCity || '').replace(/,\s*[A-Z]{2}$/, '').replace(/^.*,\s*/, '');
+    // "Borough Park, Brooklyn, NY" → "Brooklyn"; "Arad, Israel" → "Arad"; "Paris" stays "Paris".
+    const searched = String(queryCity || '').replace(/,\s*[A-Z]{2}$/, '').replace(/,\s*Israel$/, '').replace(/^.*,\s*/, '');
     const town = cityFromAddress(address, country.code);
     if (!town) return searched;
     // UK and US addresses carry the real post town.

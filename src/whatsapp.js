@@ -40,6 +40,19 @@ const MOBILE = [
     /^9725/,             // Israel 05…
 ];
 
+/**
+ * Service numbers no one can message: Israel's 1-700 / 1-800 / 1-599 lines
+ * (+972 1…), which forward to a call centre or a switchboard.
+ */
+const SERVICE = [
+    /^9721[5-9]\d{8}$/,
+];
+
+export function isServiceNumber(e164) {
+    const d = String(e164 || '').replace(/\D/g, '');
+    return SERVICE.some(re => re.test(d));
+}
+
 export function isMobile(e164) {
     const d = String(e164 || '').replace(/\D/g, '');
     return MOBILE.some(re => re.test(d));
@@ -105,11 +118,12 @@ export const WA = {
     MOBILE: 'Likely — mobile number',
     LANDLINE: 'Check — landline (WhatsApp Business possible)',
     UNKNOWN: 'Check — US number (mobile or landline unknown)',
+    SERVICE: 'No — 1-700 / 1-800 service number',
     NONE: 'No phone',
 };
 
 const PRIORITY = {
-    [WA.LINK_SITE]: 1, [WA.LINK_LISTING]: 1, [WA.MENTIONED]: 2, [WA.MOBILE]: 2, [WA.LANDLINE]: 3, [WA.UNKNOWN]: 3, [WA.NONE]: 4,
+    [WA.LINK_SITE]: 1, [WA.LINK_LISTING]: 1, [WA.MENTIONED]: 2, [WA.MOBILE]: 2, [WA.LANDLINE]: 3, [WA.UNKNOWN]: 3, [WA.SERVICE]: 4, [WA.NONE]: 4,
 };
 
 export function whatsappPriority(status) {
@@ -138,11 +152,12 @@ export function classifyWhatsApp(lead) {
     }
     if (siteNumbers.length || lead.whatsapp_site_linked) {
         // Prefer the linked number that is the listing's own phone.
-        const number = siteNumbers.find(n => n === phone) || siteNumbers[0] || phone;
+        const number = siteNumbers.find(n => n === phone) || siteNumbers[0] || (isServiceNumber(phone) ? '' : phone);
         if (number) return { status: WA.LINK_SITE, number, priority: 1 };
     }
     if (listing.length) return { status: WA.LINK_LISTING, number: listing[0], priority: 1 };
     if (!phone) return { status: WA.NONE, number: '', priority: 4 };
+    if (isServiceNumber(phone)) return { status: WA.SERVICE, number: '', priority: 4 };
     if (lead.whatsapp_mentioned) return { status: WA.MENTIONED, number: phone, priority: 2 };
     if (mobileUnknowable(phone)) return { status: WA.UNKNOWN, number: phone, priority: 3 };
     if (isMobile(phone)) return { status: WA.MOBILE, number: phone, priority: 2 };

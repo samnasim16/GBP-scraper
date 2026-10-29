@@ -270,7 +270,8 @@ export const ISRAEL_CITIES = {
          'Elad', 'Ness Ziona', 'Lod', 'Ramla', 'Rosh HaAyin', 'Yavne', 'Shoham'],
     HA: ['Haifa', 'Hadera', "Zikhron Ya'akov", 'Caesarea', 'Kiryat Ata', 'Kiryat Bialik'],
     NO: ['Safed', 'Tiberias', 'Nof HaGalil', 'Karmiel', 'Afula', 'Nahariya', 'Acre', 'Kiryat Shmona', "Ma'alot-Tarshiha"],
-    SO: ["Be'er Sheva", 'Ashdod', 'Ashkelon', 'Eilat', 'Netivot', 'Ofakim', 'Kiryat Gat', 'Sderot', 'Dimona', 'Arad'],
+    // "Arad" alone is Arad, Romania: the sushi run came back with 15 of its restaurants.
+    SO: ["Be'er Sheva", 'Ashdod', 'Ashkelon', 'Eilat', 'Netivot', 'Ofakim', 'Kiryat Gat', 'Sderot', 'Dimona', 'Arad, Israel'],
     // Israeli towns in the West Bank with large religious communities.
     JS: ["Modi'in Illit", 'Beitar Illit', "Ma'ale Adumim", 'Efrat', 'Ariel', 'Kiryat Arba', 'Emmanuel'],
 };
@@ -459,9 +460,11 @@ export const COUNTRIES = {
         emailTemplate: path.join(TEMPLATES, 'partnership-email-il.txt'),
         whatsappTemplate: path.join(TEMPLATES, 'whatsapp-message-il.txt'),
         // Abroad, and the Palestinian Authority (a Bethlehem souvenir shop came
-        // back as a Judaica seller). Israeli towns in the West Bank carry no
-        // country in their Maps address and stay.
-        foreign: /,\s*(Palestine|Palestinian Territories|Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece|Italy|France|Germany|United Kingdom|UK|USA|United States|Spain|Netherlands|Russia|Ukraine|United Arab Emirates|Morocco)\s*$/i,
+        // back as a Judaica seller; Hebron and Bethlehem restaurants carry no
+        // country at all). Israeli towns in the West Bank carry no country in
+        // their Maps address and stay. Namesakes abroad: Arad (Romania),
+        // "Sushi Modi'in" → Sushi Modo (Canada).
+        foreign: /,\s*(Palestine|Palestinian Territories|Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece|Italy|France|Germany|United Kingdom|UK|USA|United States|Canada|Spain|Portugal|Netherlands|Belgium|Switzerland|Austria|Poland|Romania|Hungary|Bulgaria|Czechia|Georgia|Russia|Ukraine|United Arab Emirates|Morocco|Thailand|Japan|Australia)\s*$|(^|,)\s*(Hebron|Bethlehem|Beit Jala|Beit Sahour|Ramallah|Al-Bireh|Nablus|Jenin|Jericho|Tulkarm|Qalqilya)(,\s*\d+)?\s*$/i,
         script: 'israel',
     },
 };
