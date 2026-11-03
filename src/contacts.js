@@ -258,7 +258,7 @@ const ROLE_LABELS = [
 ];
 
 /** Words that look like names but are really the next label or a company. */
-const NOT_A_NAME = /\b(Ltd|Limited|Registered|Company|Director|Founder|England|Wales|London|VAT|Sitz|Kontaktformular|Anrede|Plattform|Online|Redaktion|Leitung|Postanschrift|Hausanschrift|Postfach|Mobil|Handy|Web|Internet|Website|Webseite|Homepage|Hinweis|Datenschutz|Konzept|Gestaltung|Umsetzung|Kontaktdaten|Firma|Name|Vorname|Nachname|Evangelische|Katholische|Jüdische|Bibliothek|GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich|Shopping|Account|Wish|Wishlist|Cart|Checkout|Login|Menu|Search|Store|Collections?|Products?|Customer|Orders?|Shipping|Returns|Privacy|Policy|Terms|Speisekarte|Vorspeisen|Vorspeiesen|Spezialitäten|Hauptspeisen|Getränke|Sushi|Restaurant|Menü|Mittagstisch|Lieferung|Reservierung|Öffnungszeiten)\b/i;
+const NOT_A_NAME = /\b(Ltd|Limited|Registered|Company|Director|Founder|England|Wales|London|VAT|Sitz|Kontaktformular|Anrede|Plattform|Online|Redaktion|Leitung|Postanschrift|Hausanschrift|Postfach|Mobil|Handy|Web|Internet|Website|Webseite|Homepage|Hinweis|Datenschutz|Konzept|Gestaltung|Umsetzung|Kontaktdaten|Firma|Name|Vorname|Nachname|Evangelische|Katholische|Jüdische|Bibliothek|GmbH|UG|AG|KG|OHG|GbR|e\.K|e\.V|Straße|Strasse|Str\.|Platz|Weg|Allee|Telefon|Tel|Fax|E-Mail|Email|Mail|Registergericht|Amtsgericht|Handelsregister|Umsatzsteuer|USt|Steuernummer|Kontakt|Anschrift|Adresse|Impressum|Deutschland|Germany|Berlin|München|Hamburg|Köln|Frankfurt|Shop|Laden|Galerie|Verlag|Buchhandlung|Judaica|Museum|Gemeinde|Stiftung|Haftung|Inhalt|Inhalte|Angaben|Gemäß|Verantwortlich|Shopping|Account|Wish|Wishlist|Cart|Checkout|Login|Menu|Search|Store|Collections?|Products?|Customer|Orders?|Shipping|Returns|Privacy|Policy|Terms|Speisekarte|Vorspeisen|Vorspeiesen|Spezialitäten|Hauptspeisen|Getränke|Sushi|Restaurant|Menü|Mittagstisch|Liefer\w*|Reservierung|Öffnungszeiten|Schließen|Datenschutz\w*|Steuer\w*|Eingetragen|Gmb|Gb)\b/i;
 
 /**
  * French and Dutch field labels and company words that follow a name in a
@@ -301,7 +301,10 @@ export function extractContact(text) {
         const re = new RegExp(`(?:^|[\\s.;,|])(${label})\\s*(?:\\(in\\))?\\s*[:\\-–]?\\s*(${NAME})`, 'u');
         const m = t.match(re);
         if (!m) continue;
-        const { name, title } = tidyName(m[m.length - 1]);
+        // "Kien Cuong Dang Marienburger Str. 5": the street's first word sits
+        // inside the match, its "Str." just after it.
+        const streetNext = /^\s*(Str\.?|Straße|Strasse|Weg|Allee|Platz|Ring|Damm|Gasse)(?![\p{L}])/iu.test(t.slice(m.index + m[0].length));
+        const { name, title } = tidyName(m[m.length - 1], streetNext);
         if (!name) continue;
         const fromLabel = (m[1].match(/(Inhaberin|Inhaber|Geschäftsführerin|Geschäftsführer|Gérante|Gérant|Directrice|Directeur|Fondatrice|Fondateur|Présidente|Président|Zaakvoerster|Zaakvoerder|Eigenares|Eigenaar)/) || [''])[0];
         return { name, role: title || fromLabel };
@@ -313,8 +316,9 @@ export function extractContactName(text) {
     return extractContact(text).name;
 }
 
-function tidyName(raw) {
+function tidyName(raw, streetNext = false) {
     const words = clean(raw).split(' ');
+    if (streetNext && words.length > 2 && /er$/.test(words[words.length - 1])) words.pop();
     let title = '';
     // A job title in front is the role, not part of the name.
     while (words.length && TITLE_WORD.test(words[0])) title = words.shift();
@@ -328,6 +332,9 @@ function tidyName(raw) {
             break;
         }
         // "Online-" is the first half of "Online-Redaktion" on the next line.
+        // "Mood Dining Concept GmbH" (its H cut off by the name pattern): the
+        // words before a company form are the company, not a person.
+        if (/^(GmbH?|Gmb|GbR|Gb|UG|AG|KG|OHG|Ltd)$/.test(w) && kept.length >= 3) return { name: '', title: '' };
         if (NOT_A_NAME.test(w) || NOT_A_NAME_EU.test(w) || ORG_WORD.test(w) || FUNCTION_WORD.test(w) || TITLE_WORD.test(w) || /\d/.test(w) || /-$/.test(w)) break;
         kept.push(w);
     }

@@ -176,6 +176,11 @@ async function main() {
 
         const opts = { maxResultsPerQuery, maxScrolls, minReviews, maxLeads, delayBetweenListings, keepNonProfits, country: COUNTRY };
         const REFRESH_EVERY = factory.mode === 'brightdata' ? 15 : 40;
+        // Also after this many places opened: once a session had opened the
+        // ~100 places of "Sushi Berlin", every later search showed only the
+        // first 7 results ("Sushi München" alone: 96).
+        const REFRESH_PLACES = 60;
+        let placesAtRefresh = allLeads.length;
         const SAVE_EVERY = 10;
 
         session = await factory.open();
@@ -191,8 +196,10 @@ async function main() {
         for (let qi = startAt; qi < queries.length; qi++) {
             if (allLeads.length >= maxLeads) break;
 
-            if (qi > startAt && qi % REFRESH_EVERY === 0) {
-                console.log(`\n🔄 Refreshing browser session (every ${REFRESH_EVERY} queries)...`);
+            const manyPlaces = allLeads.length - placesAtRefresh >= REFRESH_PLACES;
+            if (qi > startAt && (qi % REFRESH_EVERY === 0 || manyPlaces)) {
+                placesAtRefresh = allLeads.length;
+                console.log(`\n🔄 Refreshing browser session (${manyPlaces ? `${REFRESH_PLACES}+ places opened` : `every ${REFRESH_EVERY} queries`})...`);
                 try {
                     session = await factory.refresh(session);
                     await sleep(1500);

@@ -207,3 +207,18 @@ test('Germany sushi: a menu heading is not the owner', async () => {
     assert.equal(extractContact('Inhaber: Speisekarte Vorspeiesen Sushi Spezialitäten').name, '');
     assert.equal(extractContact('Inhaberin: Thi Bich Thuy Nguyen').name, 'Thi Bich Thuy Nguyen');
 });
+
+test('full Germany sushi run: company forms, footer words and streets are cut from owner names', async () => {
+    const { extractContact } = await import('../src/contacts.js');
+    const cases = [
+        ['Inhaber: Andreas Karlsson GmbH', 'Andreas Karlsson'],
+        ['Geschäftsführer: Thanh Pham Schließen Datenschutzerklärung', 'Thanh Pham'],
+        ['Inhaber: Jörg Better Steuernr.: 123', 'Jörg Better'],
+        ['Inhaber: David Nguyen Lieferzeiten Lieferzeit', 'David Nguyen'],
+        ['Inhaber: Kien Cuong Dang Marienburger Str. 5', 'Kien Cuong Dang'],
+        ['Inhaber: Philipp Strähle Eingetragen im Handelsregister', 'Philipp Strähle'],
+        ['Vertreten durch: Mood Dining Concept GmbH', ''],
+        ['Inhaberin: Öz GbR', ''],
+    ];
+    for (const [text, name] of cases) assert.equal(extractContact(text).name, name, text);
+});
