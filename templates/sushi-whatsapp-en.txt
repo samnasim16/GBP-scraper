@@ -1,0 +1,9 @@
+Hello,
+
+This is {{sender_name}} from Jaffa Glass, an Israeli maker of handmade glassware. We make glass serving plates and cups, and thought they could suit the way {{shop_name}} presents its dishes.
+
+Could we send you our catalogue, or arrange a short call to show you the collection?
+
+Email: JaffaVintageMarket@gmail.com
+Phone / WhatsApp: +972 53-302-3636
+If you'd rather not hear from us, just reply and we won't message again.

@@ -100,6 +100,7 @@ async function refresh(file) {
         sender: input.sender || {},
         includeTiers: input.includeTiers || country.includeTiers || TARGET_TIERS.slice(0, 2),
         ...(country.workbook ? { workbook: country.workbook } : {}),
+        ...(country.list ? { list: country.list } : {}),
     });
     await save(leads);
     await chrome.close();

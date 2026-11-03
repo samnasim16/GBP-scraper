@@ -63,7 +63,7 @@ const FRESH = process.argv.includes('--fresh');
 const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
 const template = loadTemplate(emailTemplate);
 const WORKBOOK = COUNTRY.workbook || 'judaica-leads.xlsx';
-const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK });
+const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: COUNTRY.list || null });
 // What progress.json belongs to: a sushi run never resumes a Judaica one.
 const RUN_KEY = COUNTRY.campaign ? `${COUNTRY.code}-${COUNTRY.campaign}` : COUNTRY.code;
 
@@ -258,7 +258,13 @@ async function main() {
     console.log(`   WhatsApp: ${targets.filter(r => r.whatsapp_priority === 1).length} confirmed on website/listing, ${targets.filter(r => r.whatsapp_priority === 2).length} likely (mobile / mentioned), ${targets.filter(r => r.whatsapp_priority === 3).length} to check by hand (landlines / US numbers)`);
     const s = enricher.stats;
     console.log(`   Websites read: ${s.sites} (${s.pages} pages)`);
-    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/${WORKBOOK} and mail-merge.csv`);
+    if (COUNTRY.markets) {
+        // A many-country run: how many targets each country gave.
+        const per = {};
+        for (const r of targets) per[r.country_name || '?'] = (per[r.country_name || '?'] || 0) + 1;
+        console.log(`   By country: ${Object.entries(per).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ')}`);
+    }
+    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/${WORKBOOK}${COUNTRY.list ? `, ${COUNTRY.list.file}` : ''} and mail-merge.csv`);
     process.exit(0);
 }
 

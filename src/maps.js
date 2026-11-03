@@ -18,6 +18,7 @@ import { NON_RETAIL_CATEGORY, scoreRelevance, isSellable } from './relevance.js'
 import { extractWhatsApp } from './whatsapp.js';
 
 import { COUNTRIES } from './config.js';
+import { marketOfAddress } from './europe.js';
 
 /** Results from across the border are not leads for this market. */
 const DEFAULT_COUNTRY = { code: 'DE', ...COUNTRIES.DE };
@@ -75,9 +76,29 @@ export function cityFromAddress(address, countryCode = 'DE') {
         }
         return '';
     }
+    if (countryCode === 'DE' || countryCode === 'BE' || countryCode === 'FR') {
+        for (let i = parts.length - 1; i >= 0; i--) {
+            const m = parts[i].match(/^\d{4,5}\s+(.+)$/);
+            if (m) return m[1].trim();
+        }
+        return '';
+    }
+    // The rest of Europe. A postcode before the town: "1100-053 Lisboa",
+    // "00-950 Warszawa", "1012 LG Amsterdam", "111 51 Stockholm",
+    // "L-1724 Luxembourg", "20121 Milano MI", "110 00 Praha 1". After it:
+    // "Athina 105 63". Alone after the town: "Budapest, 1052",
+    // "Dublin 2, D02 X285". A house number ("23 Dawson St") is not a postcode.
+    const tidy = (t) => t.replace(/\s+([A-Z]{2}|\d{1,2})$/, '').trim();
     for (let i = parts.length - 1; i >= 0; i--) {
-        const m = parts[i].match(/^\d{4,5}\s+(.+)$/);
-        if (m) return m[1].trim();
+        const p = parts[i];
+        const before = p.match(/^(?:[A-Z]{1,2}-)?(?:\d{4,6}|\d{3} \d{2}|\d{2}-\d{3}|\d{4}-\d{3})(?:\s+[A-Z]{2}(?=\s))?\s+(\p{L}[\p{L}\s.'’-]*?(?:\s+[A-Z]{2}|\s+\d{1,2})?)$/u);
+        if (before) return tidy(before[1]);
+        const after = p.match(/^(\p{L}[\p{L}\s.'’-]*?)\s+(?:\d{3} \d{2}|\d{4,6})$/u);
+        if (after) return after[1].trim();
+        if (/^(?:\d{4,6}|[A-Z]\d{2}\s?[A-Z\d]{4})$/.test(p) && i > 0) {
+            const town = tidy(parts[i - 1]);
+            if (town && !/\d/.test(town)) return town;
+        }
     }
     return '';
 }
@@ -111,6 +132,11 @@ export function pickCity(address, queryCity, country = {}) {
     const searched = String(queryCity || '').replace(/,\s*[A-Z]{2}$/, '').replace(/,\s*Israel$/, '').replace(/^.*,\s*/, '');
     const town = cityFromAddress(address, country.code);
     if (!town) return searched;
+    if (country.markets) {
+        // "1368 Ville-Haute Luxembourg": a quarter before a city we search.
+        const city = Object.values(country.regions || {}).flat().find(c => town.endsWith(` ${c}`));
+        if (city) return city;
+    }
     // UK and US addresses carry the real post town.
     if (country.addressTownWins || country.code === 'UK') return town;
     const norm = (x) => String(x).toLowerCase().replace(/\s*\(.*\)$/, '').replace(/ (am|im|an der) .*$/, '');
@@ -152,7 +178,11 @@ export async function passConsent(page, log = () => {}) {
 
 export async function scrapeQuery(page, query, ctx, opts) {
     const { seen, allLeads, log = console.log, onLead } = ctx;
-    const country = opts.country || DEFAULT_COUNTRY;
+    const base = opts.country || DEFAULT_COUNTRY;
+    // A many-country run (Europe) searches each place as its own country:
+    // its Google region and its phone trunk code.
+    const market = base.markets && base.markets[query.state];
+    const country = market ? { ...base, code: query.state, gl: market.gl, phoneCode: market.phoneCode, trunks: market.trunks || ['0'] } : base;
     log(`\n🔍 ${query.text}`);
 
     try {
@@ -258,7 +288,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
             }
             try { await page.waitForSelector('h1.DUwDvf', { timeout: 8000 }); } catch { /* panel may render late */ }
 
-            const d = await page.evaluate(extractDetail, country.phoneCode);
+            const d = await page.evaluate(extractDetail, country.phoneCode, country.trunks || ['0']);
             const name = clean(d.name) || c.name;
             if (!name) continue;
             const address = clean(d.address);
@@ -305,6 +335,8 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 maps_url:           c.href || page.url(),
                 source_query:       query.text,
                 country:            country.code,
+                // Abroad, the address names the country: a Strasbourg search finds Kehl, Germany.
+                country_name:       (base.markets && base.markets[marketOfAddress(address, base.markets)] || market || country).name,
                 ...(country.campaign ? { campaign: country.campaign } : {}),
                 observed_date:      new Date().toISOString().split('T')[0],
             };

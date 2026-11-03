@@ -1,0 +1,21 @@
+{
+    "country": "EU",
+    "campaign": "sushi",
+    "states": [
+        "PT"
+    ],
+    "cities": [],
+    "districts": false,
+    "searchCategories": [
+        "Sushi restaurant"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-eu-sushi-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": false
+    }
+}

@@ -164,6 +164,22 @@ Put your name and title in `"sender"` in `input.israel-sushi.json`. The results 
 - **1-700 / 1-800 numbers** show as **No — 1-700 / 1-800 service number** in the WhatsApp column, with no chat link: nobody can message them.
 - **The email and WhatsApp message are in Hebrew** (`templates/sushi-email-il.txt`, `templates/sushi-whatsapp-il.txt`). They offer hand-made glass serving plates and cups, and ask whether you may send the catalogue or set up a short meeting, at the restaurant or at the Jaffa showroom. They carry the same "פרסומת" label and opt-out line as the Judaica ones (see *A note on sending (Israel)*). **Read them before sending** and change anything that doesn't match what you make.
 
+## Sushi restaurants across Europe
+
+The same sushi scraper, for every country in Europe: all EU members, the UK, Norway, Switzerland, Iceland, the microstates, the Balkans, Moldova, Ukraine, Belarus, European Russia and Istanbul (46 countries).
+
+```bash
+npm run smoke:sushi:europe   # Portugal only, 1 search term, 10 places → output-eu-sushi-smoke/
+npm run sushi:europe         # all of Europe → output-eu-sushi/   (input.europe-sushi.json)
+```
+
+- **The list:** `output-eu-sushi/sushi-europe-list.csv` has one row per sushi place: name, city, country, address, rating, reviews, phone, website, Maps link. `sushi-europe.xlsx` has the same list on its first sheet, **Sushi restaurants**, and every place found on **All results**.
+- **Sushi places only:** Japanese and Asian restaurants with no sushi on their listing are on All results, not on the list.
+- **Places:** 438 searches per term: every capital and each country's larger cities, and the biggest cities (London, Paris, Berlin, Madrid, Barcelona, Rome, Milan, Moscow, Istanbul…) district by district. Two terms, `Sushi restaurant` across every place first, then `Sushi`: 876 searches. Expect a day or more; a restart carries on where it stopped.
+- **Some countries only:** set `"states"` in `input.europe-sushi.json`, e.g. `["FR", "DE", "UK"]`. Use `"states"`, not `"cities"`: each country is searched as itself (its own Google region and phone code), and a bare city list has no country.
+- **Country column:** the country the place is in. A search in Strasbourg that finds a place in Kehl says Germany. Results outside Europe (Paris, Texas; Valencia, Venezuela) are dropped.
+- **Website lookup is off** (`"contacts": { "enabled": false }`), because the list doesn't need emails and it makes the run much faster. Turn it on to get emails; the email and WhatsApp messages are in English (`templates/sushi-email-en.txt`, `templates/sushi-whatsapp-en.txt`).
+
 ## WhatsApp: which shops have it, and who to contact first
 
 Every row gets three WhatsApp columns. The **WhatsApp** sheet lists every target you can message, best evidence first. In every sheet, shops with WhatsApp come before the rest.
@@ -236,7 +252,7 @@ All fields are optional.
 | Field | Default | Meaning |
 |---|---|---|
 | `country` | `"DE"` | `"DE"` Germany, `"UK"` England, `"FR"` France, `"BE"` Belgium, `"US"` United States, `"IL"` Israel. It sets the city list, search terms, phone code, contact pages and output folder. |
-| `campaign` | Judaica | `"sushi"` (Israel only) looks for sushi restaurants instead: its own places, search terms, tiers, templates and `output-il-sushi/` folder. |
+| `campaign` | Judaica | `"sushi"` looks for sushi restaurants instead: its own places, search terms, tiers, templates and folder. With `"country": "IL"` (Israel, `output-il-sushi/`) or `"country": "EU"` (all of Europe, `output-eu-sushi/`). |
 | `sender` | – | `{ "name", "title" }` for the email signature. |
 | `states` | all | Bundesland codes to limit the run, e.g. `["BE","BY","HE"]`. Codes: BE HH HB BY BW HE NW NI RP SL SH MV BB SN ST TH. |
 | `cities` | built-in list | An explicit list of cities, which replaces the built-in one. |
@@ -257,7 +273,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 136 offline tests
+npm test                                                               # 143 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)

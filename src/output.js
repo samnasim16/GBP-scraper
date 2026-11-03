@@ -35,6 +35,7 @@ export const COLUMNS = [
     ['website',            'Website',           34],
     ['city',               'City',              16],
     ['bundesland',         'State',              7],
+    ['country_name',       'Country',           14],
     ['address',            'Address',           38],
     ['category',           'Category',          24],
     ['rating',             'Rating',             7],
@@ -67,8 +68,8 @@ export function escapeCSV(val) {
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function buildCSV(rows, columns = CSV_COLUMNS, { flat = false } = {}) {
-    const header = columns.join(',');
+export function buildCSV(rows, columns = CSV_COLUMNS, { flat = false, headers = null } = {}) {
+    const header = (headers ? columns.map(c => escapeCSV(headers[c] || c)) : columns).join(',');
     const cell = flat ? flatCell : (v) => v;
     const lines = rows.map(r => columns.map(c => escapeCSV(cell(r[c]))).join(','));
     return '\ufeff' + [header, ...lines].join('\n');   // BOM so Excel reads umlauts
@@ -274,9 +275,11 @@ export async function writeWorkbook(file, sheets) {
     await wb.xlsx.writeFile(file);
 }
 
-async function writeXlsx(rows, file, includeTiers) {
+async function writeXlsx(rows, file, includeTiers, list) {
     const targets = rows.filter(r => isTarget(r, includeTiers));
     await writeWorkbook(file, [
+        // A campaign's plain list (Europe sushi): every target, first.
+        ...(list && list.sheet ? [[list.sheet, targets]] : []),
         // Everyone worth a WhatsApp message, best evidence first.
         ['WhatsApp', targets.filter(r => r.whatsapp_priority < 4)],
         ['Outreach', uniqueByEmail(targets.filter(r => r.email))],
@@ -289,7 +292,7 @@ async function writeXlsx(rows, file, includeTiers) {
  * Create a saver bound to an output directory. Serialised so overlapping
  * writes can't clobber each other.
  */
-export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', log = console.log } = {}) {
+export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', list = null, log = console.log } = {}) {
     fs.mkdirSync(outputDir, { recursive: true });
     let saving = false;
 
@@ -301,8 +304,13 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
             fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows, LEADS_CSV_COLUMNS, { flat: true }), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'leads.json'), JSON.stringify(rows, null, 2), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'mail-merge.csv'), buildMailMerge(rows, includeTiers), 'utf8');
+            // The plain list: name, city, country, address, rating… of every target.
+            if (list && list.file) {
+                fs.writeFileSync(path.join(outputDir, list.file), buildCSV(rows.filter(r => isTarget(r, includeTiers)), list.columns,
+                    { flat: true, headers: Object.fromEntries(COLUMNS.map(([k, h]) => [k, h])) }), 'utf8');
+            }
             try {
-                await writeXlsx(rows, path.join(outputDir, workbook), includeTiers);
+                await writeXlsx(rows, path.join(outputDir, workbook), includeTiers, list);
             } catch (e) {
                 if (!quiet) log(`⚠️  XLSX write skipped (${e.message}) — CSV still saved.`);
             }
