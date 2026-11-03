@@ -178,7 +178,16 @@ npm run sushi:europe         # all of Europe → output-eu-sushi/   (input.europ
 - **Places:** 438 searches per term: every capital and each country's larger cities, and the biggest cities (London, Paris, Berlin, Madrid, Barcelona, Rome, Milan, Moscow, Istanbul…) district by district. Two terms, `Sushi restaurant` across every place first, then `Sushi`: 876 searches. Expect a day or more; a restart carries on where it stopped.
 - **Some countries only:** set `"states"` in `input.europe-sushi.json`, e.g. `["FR", "DE", "UK"]`. Use `"states"`, not `"cities"`: each country is searched as itself (its own Google region and phone code), and a bare city list has no country.
 - **Country column:** the country the place is in. A search in Strasbourg that finds a place in Kehl says Germany. Results outside Europe (Paris, Texas; Valencia, Venezuela) are dropped.
-- **Website lookup is off** (`"contacts": { "enabled": false }`), because the list doesn't need emails and it makes the run much faster. Turn it on to get emails; the email and WhatsApp messages are in English (`templates/sushi-email-en.txt`, `templates/sushi-whatsapp-en.txt`).
+- **Website lookup is off** (`"contacts": { "enabled": false }`), because the list doesn't need emails and it makes the run much faster. Turn it on to get emails.
+- **The email** is Email 1 of the JaffaGlass outreach sequence (`templates/sushi-email-en.txt`): "Quick question about {{shop_name}}'s sushi plates", signed by Zack with WhatsApp +972 53-854-8320. It opens "Hi there" unless you fill in a `first_name` by hand: names are never guessed, because many owners' Impressum names put the family name first ("Thi Bich Thuy Nguyen"). Emails 2–6 (follow-ups, catalog, close) are sent by hand or by your mail tool as replies in the same thread.
+
+### Sushi in Germany (your own search list)
+
+```bash
+npm run sushi:germany        # input.germany-sushi.json → output-de-sushi/sushi-germany-list.csv + sushi-germany.xlsx
+```
+
+`input.germany-sushi.json` runs exactly these searches: Sushi Berlin, Nürnberg, Düsseldorf, München, Hamburg, Köln, Frankfurt, Stuttgart, Leipzig, Dortmund. Change `"cities"` to change them; `"states": ["DE"]` keeps them German. Website lookup is on, so German Impressum pages give emails. Note that German law (UWG §7) restricts unsolicited advertising email even to businesses; this isn't legal advice.
 
 ## WhatsApp: which shops have it, and who to contact first
 
@@ -273,7 +282,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 143 offline tests
+npm test                                                               # 145 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)

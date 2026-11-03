@@ -172,3 +172,38 @@ test('Europe: the saver writes the plain list with readable headers, and a list 
     assert.match(full.split('\n')[0], /country_name/);
     fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('Germany sushi: exactly the given searches, cities stay cities, and the PDF email', async () => {
+    const input = JSON.parse(fs.readFileSync(new URL('../input.germany-sushi.json', import.meta.url), 'utf8'));
+    const DE = resolveCountry(input);
+    const q = buildQueryMatrix(resolveLocations(input, () => {}), input.searchCategories, DE.highYield);
+    // "Sushi Düsseldorf" was listed twice; it runs once.
+    assert.deepEqual(q.map(x => x.text), ['Sushi Berlin', 'Sushi Nürnberg', 'Sushi Düsseldorf', 'Sushi München', 'Sushi Hamburg',
+        'Sushi Köln', 'Sushi Frankfurt', 'Sushi Stuttgart', 'Sushi Leipzig', 'Sushi Dortmund']);
+    assert.ok(q.every(x => x.state === 'DE'), 'every search runs as Germany');
+    assert.deepEqual(input.includeTiers, ['Sushi place']);
+    // Maps names the district after a German postcode; the searched city stays.
+    const de = { ...EU, code: 'DE', districtTowns: true };
+    assert.equal(pickCity('Venloer Str. 1, 50823 Ehrenfeld', 'Köln', de), 'Köln');
+    assert.equal(pickCity('Königsallee 1, 40212 Düsseldorf', 'Düsseldorf', de), 'Düsseldorf');
+
+    const { renderEmail } = await import('../src/email-template.js');
+    const { loadWhatsAppTemplate } = await import('../src/whatsapp.js');
+    const e = renderEmail({ business_name: 'Sushi Ninja | Best Sushi in Köln' }, loadTemplate(EU.emailTemplate));
+    assert.equal(e.subject, "Quick question about Sushi Ninja's sushi plates");
+    assert.match(e.body, /^Hi there,\n/);
+    assert.match(e.body, /might suit Sushi Ninja\./);
+    assert.match(e.body, /WhatsApp: \+972 53-854-8320/);
+    assert.match(e.body, /Reply "no thanks"/);
+    assert.doesNotMatch(e.subject + e.body, /\{\{|\[Your Name\]/);
+    // A first name written in by hand is used.
+    assert.match(renderEmail({ business_name: 'X', first_name: 'Anna' }, loadTemplate(EU.emailTemplate)).body, /^Hi Anna,/);
+    assert.match(loadWhatsAppTemplate(EU.whatsappTemplate), /\+?972|sushi plates/);
+});
+
+test('Germany sushi: a menu heading is not the owner', async () => {
+    const { extractContact } = await import('../src/contacts.js');
+    // Live run, Sakura Leipzig: "Speisekarte Vorspeiesen Sushi Spezialitäten" came back as the contact.
+    assert.equal(extractContact('Inhaber: Speisekarte Vorspeiesen Sushi Spezialitäten').name, '');
+    assert.equal(extractContact('Inhaberin: Thi Bich Thuy Nguyen').name, 'Thi Bich Thuy Nguyen');
+});

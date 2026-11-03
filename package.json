@@ -23,6 +23,7 @@
         "smoke:sushi:israel": "node src/main.js --input ./input.israel-sushi-smoke.json",
         "sushi:europe": "node src/main.js --input ./input.europe-sushi.json",
         "smoke:sushi:europe": "node src/main.js --input ./input.europe-sushi-smoke.json",
+        "sushi:germany": "node src/main.js --input ./input.germany-sushi.json",
         "contacts": "node src/contacts-cli.js",
         "test": "node --test test/*.test.js"
     },

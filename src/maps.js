@@ -138,7 +138,7 @@ export function pickCity(address, queryCity, country = {}) {
         if (city) return city;
     }
     // UK and US addresses carry the real post town.
-    if (country.addressTownWins || country.code === 'UK') return town;
+    if ((country.addressTownWins && !country.districtTowns) || country.code === 'UK') return town;
     const norm = (x) => String(x).toLowerCase().replace(/\s*\(.*\)$/, '').replace(/ (am|im|an der) .*$/, '');
     if (norm(town).startsWith(norm(searched))) return searched;
     const known = new Set(Object.values(country.regions || {}).flat().map(norm));
@@ -182,7 +182,9 @@ export async function scrapeQuery(page, query, ctx, opts) {
     // A many-country run (Europe) searches each place as its own country:
     // its Google region and its phone trunk code.
     const market = base.markets && base.markets[query.state];
-    const country = market ? { ...base, code: query.state, gl: market.gl, phoneCode: market.phoneCode, trunks: market.trunks || ['0'] } : base;
+    const country = market
+        ? { ...base, code: query.state, gl: market.gl, phoneCode: market.phoneCode, trunks: market.trunks || ['0'], districtTowns: !!market.districtTowns }
+        : base;
     log(`\n🔍 ${query.text}`);
 
     try {
@@ -219,13 +221,23 @@ export async function scrapeQuery(page, query, ctx, opts) {
     let cards = [];
     if (feed) {
         // Scroll until the feed stops growing or Maps says it has run out.
+        // Maps can take several seconds to load the next batch ("Sushi Berlin"
+        // stopped at 14 places after one second without new cards), so the
+        // feed has ended only when Maps says so or three checks in a row
+        // find no new card.
         let last = -1;
+        let stalls = 0;
         for (let i = 0; i < opts.maxScrolls; i++) {
-            await page.evaluate(el => el.scrollBy(0, 1200), feed);
-            await sleep(1000);
+            await page.evaluate(el => el.scrollBy(0, 2400), feed);
+            await sleep(1500);
             if (await page.$('.HlvSq')) break;
             const n = await page.$$eval('div[role="feed"] a[href*="/maps/place/"]', els => els.length).catch(() => 0);
-            if (n === last) break;
+            if (n >= opts.maxResultsPerQuery) break;
+            if (n === last) {
+                if (++stalls >= 3) break;
+                continue;
+            }
+            stalls = 0;
             last = n;
         }
         await sleep(1000);

@@ -1,9 +1,7 @@
-Hello,
+Hi {{first_name}},
 
-This is {{sender_name}} from Jaffa Glass, an Israeli maker of handmade glassware. We make glass serving plates and cups, and thought they could suit the way {{shop_name}} presents its dishes.
+I'm Zack from JaffaGlass. We make handmade glass sushi plates in Tel Aviv-Jaffa: one piece of 5mm-thick glass with a long section for sushi, four built-in sauce dishes and 24-karat gold luster details. I thought they might suit {{shop_name}}.
 
-Could we send you our catalogue, or arrange a short call to show you the collection?
+Can I send you a few photos and wholesale pricing?
 
-Email: JaffaVintageMarket@gmail.com
-Phone / WhatsApp: +972 53-302-3636
-If you'd rather not hear from us, just reply and we won't message again.
+Not interested? Reply "no thanks" and I won't message again.

@@ -28,7 +28,9 @@ export const EUROPE_MARKETS = {
     EE: { name: 'Estonia', gl: 'ee', phoneCode: '372', trunks: [] },
     FI: { name: 'Finland', gl: 'fi', phoneCode: '358' },
     FR: { name: 'France', gl: 'fr', phoneCode: '33' },
-    DE: { name: 'Germany', gl: 'de', phoneCode: '49', names: ['Germany', 'Deutschland'] },
+    // Maps names the district after a German postcode ("50823 Ehrenfeld"),
+    // so the searched city stays unless the address names another city.
+    DE: { name: 'Germany', gl: 'de', phoneCode: '49', names: ['Germany', 'Deutschland'], districtTowns: true },
     GR: { name: 'Greece', gl: 'gr', phoneCode: '30', trunks: [] },
     HU: { name: 'Hungary', gl: 'hu', phoneCode: '36', trunks: ['06'] },
     IE: { name: 'Ireland', gl: 'ie', phoneCode: '353' },

@@ -139,6 +139,7 @@ function fillWhatsApp(text, row, sender) {
         shop_name: shortBusinessName(row.business_name) || row.business_name,
         sender_name: sender.name || '[Your Name]',
         sender_title: sender.title || '[Title]',
+        first_name: row.first_name || 'there',
     };
     return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] == null ? '' : String(vars[k])));
 }

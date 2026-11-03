@@ -1,0 +1,45 @@
+{
+    "country": "EU",
+    "campaign": "sushi",
+    "states": [
+        "DE"
+    ],
+    "cities": [
+        "Berlin",
+        "Nürnberg",
+        "Düsseldorf",
+        "München",
+        "Hamburg",
+        "Köln",
+        "Frankfurt",
+        "Düsseldorf",
+        "Stuttgart",
+        "Leipzig",
+        "Dortmund"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "Sushi"
+    ],
+    "includeTiers": [
+        "Sushi place"
+    ],
+    "outputDir": "output-de-sushi",
+    "workbook": "sushi-germany.xlsx",
+    "listFile": "sushi-germany-list.csv",
+    "maxLeads": 5000,
+    "maxResultsPerQuery": 120,
+    "maxScrolls": 30,
+    "delayBetweenQueries": 4000,
+    "delayBetweenListings": 1800,
+    "browser": {
+        "mode": "local",
+        "headless": false,
+        "userDataDir": ".cache/chrome-profile"
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 3,
+        "maxPagesPerSite": 4
+    }
+}

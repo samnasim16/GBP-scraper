@@ -608,6 +608,8 @@ export function loadInput(log = console.log) {
  *
  *   states: ["BE","BY"]  — only those Bundesländer (empty = all of Germany)
  *   cities: ["Worms"]    — an explicit list, which replaces the built-in one
+ *                          (with one "states" code, the cities are in that
+ *                          country: Europe's "states": ["DE"] + German cities)
  *   districts: true      — also search the big cities district by district
  */
 export function resolveLocations(input = {}, log = console.log) {
@@ -619,9 +621,10 @@ export function resolveLocations(input = {}, log = console.log) {
     const push = (state, city) => out.push({ state, city });
 
     if (Array.isArray(cities) && cities.length > 0) {
-        for (const c of cities) {
-            const city = String(c).trim();
-            if (city) push('', city);
+        // A many-country run (Europe) searches each place as its country.
+        const only = Array.isArray(states) && states.length === 1 ? String(states[0]).trim().toUpperCase() : '';
+        for (const c of [...new Set(cities.map(c => String(c).trim()))]) {
+            if (c) push(only, c);
         }
     } else {
         const wanted = (Array.isArray(states) && states.length > 0)
