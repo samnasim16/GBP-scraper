@@ -8,6 +8,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { EUROPE_MARKETS, EUROPE_SUSHI_CITIES, EUROPE_SUSHI_DISTRICTS } from './europe.js';
+
 const TEMPLATES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
 /** Load .env without requiring dotenv. */
@@ -467,6 +469,29 @@ export const COUNTRIES = {
         foreign: /,\s*(Palestine|Palestinian Territories|Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece|Italy|France|Germany|United Kingdom|UK|USA|United States|Canada|Spain|Portugal|Netherlands|Belgium|Switzerland|Austria|Poland|Romania|Hungary|Bulgaria|Czechia|Georgia|Russia|Ukraine|United Arab Emirates|Morocco|Thailand|Japan|Australia)\s*$|(^|,)\s*(Hebron|Bethlehem|Beit Jala|Beit Sahour|Ramallah|Al-Bireh|Nablus|Jenin|Jericho|Tulkarm|Qalqilya)(,\s*\d+)?\s*$/i,
         script: 'israel',
     },
+    // Europe: many countries in one run, for campaigns only (sushi). Each
+    // search runs as its own country: markets[query.state] gives its `gl`
+    // and phone code (see europe.js and scrapeQuery).
+    EU: {
+        name: 'Europe',
+        campaignOnly: true,
+        gl: 'gb',
+        phoneCode: '44',
+        regionLabel: 'country',
+        markets: EUROPE_MARKETS,
+        regions: EUROPE_SUSHI_CITIES,
+        districts: EUROPE_SUSHI_DISTRICTS,
+        categories: [],
+        highYield: [],
+        acceptLanguage: 'en-GB,en;q=0.9',
+        contactKeyPage: 'contact|kontakt|impressum|mentions|contatti|contacto',
+        contactPaths: ['/contact', '/kontakt', '/impressum', '/contact-us', '/about'],
+        outputDir: 'output-eu',
+        // The address names the real town; abroad it also names the country.
+        addressTownWins: true,
+        // Results outside Europe: a "Sushi Valencia" in Venezuela, a Paris in Texas.
+        foreign: /,\s*(United States|USA|Canada|Mexico|Brazil|Argentina|Chile|Colombia|Venezuela|Peru|Australia|New Zealand|South Africa|Israel|Japan|China|India|Egypt|Morocco|Tunisia|Algeria|United Arab Emirates|Saudi Arabia|Qatar|Lebanon|Jordan|Georgia|Armenia|Azerbaijan|Kazakhstan|Thailand|Singapore|Philippines|Indonesia|Malaysia|Vietnam|South Korea)\s*$|,\s*[A-Z]{2}\s+\d{5}(-\d{4})?\s*$/,
+    },
 };
 
 /**
@@ -494,6 +519,27 @@ export const CAMPAIGNS = {
             whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-il.txt'),
             script: 'sushi:israel',
         },
+        // Every country in Europe; sushi places only (no Japanese / Asian tier).
+        EU: {
+            title: 'Sushi Restaurant Scraper',
+            categories: ['Sushi restaurant', 'Sushi'],
+            // Every city once before any second pass.
+            highYield: ['Sushi restaurant'],
+            outputDir: 'output-eu-sushi',
+            workbook: 'sushi-europe.xlsx',
+            includeTiers: ['Sushi place'],
+            tiers: ['Sushi place', 'Japanese / Asian restaurant', 'Other restaurant', 'Not a restaurant', 'Non-profit / religious'],
+            dropAtFeed: ['Not a restaurant'],
+            // The plain list: one row per sushi place.
+            list: {
+                file: 'sushi-europe-list.csv',
+                sheet: 'Sushi restaurants',
+                columns: ['business_name', 'city', 'country_name', 'address', 'rating', 'review_count', 'phone', 'website', 'maps_url'],
+            },
+            emailTemplate: path.join(TEMPLATES, 'sushi-email-en.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-en.txt'),
+            script: 'sushi:europe',
+        },
     },
 };
 
@@ -505,11 +551,15 @@ export function resolveCountry(input = {}) {
         FRANCE: 'FR', BELGIUM: 'BE', BELGIQUE: 'BE', 'BELGIË': 'BE', BELGIE: 'BE',
         USA: 'US', 'UNITED STATES': 'US', AMERICA: 'US', 'U.S.': 'US', 'U.S.A.': 'US',
         ISRAEL: 'IL', 'ISRAËL': 'IL', ISR: 'IL',
+        EUROPE: 'EU',
     }[raw] || raw;
     const c = COUNTRIES[code];
     if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);
     const campaign = String(input.campaign || '').trim().toLowerCase();
-    if (!campaign || campaign === 'judaica') return { code, ...c };
+    if (!campaign || campaign === 'judaica') {
+        if (c.campaignOnly) throw new Error(`${c.name} is set up for a campaign only: add "campaign": "${Object.keys(CAMPAIGNS).find(k => CAMPAIGNS[k][code])}"`);
+        return { code, ...c };
+    }
     const markets = CAMPAIGNS[campaign];
     if (!markets) throw new Error(`Unknown campaign "${input.campaign}". Use one of: ${Object.keys(CAMPAIGNS).join(', ')}`);
     if (!markets[code]) {

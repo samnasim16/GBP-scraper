@@ -16,7 +16,9 @@ export const SUSHI_TIERS = ['Sushi place', 'Japanese / Asian restaurant', 'Other
 
 /** Sushi words. Matched at a word start: "Sushiya", "סושיה", "הסושי". */
 const SUSHI = ['sushi', 'sashimi', 'nigiri', 'omakase', 'uramaki', 'temaki', 'futomaki', 'hosomaki', 'chirashi',
-    'סושי', 'סשימי', 'סאשימי', 'ניגירי', 'אומקאסה', 'אוראמאקי', 'טמאקי', 'פוטומאקי', 'הוסומאקי', 'אינסייד אאוט'];
+    'סושי', 'סשימי', 'סאשימי', 'ניגירי', 'אומקאסה', 'אוראמאקי', 'טמאקי', 'פוטומאקי', 'הוסומאקי', 'אינסייד אאוט',
+    // Europe: Russian, Ukrainian, Bulgarian, Serbian, Greek, Japanese.
+    'суши', 'суші', 'сусі', 'сашими', 'σούσι', 'σουσι', '寿司', 'すし', '鮨'];
 /** …and whole words only: "maki" is also the start of "making". */
 const SUSHI_WHOLE = ['maki', 'מאקי'];
 

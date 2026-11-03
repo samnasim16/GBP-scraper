@@ -172,7 +172,7 @@ export function extractFeedCards() {
  * "People also search for" cards whose ratings and review counts otherwise leak
  * into the wrong business.
  */
-export function extractDetail(phoneCode = '49') {
+export function extractDetail(phoneCode = '49', trunks = ['0']) {
     const panel = document.querySelector('div[role="main"]') || document.body;
     const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
 
@@ -262,7 +262,11 @@ export function extractDetail(phoneCode = '49') {
         if (!d) return null;
         if (/^\+/.test(s)) { /* already international */ }
         else if (d.startsWith('00')) d = d.slice(2);
-        else if (d.startsWith('0')) d = phoneCode + d.slice(1);
+        // `trunks` are the national prefixes dialled before the area code:
+        // "0" in most countries, "8" in Russia, none at all in Spain,
+        // Portugal, Luxembourg or Denmark, and Italy keeps its 0 (+39 02…).
+        else if (!trunks.length) d = phoneCode + d;
+        else if (trunks.some(t => d.startsWith(t))) d = phoneCode + d.slice(trunks.find(t => d.startsWith(t)).length);
         // Ten digits with no trunk 0: a US number in the US, a national
         // service number elsewhere (Israel's 1-700 / 1-599 lines).
         else if (d.length === 10 && !d.startsWith(phoneCode)) d = (phoneCode === '1' ? '1' : phoneCode) + d;

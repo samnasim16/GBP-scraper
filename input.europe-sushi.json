@@ -1,0 +1,31 @@
+{
+    "country": "EU",
+    "campaign": "sushi",
+    "sender": {
+        "name": "",
+        "title": ""
+    },
+    "states_comment": "Leave empty for all of Europe, or pick countries, e.g. [\"FR\", \"DE\", \"UK\"]. Codes: AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE UK NO CH IS LI MC AD SM RS BA ME MK AL XK MD UA BY RU TR",
+    "states": [],
+    "cities": [],
+    "districts": true,
+    "searchCategories": [],
+    "includeTiers": [
+        "Sushi place"
+    ],
+    "maxLeads": 40000,
+    "maxResultsPerQuery": 120,
+    "maxScrolls": 20,
+    "delayBetweenQueries": 4000,
+    "delayBetweenListings": 1800,
+    "browser": {
+        "mode": "local",
+        "headless": false,
+        "userDataDir": ".cache/chrome-profile"
+    },
+    "contacts": {
+        "enabled": false,
+        "concurrency": 3,
+        "maxPagesPerSite": 4
+    }
+}

@@ -36,7 +36,7 @@ test('the sushi campaign is Israel with its own terms, places, templates and fol
     assert.equal(IL.campaign, undefined);
     assert.equal(resolveCountry({ country: 'IL', campaign: 'judaica' }).outputDir, 'output-il');
 
-    assert.throws(() => resolveCountry({ country: 'DE', campaign: 'sushi' }), /Israel only/);
+    assert.throws(() => resolveCountry({ country: 'DE', campaign: 'sushi' }), /Israel, Europe only/);
     assert.throws(() => resolveCountry({ country: 'IL', campaign: 'pizza' }), /Unknown campaign/);
 
     const locs = resolveLocations({ country: 'IL', campaign: 'sushi' }, () => {});
