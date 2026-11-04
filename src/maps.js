@@ -220,6 +220,10 @@ export async function scrapeQuery(page, query, ctx, opts) {
 
     let cards = [];
     if (feed) {
+        // The website lookup opens shop sites in other tabs of this browser.
+        // A tab in the background doesn't load more results when scrolled:
+        // after "Sushi Berlin", every search showed only its first 7 places.
+        await page.bringToFront().catch(() => {});
         // Scroll until the feed stops growing or Maps says it has run out.
         // Maps can take several seconds to load the next batch ("Sushi Berlin"
         // stopped at 14 places after one second without new cards), so the

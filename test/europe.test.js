@@ -113,6 +113,7 @@ test('Europe: sushi places only; sushi in Cyrillic, Greek and Japanese counts', 
 test('Europe: each search runs as its own country — Google region, phone code, Country column', async () => {
     const urls = [];
     let current = '';
+    let fronted = 0;
     const cards = [
         { name: 'Sushi Lisboa', href: 'https://www.google.com/maps/place/a/data=!1s0x1:0xa', category: 'Sushi restaurant', rating: 4.6, reviewCount: 300, closedFlag: false },
         { name: 'Sushi Kehl', href: 'https://www.google.com/maps/place/b/data=!1s0x1:0xb', category: 'Sushi restaurant', rating: 4.1, reviewCount: 50, closedFlag: false },
@@ -128,6 +129,7 @@ test('Europe: each search runs as its own country — Google region, phone code,
         $: async (sel) => (sel === 'div[role="feed"]' || sel === 'h1.DUwDvf' ? {} : null),
         $$eval: async () => cards.length,
         waitForSelector: async () => {},
+        bringToFront: async () => { fronted++; },
         evaluate: async (fn, arg) => {
             if (fn === extractFeedCards) return cards;
             if (fn === extractDetail) {
@@ -141,6 +143,8 @@ test('Europe: each search runs as its own country — Google region, phone code,
     await scrapeQuery(page, { text: 'Sushi restaurant Lisbon', city: 'Lisbon', state: 'PT' }, { seen: new Set(), allLeads, log: () => {} },
         { maxResultsPerQuery: 60, maxScrolls: 0, minReviews: 0, maxLeads: 100, delayBetweenListings: 0, keepNonProfits: false, country: EU });
     assert.match(urls[0], /\?hl=en&gl=pt$/);
+    // A background tab doesn't load more results; the Maps tab comes to the front first.
+    assert.equal(fronted, 1);
     assert.ok(urls.slice(1).every(u => /gl=pt/.test(u)));
     // The supermarket never opens.
     assert.deepEqual(allLeads.map(l => l.business_name), ['Sushi Lisboa', 'Sushi Kehl']);
