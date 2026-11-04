@@ -58,6 +58,7 @@ const emailTemplate = input.emailTemplate || COUNTRY.emailTemplate || DEFAULT_TE
 const whatsappTemplate = (input.whatsappTemplate || COUNTRY.whatsappTemplate)
     ? loadWhatsAppTemplate(input.whatsappTemplate || COUNTRY.whatsappTemplate) : undefined;
 const FRESH = process.argv.includes('--fresh');
+const AFTER_SEARCH = !!contacts.afterSearch;
 // Each market writes to its own folder, so an England run never overwrites
 // the Germany results.
 const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
@@ -166,7 +167,7 @@ async function main() {
                 seedSeen(seen, previous, queries);
                 console.log(`   ⏯️  Resuming: ${previous.length} places already found, continuing at query ${startAt + 1} of ${queries.length}`);
                 const pending = previous.filter(needsContactLookup);
-                if (pending.length && enricher.enabled) {
+                if (pending.length && enricher.enabled && !AFTER_SEARCH) {
                     console.log(`   📇 Re-checking ${pending.length} websites the last run may not have finished reading`);
                     for (const lead of pending) enricher.enqueue(lead).catch(() => {});
                 }
@@ -190,7 +191,10 @@ async function main() {
         const ctx = {
             seen, allLeads,
             log: console.log,
-            onLead: (lead) => { enricher.enqueue(lead).catch(() => {}); },
+            // "afterSearch": read the websites once every search is done.
+            // Lookups running alongside the searches stunt Maps' results
+            // lists: "Sushi München" loaded 21 places, alone 96.
+            onLead: (lead) => { if (!AFTER_SEARCH) enricher.enqueue(lead).catch(() => {}); },
         };
 
         for (let qi = startAt; qi < queries.length; qi++) {
@@ -247,6 +251,13 @@ async function main() {
         }
 
         if (enricher.enabled) {
+            if (AFTER_SEARCH) {
+                // Every website not yet read (sites that only render in a
+                // browser still use this session's Chrome).
+                const pending = allLeads.filter(l => l.website && !l.contacts_checked);
+                console.log(`\n📇 Searches done — reading ${pending.length} websites...`);
+                for (const lead of pending) enricher.enqueue(lead).catch(() => {});
+            }
             console.log('\n⏳ Finishing website / Impressum lookups...');
             await enricher.drain();
         }

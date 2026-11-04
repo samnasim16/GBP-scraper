@@ -26,6 +26,7 @@
     "contacts": {
         "enabled": false,
         "concurrency": 3,
-        "maxPagesPerSite": 4
+        "maxPagesPerSite": 4,
+        "afterSearch": true
     }
 }

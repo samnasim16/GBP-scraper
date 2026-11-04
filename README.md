@@ -187,7 +187,7 @@ npm run sushi:europe         # all of Europe → output-eu-sushi/   (input.europ
 npm run sushi:germany        # input.germany-sushi.json → output-de-sushi/sushi-germany-list.csv + sushi-germany.xlsx
 ```
 
-`input.germany-sushi.json` runs exactly these searches: Sushi Berlin, Nürnberg, Düsseldorf, München, Hamburg, Köln, Frankfurt, Stuttgart, Leipzig, Dortmund. Change `"cities"` to change them; `"states": ["DE"]` keeps them German. Website lookup is on, so German Impressum pages give emails. Note that German law (UWG §7) restricts unsolicited advertising email even to businesses; this isn't legal advice.
+Websites are read after all the searches are done (`"contacts": { "afterSearch": true }`): reading them alongside the searches made Maps load only 14–34 places per city instead of up to about 120. `input.germany-sushi.json` runs exactly these searches: Sushi Berlin, Nürnberg, Düsseldorf, München, Hamburg, Köln, Frankfurt, Stuttgart, Leipzig, Dortmund. Change `"cities"` to change them; `"states": ["DE"]` keeps them German. Website lookup is on, so German Impressum pages give emails. Note that German law (UWG §7) restricts unsolicited advertising email even to businesses; this isn't legal advice.
 
 ## WhatsApp: which shops have it, and who to contact first
 
