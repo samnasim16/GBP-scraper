@@ -19,6 +19,7 @@ import { isTarget, RANKED_TIERS } from './relevance.js';
 import { greetingFor, shortBusinessName } from './contacts.js';
 import { classifyWhatsApp, whatsappLink, loadWhatsAppTemplate } from './whatsapp.js';
 import { renderEmail } from './email-template.js';
+import { writeCleanOutput } from './clean.js';
 
 export const COLUMNS = [
     ['business_name',      'Business Name',     34],
@@ -139,6 +140,7 @@ function fillWhatsApp(text, row, sender) {
         shop_name: shortBusinessName(row.business_name) || row.business_name,
         sender_name: sender.name || '[Your Name]',
         sender_title: sender.title || '[Title]',
+        first_name: row.first_name || 'there',
     };
     return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (vars[k] == null ? '' : String(vars[k])));
 }
@@ -292,7 +294,7 @@ async function writeXlsx(rows, file, includeTiers, list) {
  * Create a saver bound to an output directory. Serialised so overlapping
  * writes can't clobber each other.
  */
-export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', list = null, log = console.log } = {}) {
+export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', list = null, clean = null, log = console.log } = {}) {
     fs.mkdirSync(outputDir, { recursive: true });
     let saving = false;
 
@@ -311,6 +313,8 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
             }
             try {
                 await writeXlsx(rows, path.join(outputDir, workbook), includeTiers, list);
+                // The client-ready copy (Sushi_Restaurants_Germany.xlsx / .csv).
+                if (clean) await writeCleanOutput(rows.filter(r => isTarget(r, includeTiers)), outputDir, clean);
             } catch (e) {
                 if (!quiet) log(`⚠️  XLSX write skipped (${e.message}) — CSV still saved.`);
             }

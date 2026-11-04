@@ -37,6 +37,9 @@ export function renderEmail(lead, template, sender = {}) {
         shop_name: shortBusinessName(lead.business_name) || lead.business_name,
         sender_name: sender.name || '[Your Name]',
         sender_title: sender.title || '[Title]',
+        // "Hi {{first_name}}": a name only when one was written in by hand;
+        // never guessed from an Impressum ("Inhaber: Nguyen Van Minh").
+        first_name: lead.first_name || 'there',
     };
     return { subject: fill(template.subject, vars), body: fill(template.body, vars) };
 }

@@ -113,6 +113,7 @@ test('Europe: sushi places only; sushi in Cyrillic, Greek and Japanese counts', 
 test('Europe: each search runs as its own country — Google region, phone code, Country column', async () => {
     const urls = [];
     let current = '';
+    let fronted = 0;
     const cards = [
         { name: 'Sushi Lisboa', href: 'https://www.google.com/maps/place/a/data=!1s0x1:0xa', category: 'Sushi restaurant', rating: 4.6, reviewCount: 300, closedFlag: false },
         { name: 'Sushi Kehl', href: 'https://www.google.com/maps/place/b/data=!1s0x1:0xb', category: 'Sushi restaurant', rating: 4.1, reviewCount: 50, closedFlag: false },
@@ -128,6 +129,7 @@ test('Europe: each search runs as its own country — Google region, phone code,
         $: async (sel) => (sel === 'div[role="feed"]' || sel === 'h1.DUwDvf' ? {} : null),
         $$eval: async () => cards.length,
         waitForSelector: async () => {},
+        bringToFront: async () => { fronted++; },
         evaluate: async (fn, arg) => {
             if (fn === extractFeedCards) return cards;
             if (fn === extractDetail) {
@@ -141,6 +143,8 @@ test('Europe: each search runs as its own country — Google region, phone code,
     await scrapeQuery(page, { text: 'Sushi restaurant Lisbon', city: 'Lisbon', state: 'PT' }, { seen: new Set(), allLeads, log: () => {} },
         { maxResultsPerQuery: 60, maxScrolls: 0, minReviews: 0, maxLeads: 100, delayBetweenListings: 0, keepNonProfits: false, country: EU });
     assert.match(urls[0], /\?hl=en&gl=pt$/);
+    // A background tab doesn't load more results; the Maps tab comes to the front first.
+    assert.equal(fronted, 1);
     assert.ok(urls.slice(1).every(u => /gl=pt/.test(u)));
     // The supermarket never opens.
     assert.deepEqual(allLeads.map(l => l.business_name), ['Sushi Lisboa', 'Sushi Kehl']);
@@ -171,4 +175,83 @@ test('Europe: the saver writes the plain list with readable headers, and a list 
     const full = fs.readFileSync(path.join(dir, 'leads.csv'), 'utf8');
     assert.match(full.split('\n')[0], /country_name/);
     fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('Germany sushi: exactly the given searches, cities stay cities, and the PDF email', async () => {
+    const input = JSON.parse(fs.readFileSync(new URL('../input.germany-sushi.json', import.meta.url), 'utf8'));
+    const DE = resolveCountry(input);
+    const q = buildQueryMatrix(resolveLocations(input, () => {}), input.searchCategories, DE.highYield);
+    // "Sushi Düsseldorf" was listed twice; it runs once.
+    assert.deepEqual(q.map(x => x.text), ['Sushi Berlin', 'Sushi Nürnberg', 'Sushi Düsseldorf', 'Sushi München', 'Sushi Hamburg',
+        'Sushi Köln', 'Sushi Frankfurt', 'Sushi Stuttgart', 'Sushi Leipzig', 'Sushi Dortmund']);
+    assert.ok(q.every(x => x.state === 'DE'), 'every search runs as Germany');
+    assert.deepEqual(input.includeTiers, ['Sushi place']);
+    // Maps names the district after a German postcode; the searched city stays.
+    const de = { ...EU, code: 'DE', districtTowns: true };
+    assert.equal(pickCity('Venloer Str. 1, 50823 Ehrenfeld', 'Köln', de), 'Köln');
+    assert.equal(pickCity('Königsallee 1, 40212 Düsseldorf', 'Düsseldorf', de), 'Düsseldorf');
+
+    const { renderEmail } = await import('../src/email-template.js');
+    const { loadWhatsAppTemplate } = await import('../src/whatsapp.js');
+    const e = renderEmail({ business_name: 'Sushi Ninja | Best Sushi in Köln' }, loadTemplate(EU.emailTemplate));
+    assert.equal(e.subject, "Quick question about Sushi Ninja's sushi plates");
+    assert.match(e.body, /^Hi there,\n/);
+    assert.match(e.body, /might suit Sushi Ninja\./);
+    assert.match(e.body, /WhatsApp: \+972 53-854-8320/);
+    assert.match(e.body, /Reply "no thanks"/);
+    assert.doesNotMatch(e.subject + e.body, /\{\{|\[Your Name\]/);
+    // A first name written in by hand is used.
+    assert.match(renderEmail({ business_name: 'X', first_name: 'Anna' }, loadTemplate(EU.emailTemplate)).body, /^Hi Anna,/);
+    assert.match(loadWhatsAppTemplate(EU.whatsappTemplate), /\+?972|sushi plates/);
+});
+
+test('Germany sushi: a menu heading is not the owner', async () => {
+    const { extractContact } = await import('../src/contacts.js');
+    // Live run, Sakura Leipzig: "Speisekarte Vorspeiesen Sushi Spezialitäten" came back as the contact.
+    assert.equal(extractContact('Inhaber: Speisekarte Vorspeiesen Sushi Spezialitäten').name, '');
+    assert.equal(extractContact('Inhaberin: Thi Bich Thuy Nguyen').name, 'Thi Bich Thuy Nguyen');
+});
+
+test('full Germany sushi run: company forms, footer words and streets are cut from owner names', async () => {
+    const { extractContact } = await import('../src/contacts.js');
+    const cases = [
+        ['Inhaber: Andreas Karlsson GmbH', 'Andreas Karlsson'],
+        ['Geschäftsführer: Thanh Pham Schließen Datenschutzerklärung', 'Thanh Pham'],
+        ['Inhaber: Jörg Better Steuernr.: 123', 'Jörg Better'],
+        ['Inhaber: David Nguyen Lieferzeiten Lieferzeit', 'David Nguyen'],
+        ['Inhaber: Kien Cuong Dang Marienburger Str. 5', 'Kien Cuong Dang'],
+        ['Inhaber: Philipp Strähle Eingetragen im Handelsregister', 'Philipp Strähle'],
+        ['Vertreten durch: Mood Dining Concept GmbH', ''],
+        ['Inhaberin: Öz GbR', ''],
+    ];
+    for (const [text, name] of cases) assert.equal(extractContact(text).name, name, text);
+});
+
+test('full Germany sushi run: a street cut at its ß and disclaimer text are not part of a name', async () => {
+    const { extractContact } = await import('../src/contacts.js');
+    assert.equal(extractContact('Inhaber: Apichat Srisang Derendorferstra').name, 'Apichat Srisang');
+    assert.equal(extractContact('Inhaber: Haifan Xiang Disclaimer Trotz sorgfältiger Kontrolle').name, 'Haifan Xiang');
+    assert.equal(extractContact('Inhaberin: Petra Schmidt').name, 'Petra Schmidt');
+});
+
+test('full Germany sushi run: a German site\'s local WhatsApp number gets +49, not the run\'s default +44', async (t) => {
+    const http = await import('node:http');
+    const { ContactEnricher } = await import('../src/contacts.js');
+    const { createHttpClient } = await import('../src/http.js');
+    const server = http.createServer((req, res) => {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end('<html><body><h1>Berger Streetfood</h1><p>Bestellen per <a href="https://wa.me/017656393139">WhatsApp</a></p></body></html>');
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    t.after(() => server.close());
+    // The Europe run's config carries one phone code (+44); the place knows its own.
+    const enricher = new ContactEnricher({ http: createHttpClient({ transport: 'local' }), config: { delayMs: 0, phoneCode: EU.phoneCode }, log: () => {} });
+    const lead = { business_name: 'Berger Streetfood', website: `http://127.0.0.1:${server.address().port}/`, phone_code: '49' };
+    await enricher.enqueue(lead);
+    await enricher.drain();
+    assert.equal(lead.whatsapp_site_numbers, '+4917656393139');
+    // Written out next to "WhatsApp" (Berger Streetfood came back as +44 176…).
+    const { extractWhatsApp } = await import('../src/whatsapp.js');
+    assert.deepEqual(extractWhatsApp('<p>WhatsApp: 0176 56393139</p>', '49').numbers, ['+4917656393139']);
+    assert.deepEqual(extractWhatsApp('<a href="https://wa.me/4917656393139">x</a>', '44').numbers, ['+4917656393139']);
 });

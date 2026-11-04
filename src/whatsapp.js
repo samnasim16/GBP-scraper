@@ -93,7 +93,10 @@ export function extractWhatsApp(html, phoneCode = '49') {
         let r = raw;
         try { r = decodeURIComponent(raw); } catch { /* keep as is */ }
         // wa.me numbers are written without a "+" but are always international.
-        const n = normaliseNumber(/^\+|^00/.test(r.trim()) ? r : '+' + r.replace(/^\s*0+/, ''), phoneCode);
+        const n = normaliseNumber(/^\+|^00/.test(r.trim()) ? r
+            // "wa.me/0176…" is a local number written into the link: it
+            // gets the country code, not "+176…".
+            : /^\s*0[1-9]/.test(r) ? r : '+' + r.replace(/^\s*0+/, ''), phoneCode);
         if (n && !numbers.includes(n)) numbers.push(n);
     };
     let linked = false;

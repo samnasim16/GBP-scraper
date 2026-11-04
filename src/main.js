@@ -58,12 +58,19 @@ const emailTemplate = input.emailTemplate || COUNTRY.emailTemplate || DEFAULT_TE
 const whatsappTemplate = (input.whatsappTemplate || COUNTRY.whatsappTemplate)
     ? loadWhatsAppTemplate(input.whatsappTemplate || COUNTRY.whatsappTemplate) : undefined;
 const FRESH = process.argv.includes('--fresh');
+const AFTER_SEARCH = !!contacts.afterSearch;
 // Each market writes to its own folder, so an England run never overwrites
 // the Germany results.
 const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
 const template = loadTemplate(emailTemplate);
-const WORKBOOK = COUNTRY.workbook || 'judaica-leads.xlsx';
-const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: COUNTRY.list || null });
+// An input file can rename the workbook and the list ("sushi-germany.xlsx").
+const WORKBOOK = input.workbook || COUNTRY.workbook || 'judaica-leads.xlsx';
+const LIST = COUNTRY.list ? { ...COUNTRY.list, ...(input.listFile ? { file: input.listFile } : {}) } : null;
+// The clean copy; an input file can name it ("cleanFile", "cleanTitle").
+const CLEAN = COUNTRY.clean
+    ? { ...COUNTRY.clean, ...(input.cleanFile ? { file: input.cleanFile } : {}), ...(input.cleanTitle ? { title: input.cleanTitle } : {}) }
+    : null;
+const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: LIST, clean: CLEAN });
 // What progress.json belongs to: a sushi run never resumes a Judaica one.
 const RUN_KEY = COUNTRY.campaign ? `${COUNTRY.code}-${COUNTRY.campaign}` : COUNTRY.code;
 
@@ -154,7 +161,13 @@ async function main() {
             const progress = readProgress(OUTPUT_DIR);
             if (previous.length || progress) {
                 startAt = resumePoint(queries, previous, progress, RUN_KEY);
-                if (startAt >= queries.length) {
+                // Searches done but websites still to read ("afterSearch", or
+                // a run stopped while reading them): read them, don't exit.
+                const unread = enricher.enabled ? previous.filter(l => l.website && !l.contacts_checked) : [];
+                if (startAt >= queries.length && unread.length) {
+                    console.log(`   ⏯️  All ${queries.length} searches were done; ${unread.length} websites still to read.`);
+                    if (!AFTER_SEARCH) for (const lead of unread) enricher.enqueue(lead).catch(() => {});
+                } else if (startAt >= queries.length) {
                     console.log(`   ✅ The previous ${COUNTRY.name}${COUNTRY.campaign ? ` ${COUNTRY.campaign}` : ''} run already finished all ${queries.length} queries (${previous.length} places).`);
                     console.log('      Nothing to resume. To search again from the start, add --fresh:');
                     console.log(`        npm run ${COUNTRY.script || 'start'} -- --fresh`);
@@ -162,9 +175,9 @@ async function main() {
                 }
                 allLeads.push(...previous);
                 seedSeen(seen, previous, queries);
-                console.log(`   ⏯️  Resuming: ${previous.length} places already found, continuing at query ${startAt + 1} of ${queries.length}`);
+                if (startAt < queries.length) console.log(`   ⏯️  Resuming: ${previous.length} places already found, continuing at query ${startAt + 1} of ${queries.length}`);
                 const pending = previous.filter(needsContactLookup);
-                if (pending.length && enricher.enabled) {
+                if (pending.length && enricher.enabled && !AFTER_SEARCH && startAt < queries.length) {
                     console.log(`   📇 Re-checking ${pending.length} websites the last run may not have finished reading`);
                     for (const lead of pending) enricher.enqueue(lead).catch(() => {});
                 }
@@ -174,6 +187,11 @@ async function main() {
 
         const opts = { maxResultsPerQuery, maxScrolls, minReviews, maxLeads, delayBetweenListings, keepNonProfits, country: COUNTRY };
         const REFRESH_EVERY = factory.mode === 'brightdata' ? 15 : 40;
+        // Also after this many places opened: once a session had opened the
+        // ~100 places of "Sushi Berlin", every later search showed only the
+        // first 7 results ("Sushi München" alone: 96).
+        const REFRESH_PLACES = 60;
+        let placesAtRefresh = allLeads.length;
         const SAVE_EVERY = 10;
 
         session = await factory.open();
@@ -183,14 +201,19 @@ async function main() {
         const ctx = {
             seen, allLeads,
             log: console.log,
-            onLead: (lead) => { enricher.enqueue(lead).catch(() => {}); },
+            // "afterSearch": read the websites once every search is done.
+            // Lookups running alongside the searches stunt Maps' results
+            // lists: "Sushi München" loaded 21 places, alone 96.
+            onLead: (lead) => { if (!AFTER_SEARCH) enricher.enqueue(lead).catch(() => {}); },
         };
 
         for (let qi = startAt; qi < queries.length; qi++) {
             if (allLeads.length >= maxLeads) break;
 
-            if (qi > startAt && qi % REFRESH_EVERY === 0) {
-                console.log(`\n🔄 Refreshing browser session (every ${REFRESH_EVERY} queries)...`);
+            const manyPlaces = allLeads.length - placesAtRefresh >= REFRESH_PLACES;
+            if (qi > startAt && (qi % REFRESH_EVERY === 0 || manyPlaces)) {
+                placesAtRefresh = allLeads.length;
+                console.log(`\n🔄 Refreshing browser session (${manyPlaces ? `${REFRESH_PLACES}+ places opened` : `every ${REFRESH_EVERY} queries`})...`);
                 try {
                     session = await factory.refresh(session);
                     await sleep(1500);
@@ -238,6 +261,13 @@ async function main() {
         }
 
         if (enricher.enabled) {
+            if (AFTER_SEARCH) {
+                // Every website not yet read (sites that only render in a
+                // browser still use this session's Chrome).
+                const pending = allLeads.filter(l => l.website && !l.contacts_checked);
+                console.log(`\n📇 Searches done — reading ${pending.length} websites...`);
+                for (const lead of pending) enricher.enqueue(lead).catch(() => {});
+            }
             console.log('\n⏳ Finishing website / Impressum lookups...');
             await enricher.drain();
         }
@@ -264,7 +294,7 @@ async function main() {
         for (const r of targets) per[r.country_name || '?'] = (per[r.country_name || '?'] || 0) + 1;
         console.log(`   By country: ${Object.entries(per).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     }
-    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/${WORKBOOK}${COUNTRY.list ? `, ${COUNTRY.list.file}` : ''} and mail-merge.csv`);
+    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/${WORKBOOK}${LIST ? `, ${LIST.file}` : ''}${CLEAN ? `, ${CLEAN.file}.xlsx/.csv (clean)` : ''} and mail-merge.csv`);
     process.exit(0);
 }
 

@@ -515,6 +515,8 @@ export const CAMPAIGNS = {
             tiers: ['Sushi place', 'Japanese / Asian restaurant', 'Other restaurant', 'Not a restaurant', 'Non-profit / religious'],
             // Dropped from the feed before the place is opened.
             dropAtFeed: ['Not a restaurant'],
+            // The client-ready workbook and CSV, written with every save.
+            clean: { file: 'Sushi_Restaurants_Israel', title: 'Sushi restaurants in Israel', noun: 'Restaurants' },
             emailTemplate: path.join(TEMPLATES, 'sushi-email-il.txt'),
             whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-il.txt'),
             script: 'sushi:israel',
@@ -536,6 +538,7 @@ export const CAMPAIGNS = {
                 sheet: 'Sushi restaurants',
                 columns: ['business_name', 'city', 'country_name', 'address', 'rating', 'review_count', 'phone', 'website', 'maps_url'],
             },
+            clean: { file: 'Sushi_Restaurants_Europe', title: 'Sushi restaurants in Europe', noun: 'Restaurants' },
             emailTemplate: path.join(TEMPLATES, 'sushi-email-en.txt'),
             whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-en.txt'),
             script: 'sushi:europe',
@@ -608,6 +611,8 @@ export function loadInput(log = console.log) {
  *
  *   states: ["BE","BY"]  — only those Bundesländer (empty = all of Germany)
  *   cities: ["Worms"]    — an explicit list, which replaces the built-in one
+ *                          (with one "states" code, the cities are in that
+ *                          country: Europe's "states": ["DE"] + German cities)
  *   districts: true      — also search the big cities district by district
  */
 export function resolveLocations(input = {}, log = console.log) {
@@ -619,9 +624,10 @@ export function resolveLocations(input = {}, log = console.log) {
     const push = (state, city) => out.push({ state, city });
 
     if (Array.isArray(cities) && cities.length > 0) {
-        for (const c of cities) {
-            const city = String(c).trim();
-            if (city) push('', city);
+        // A many-country run (Europe) searches each place as its country.
+        const only = Array.isArray(states) && states.length === 1 ? String(states[0]).trim().toUpperCase() : '';
+        for (const c of [...new Set(cities.map(c => String(c).trim()))]) {
+            if (c) push(only, c);
         }
     } else {
         const wanted = (Array.isArray(states) && states.length > 0)
