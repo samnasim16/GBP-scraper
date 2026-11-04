@@ -162,7 +162,8 @@ Put your name and title in `"sender"` in `input.israel-sushi.json`. The results 
 - **Ordering and booking pages** (Wolt, 10bis, Mishloha, Ontopo, Tabit, rest.co.il, Uber Eats…) and restaurant directories (israelbusinessguide.com, rol.co.il, Bali B Click) are not read as a restaurant's website, so their inboxes never show up as the restaurant's email. Mishlohim pages are read, but Mishlohim's own address is ignored.
 - **Not targets:** Japanese spas, Chinese-medicine clinics and parks, even with "Japanese" or "Chinese" in the name. Restaurants in Hebron, Bethlehem and abroad (Arad in Romania, Sushi Modo in Canada) are dropped.
 - **1-700 / 1-800 numbers** show as **No — 1-700 / 1-800 service number** in the WhatsApp column, with no chat link: nobody can message them.
-- **The email and WhatsApp message are in Hebrew** (`templates/sushi-email-il.txt`, `templates/sushi-whatsapp-il.txt`). They offer hand-made glass serving plates and cups, and ask whether you may send the catalogue or set up a short meeting, at the restaurant or at the Jaffa showroom. They carry the same "פרסומת" label and opt-out line as the Judaica ones (see *A note on sending (Israel)*). **Read them before sending** and change anything that doesn't match what you make.
+- **The email and WhatsApp message** are the JaffaGlass outreach drafts (Email 1: "Quick question about {{shop_name}}'s sushi plates", Zack, WhatsApp +972 53-854-8320, "no thanks" opt-out), the same as the Europe and Germany runs. The earlier Hebrew drafts are still in `templates/sushi-email-il.txt` and `templates/sushi-whatsapp-il.txt`. Israel's anti-spam law expects "פרסומת" at the start of an advertising email's subject; the English draft doesn't have it (see *A note on sending (Israel)*).
+- **Not in Israel:** addresses in Ramallah/Al-Bireh, Hebron, Bethlehem or Jordan, and places with a Palestinian Authority number (+970) even when the address reads "Jerusalem".
 
 ## Sushi restaurants across Europe
 
@@ -173,7 +174,7 @@ npm run smoke:sushi:europe   # Portugal only, 1 search term, 10 places → outpu
 npm run sushi:europe         # all of Europe → output-eu-sushi/   (input.europe-sushi.json)
 ```
 
-- **The list:** `output-eu-sushi/sushi-europe-list.csv` has one row per sushi place: name, city, country, address, rating, reviews, phone, website, Maps link. `sushi-europe.xlsx` has the same list on its first sheet, **Sushi restaurants**, and every place found on **All results**.
+- **The list:** `output-eu-sushi/sushi-europe-list.csv` has one row per sushi place: name, city, country, address, rating, reviews, phone, website, Maps link. `sushi-europe.xlsx` is the usual workbook (WhatsApp · Outreach · No email found · All results).
 - **Sushi places only:** Japanese and Asian restaurants with no sushi on their listing are on All results, not on the list.
 - **Places:** 438 searches per term: every capital and each country's larger cities, and the biggest cities (London, Paris, Berlin, Madrid, Barcelona, Rome, Milan, Moscow, Istanbul…) district by district. Two terms, `Sushi restaurant` across every place first, then `Sushi`: 876 searches. Expect a day or more; a restart carries on where it stopped.
 - **Some countries only:** set `"states"` in `input.europe-sushi.json`, e.g. `["FR", "DE", "UK"]`. Use `"states"`, not `"cities"`: each country is searched as itself (its own Google region and phone code), and a bare city list has no country.
@@ -181,17 +182,11 @@ npm run sushi:europe         # all of Europe → output-eu-sushi/   (input.europ
 - **Website lookup is off** (`"contacts": { "enabled": false }`), because the list doesn't need emails and it makes the run much faster. Turn it on to get emails.
 - **The email** is Email 1 of the JaffaGlass outreach sequence (`templates/sushi-email-en.txt`): "Quick question about {{shop_name}}'s sushi plates", signed by Zack with WhatsApp +972 53-854-8320. It opens "Hi there" unless you fill in a `first_name` by hand: names are never guessed, because many owners' Impressum names put the family name first ("Thi Bich Thuy Nguyen"). Emails 2–6 (follow-ups, catalog, close) are sent by hand or by your mail tool as replies in the same thread.
 
-### The clean file (every sushi run)
+### The workbook (every run)
 
-Every sushi run also writes a clean, ready-to-share copy next to the full results, updated with every save:
+Every run writes one workbook in the same layout, updated with every save: **WhatsApp** (every target with a number, best evidence first, one row per number: a chain's branches that share one WhatsApp get one message), **Outreach** (one row per email address), **No email found** and **All results**. The Relevance and WhatsApp columns are colour-coded, and "Open chat" opens WhatsApp with the message typed in.
 
-| Run | Clean files |
-|---|---|
-| `npm run sushi:germany` | `output-de-sushi/Sushi_Restaurants_Germany.xlsx` and `.csv` |
-| `npm run sushi:europe` | `output-eu-sushi/Sushi_Restaurants_Europe.xlsx` and `.csv` |
-| `npm run sushi:israel` | `output-il-sushi/Sushi_Restaurants_Israel.xlsx` and `.csv` |
-
-The workbook has three sheets: **Summary** (per city, or per country on the Europe run: restaurants, with email, WhatsApp, average rating), **All restaurants** (name, city, address, rating, reviews, email, phone, WhatsApp, chat link, website, Instagram, contact, map link; biggest city first, most-reviewed first) and **Email list** (one row per address). No scores, match reasons or email text. Rename it with `"cleanFile"` / `"cleanTitle"` in the input file.
+WhatsApp numbers that sites write wrongly are repaired: the trunk 0 kept after the code ("+972 058…", "+49 0211…"), and links without a country code ("wa.me/527320122" is 052-732-0122; "wa.me/15730642210" on a German site is 01573 …, not an American number).
 
 ### Sushi in Germany (your own search list)
 

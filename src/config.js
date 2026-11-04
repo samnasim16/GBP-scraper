@@ -466,7 +466,10 @@ export const COUNTRIES = {
         // country at all). Israeli towns in the West Bank carry no country in
         // their Maps address and stay. Namesakes abroad: Arad (Romania),
         // "Sushi Modi'in" → Sushi Modo (Canada).
-        foreign: /,\s*(Palestine|Palestinian Territories|Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece|Italy|France|Germany|United Kingdom|UK|USA|United States|Canada|Spain|Portugal|Netherlands|Belgium|Switzerland|Austria|Poland|Romania|Hungary|Bulgaria|Czechia|Georgia|Russia|Ukraine|United Arab Emirates|Morocco|Thailand|Japan|Australia)\s*$|(^|,)\s*(Hebron|Bethlehem|Beit Jala|Beit Sahour|Ramallah|Al-Bireh|Nablus|Jenin|Jericho|Tulkarm|Qalqilya)(,\s*\d+)?\s*$/i,
+        foreign: /,\s*(Palestine|Palestinian Territories|Jordan|Egypt|Lebanon|Syria|Cyprus|Turkey|Greece|Italy|France|Germany|United Kingdom|UK|USA|United States|Canada|Spain|Portugal|Netherlands|Belgium|Switzerland|Austria|Poland|Romania|Hungary|Bulgaria|Czechia|Georgia|Russia|Ukraine|United Arab Emirates|Morocco|Thailand|Japan|Australia)\s*$|(^|,)\s*(Hebron|Bethlehem|Beit Jala|Beit Sahour|Ramallah|Al-?Bireh|Albireh|Albereh|Nablus|Jenin|Jericho|Tulkarm|Qalqilya)\b[^,]*(,\s*\d+)?\s*$|^\s*(Jordan|Palestine|Egypt|Lebanon|Syria)\s*,|(^|,)\s*(Amman|Aqaba|Irbid|Zarqa)\s*(,|$)/i,
+        // A Palestinian Authority number (+970) on a place whose address
+        // reads "Jerusalem" (Bir Nabala) or "Kiryat Arba" (Hebron).
+        foreignPhone: /^\+970/,
         script: 'israel',
     },
     // Europe: many countries in one run, for campaigns only (sushi). Each
@@ -515,10 +518,9 @@ export const CAMPAIGNS = {
             tiers: ['Sushi place', 'Japanese / Asian restaurant', 'Other restaurant', 'Not a restaurant', 'Non-profit / religious'],
             // Dropped from the feed before the place is opened.
             dropAtFeed: ['Not a restaurant'],
-            // The client-ready workbook and CSV, written with every save.
-            clean: { file: 'Sushi_Restaurants_Israel', title: 'Sushi restaurants in Israel', noun: 'Restaurants' },
-            emailTemplate: path.join(TEMPLATES, 'sushi-email-il.txt'),
-            whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-il.txt'),
+            // The user's JaffaGlass outreach drafts (Email 1, Zack), as on every sushi run.
+            emailTemplate: path.join(TEMPLATES, 'sushi-email-en.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-en.txt'),
             script: 'sushi:israel',
         },
         // Every country in Europe; sushi places only (no Japanese / Asian tier).
@@ -532,13 +534,12 @@ export const CAMPAIGNS = {
             includeTiers: ['Sushi place'],
             tiers: ['Sushi place', 'Japanese / Asian restaurant', 'Other restaurant', 'Not a restaurant', 'Non-profit / religious'],
             dropAtFeed: ['Not a restaurant'],
-            // The plain list: one row per sushi place.
+            // The plain list: one row per sushi place (a CSV; the workbook keeps
+            // its usual WhatsApp · Outreach · No email found · All results).
             list: {
                 file: 'sushi-europe-list.csv',
-                sheet: 'Sushi restaurants',
                 columns: ['business_name', 'city', 'country_name', 'address', 'rating', 'review_count', 'phone', 'website', 'maps_url'],
             },
-            clean: { file: 'Sushi_Restaurants_Europe', title: 'Sushi restaurants in Europe', noun: 'Restaurants' },
             emailTemplate: path.join(TEMPLATES, 'sushi-email-en.txt'),
             whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-en.txt'),
             script: 'sushi:europe',

@@ -309,6 +309,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
             if (!name) continue;
             const address = clean(d.address);
             if (country.foreign.test(address)) { log(`    ✗ Outside ${country.name}: ${name} (${address})`); continue; }
+            if (country.foreignPhone && d.phone && country.foreignPhone.test(d.phone)) { log(`    ✗ Outside ${country.name}: ${name} (phone ${d.phone})`); continue; }
 
             const pk = c.pk || placeKey(page.url());
             const nk = nameKey(name, query.city);

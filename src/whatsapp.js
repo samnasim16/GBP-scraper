@@ -82,6 +82,28 @@ export function normaliseNumber(raw, phoneCode = '49') {
 
 const LINK_RE = /(?:wa\.me\/|api\.whatsapp\.com\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=|web\.whatsapp\.com\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=|whatsapp:\/\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=)(\+?[\d%\s().-]{7,20})/gi;
 
+/** Countries whose numbers never start with 0 after the country code. */
+const NO_ZERO_AFTER_CODE = ['972', '49', '44', '33', '32', '31', '43', '41', '46', '45', '47', '358', '353', '34', '351', '30', '48', '36', '420', '40', '90', '1'];
+
+/**
+ * Numbers sites write wrongly into WhatsApp links, from the Israel and
+ * Germany sushi runs:
+ *   - the trunk 0 kept after the code: "+972 058…", "+49 0211…" → drop the 0;
+ *   - no country code: "wa.me/527320122" is Israel's 052-732-0122, not
+ *     +52 732 0122. Nine digits or fewer are too short for an international
+ *     number, so they get the market's code; ten or eleven ("wa.me/15730642210",
+ *     a German 01573 mobile, not +1 573) only when that makes one of its mobiles.
+ */
+export function fixMissingCode(e164, phoneCode) {
+    let d = String(e164 || '').replace(/\D/g, '');
+    if (!d) return e164;
+    const code = NO_ZERO_AFTER_CODE.find(c => d.startsWith(c + '0'));
+    if (code) return `+${code}${d.slice(code.length + 1)}`;
+    if (!phoneCode || d.startsWith(phoneCode) || d.length > 11) return e164;
+    if (d.length <= 9 || isMobile(phoneCode + d)) return `+${phoneCode}${d}`;
+    return e164;
+}
+
 /**
  * WhatsApp evidence in a page.
  * @returns {{ numbers: string[], linked: boolean, mentioned: boolean }}
@@ -97,7 +119,8 @@ export function extractWhatsApp(html, phoneCode = '49') {
             // "wa.me/0176…" is a local number written into the link: it
             // gets the country code, not "+176…".
             : /^\s*0[1-9]/.test(r) ? r : '+' + r.replace(/^\s*0+/, ''), phoneCode);
-        if (n && !numbers.includes(n)) numbers.push(n);
+        const fixed = n && fixMissingCode(n, phoneCode);
+        if (fixed && !numbers.includes(fixed)) numbers.push(fixed);
     };
     let linked = false;
     for (const m of src.matchAll(LINK_RE)) { linked = true; add(m[1]); }
@@ -108,7 +131,7 @@ export function extractWhatsApp(html, phoneCode = '49') {
     const mentioned = /whats\s?app/i.test(text);
     // "WhatsApp: +44 7958 131295", "WhatsApp 06 12 34 56 78"
     for (const m of text.matchAll(/whats\s?app[^0-9+]{0,25}(\+?\d[\d\s().\/-]{7,18}\d)/gi)) {
-        const n = normaliseNumber(m[1], phoneCode);
+        const n = fixMissingCode(normaliseNumber(m[1], phoneCode), '');
         if (n && !numbers.includes(n)) numbers.push(n);
     }
     return { numbers, linked: linked || numbers.length > 0, mentioned };

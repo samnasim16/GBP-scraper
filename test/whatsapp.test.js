@@ -90,3 +90,55 @@ test('end to end: the contact lookup records a WhatsApp button on the shop site'
     assert.equal(classifyWhatsApp(lead).status, WA.LINK_SITE);
     assert.equal(classifyWhatsApp(lead).number, '+33612345678', 'the WhatsApp number, not the landline');
 });
+
+test('full Israel sushi run: a wa.me link without its country code is a local number', async () => {
+    const { extractWhatsApp, fixMissingCode } = await import('../src/whatsapp.js');
+    // "סושי טיים" linked wa.me/527320122 and came back as +527320122.
+    assert.deepEqual(extractWhatsApp('<a href="https://wa.me/527320122">x</a>', '972').numbers, ['+972527320122']);
+    assert.equal(fixMissingCode('+527320122', '972'), '+972527320122');
+    // Real international numbers are left alone.
+    assert.equal(fixMissingCode('+447958131295', '972'), '+447958131295');
+    // A US number that can't be a German mobile (015–017 …) stays American.
+    assert.equal(fixMissingCode('+12125551234', '49'), '+12125551234');
+    assert.equal(fixMissingCode('+972527320122', '972'), '+972527320122');
+});
+
+test('full Israel sushi run: the WhatsApp sheet has one row per number', async () => {
+    const { uniqueByWhatsApp } = await import('../src/output.js');
+    const rows = [
+        { business_name: 'Atza Sushi Bar Ashdod', whatsapp_number: '+972502975776' },
+        { business_name: 'Moon Sushi', whatsapp_number: '+972552217817' },
+        { business_name: 'Atza Sushi Bar Mevaseret', whatsapp_number: '+972502975776' },
+        { business_name: 'No number', whatsapp_number: '' },
+    ];
+    assert.deepEqual(uniqueByWhatsApp(rows).map(r => r.business_name), ['Atza Sushi Bar Ashdod', 'Moon Sushi', 'No number']);
+});
+
+test('full sushi runs: the trunk 0 kept after the code, and a German mobile without 49, are repaired', async () => {
+    const { fixMissingCode, extractWhatsApp } = await import('../src/whatsapp.js');
+    const cases = [
+        ['+9720587654774', '972', '+972587654774'],     // "+972 058…"
+        ['+972098788888', '972', '+97298788888'],
+        ['+49021136113699', '49', '+4921136113699'],    // "+49 0211…"
+        ['+15730642210', '49', '+4915730642210'],       // wa.me/15730642210 on a German site: 01573 …, not +1 573
+        ['+779800472', '972', '+972779800472'],         // 077-980-0472
+        ['+27689485996', '972', '+27689485996'],        // a real South African number stays
+        ['+962779221888', '972', '+962779221888'],
+        ['+390212345678', '39', '+390212345678'],       // Italy keeps its 0
+    ];
+    for (const [n, code, want] of cases) assert.equal(fixMissingCode(n, code), want, n);
+    assert.deepEqual(extractWhatsApp('<p>WhatsApp: +972 058-765-4774</p>', '972').numbers, ['+972587654774']);
+});
+
+test('full Israel sushi run: Ramallah and Amman are outside Israel; Hebron Road in Jerusalem is not', async () => {
+    const { resolveCountry } = await import('../src/config.js');
+    const { foreign } = resolveCountry({ country: 'IL', campaign: 'sushi' });
+    assert.ok(foreign.test('Irsal Street, Ramallah Albereh'));
+    assert.ok(foreign.test('Jordan, Amman, Queen Rania St, JOMajdi Mall'));
+    assert.ok(!foreign.test('Derech Hebron 1, Jerusalem'));
+    assert.ok(!foreign.test("8c, Sokolov St, Ra'anana, 4333419"));
+    // A +970 (Palestinian Authority) number on an address that reads "Jerusalem".
+    const { foreignPhone } = resolveCountry({ country: 'IL', campaign: 'sushi' });
+    assert.ok(foreignPhone.test('+97022440696'));
+    assert.ok(!foreignPhone.test('+97222440696'));
+});

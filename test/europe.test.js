@@ -158,7 +158,7 @@ test('Europe: each search runs as its own country — Google region, phone code,
     assert.equal(kehl.country_name, 'Germany');
 });
 
-test('Europe: the saver writes the plain list with readable headers, and a list sheet', async () => {
+test('Europe: the saver writes the plain list with readable headers; the workbook keeps its usual sheets', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'eu-sushi-'));
     const leads = [
         { business_name: 'Sushi Lisboa', city: 'Lisboa', country_name: 'Portugal', address: 'Rua Augusta 10, 1100-053 Lisboa', rating: 4.6, review_count: 300,
@@ -172,6 +172,10 @@ test('Europe: the saver writes the plain list with readable headers, and a list 
     assert.equal(csv.length, 2, 'sushi places only');
     assert.match(csv[1], /^Sushi Lisboa,Lisboa,Portugal,"?Rua Augusta 10, 1100-053 Lisboa"?,4\.6,300,/);
     assert.ok(fs.existsSync(path.join(dir, 'sushi-europe.xlsx')));
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(path.join(dir, 'sushi-europe.xlsx'));
+    assert.deepEqual(wb.worksheets.map(w => w.name), ['WhatsApp', 'Outreach', 'No email found', 'All results']);
     const full = fs.readFileSync(path.join(dir, 'leads.csv'), 'utf8');
     assert.match(full.split('\n')[0], /country_name/);
     fs.rmSync(dir, { recursive: true, force: true });

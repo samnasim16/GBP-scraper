@@ -107,17 +107,22 @@ test('ordering and booking sites are not a restaurant\'s website', () => {
     assert.ok(!PLATFORM_DOMAIN.test('restaurant.co.il'));
 });
 
-test('the sushi email and WhatsApp message are Hebrew, labelled, with an opt-out', () => {
+test('the sushi email and WhatsApp message are the JaffaGlass drafts (Email 1), with an opt-out', () => {
+    // The user's outreach PDF: the same drafts for Israel as for Europe.
+    const EU = resolveCountry({ country: 'EU', campaign: 'sushi' });
+    assert.equal(SUSHI.emailTemplate, EU.emailTemplate);
+    assert.equal(SUSHI.whatsappTemplate, EU.whatsappTemplate);
     const t = loadTemplate(SUSHI.emailTemplate);
-    assert.match(t.subject, /^פרסומת/);
-    assert.match(t.subject, /צלחות וכוסות זכוכית/);
-    assert.match(t.body, /הסר/);
-    const e = renderEmail({ business_name: 'Japanika | ג\'פניקה' }, t, { name: 'Sam', title: 'Sales' });
-    assert.match(e.body, /ראינו את Japanika,/);
+    const e = renderEmail({ business_name: 'Japanika | ג\'פניקה' }, t);
+    assert.equal(e.subject, "Quick question about Japanika's sushi plates");
+    assert.match(e.body, /^Hi there,\n\nI'm Zack from JaffaGlass\./);
+    assert.match(e.body, /might suit Japanika\./);
+    assert.match(e.body, /WhatsApp: \+972 53-854-8320/);
+    assert.match(e.body, /Reply "no thanks"/);
     assert.doesNotMatch(e.subject + e.body, /\{\{/);
     const wa = loadWhatsAppTemplate(SUSHI.whatsappTemplate);
-    assert.match(wa, /צלחות הגשה וכוסות/);
-    assert.match(wa, /הסר/);
+    assert.match(wa, /Zack from JaffaGlass/);
+    assert.match(wa, /no thanks/);
 });
 
 test('sushi output: sushi places first, its own workbook, and the mail merge holds both target tiers', async () => {
