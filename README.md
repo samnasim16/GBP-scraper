@@ -181,6 +181,18 @@ npm run sushi:europe         # all of Europe → output-eu-sushi/   (input.europ
 - **Website lookup is off** (`"contacts": { "enabled": false }`), because the list doesn't need emails and it makes the run much faster. Turn it on to get emails.
 - **The email** is Email 1 of the JaffaGlass outreach sequence (`templates/sushi-email-en.txt`): "Quick question about {{shop_name}}'s sushi plates", signed by Zack with WhatsApp +972 53-854-8320. It opens "Hi there" unless you fill in a `first_name` by hand: names are never guessed, because many owners' Impressum names put the family name first ("Thi Bich Thuy Nguyen"). Emails 2–6 (follow-ups, catalog, close) are sent by hand or by your mail tool as replies in the same thread.
 
+### The clean file (every sushi run)
+
+Every sushi run also writes a clean, ready-to-share copy next to the full results, updated with every save:
+
+| Run | Clean files |
+|---|---|
+| `npm run sushi:germany` | `output-de-sushi/Sushi_Restaurants_Germany.xlsx` and `.csv` |
+| `npm run sushi:europe` | `output-eu-sushi/Sushi_Restaurants_Europe.xlsx` and `.csv` |
+| `npm run sushi:israel` | `output-il-sushi/Sushi_Restaurants_Israel.xlsx` and `.csv` |
+
+The workbook has three sheets: **Summary** (per city, or per country on the Europe run: restaurants, with email, WhatsApp, average rating), **All restaurants** (name, city, address, rating, reviews, email, phone, WhatsApp, chat link, website, Instagram, contact, map link; biggest city first, most-reviewed first) and **Email list** (one row per address). No scores, match reasons or email text. Rename it with `"cleanFile"` / `"cleanTitle"` in the input file.
+
 ### Sushi in Germany (your own search list)
 
 ```bash
@@ -282,7 +294,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 148 offline tests
+npm test                                                               # 152 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)

@@ -27,6 +27,8 @@
     "outputDir": "output-de-sushi",
     "workbook": "sushi-germany.xlsx",
     "listFile": "sushi-germany-list.csv",
+    "cleanFile": "Sushi_Restaurants_Germany",
+    "cleanTitle": "Sushi restaurants in Germany",
     "maxLeads": 5000,
     "maxResultsPerQuery": 120,
     "maxScrolls": 30,

@@ -515,6 +515,8 @@ export const CAMPAIGNS = {
             tiers: ['Sushi place', 'Japanese / Asian restaurant', 'Other restaurant', 'Not a restaurant', 'Non-profit / religious'],
             // Dropped from the feed before the place is opened.
             dropAtFeed: ['Not a restaurant'],
+            // The client-ready workbook and CSV, written with every save.
+            clean: { file: 'Sushi_Restaurants_Israel', title: 'Sushi restaurants in Israel', noun: 'Restaurants' },
             emailTemplate: path.join(TEMPLATES, 'sushi-email-il.txt'),
             whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-il.txt'),
             script: 'sushi:israel',
@@ -536,6 +538,7 @@ export const CAMPAIGNS = {
                 sheet: 'Sushi restaurants',
                 columns: ['business_name', 'city', 'country_name', 'address', 'rating', 'review_count', 'phone', 'website', 'maps_url'],
             },
+            clean: { file: 'Sushi_Restaurants_Europe', title: 'Sushi restaurants in Europe', noun: 'Restaurants' },
             emailTemplate: path.join(TEMPLATES, 'sushi-email-en.txt'),
             whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-en.txt'),
             script: 'sushi:europe',

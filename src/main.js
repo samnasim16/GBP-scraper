@@ -66,7 +66,11 @@ const template = loadTemplate(emailTemplate);
 // An input file can rename the workbook and the list ("sushi-germany.xlsx").
 const WORKBOOK = input.workbook || COUNTRY.workbook || 'judaica-leads.xlsx';
 const LIST = COUNTRY.list ? { ...COUNTRY.list, ...(input.listFile ? { file: input.listFile } : {}) } : null;
-const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: LIST });
+// The clean copy; an input file can name it ("cleanFile", "cleanTitle").
+const CLEAN = COUNTRY.clean
+    ? { ...COUNTRY.clean, ...(input.cleanFile ? { file: input.cleanFile } : {}), ...(input.cleanTitle ? { title: input.cleanTitle } : {}) }
+    : null;
+const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: LIST, clean: CLEAN });
 // What progress.json belongs to: a sushi run never resumes a Judaica one.
 const RUN_KEY = COUNTRY.campaign ? `${COUNTRY.code}-${COUNTRY.campaign}` : COUNTRY.code;
 
@@ -290,7 +294,7 @@ async function main() {
         for (const r of targets) per[r.country_name || '?'] = (per[r.country_name || '?'] || 0) + 1;
         console.log(`   By country: ${Object.entries(per).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     }
-    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/${WORKBOOK}${LIST ? `, ${LIST.file}` : ''} and mail-merge.csv`);
+    console.log(`\n📥 Ready — ${path.relative(process.cwd(), OUTPUT_DIR)}/${WORKBOOK}${LIST ? `, ${LIST.file}` : ''}${CLEAN ? `, ${CLEAN.file}.xlsx/.csv (clean)` : ''} and mail-merge.csv`);
     process.exit(0);
 }
 
