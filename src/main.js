@@ -157,7 +157,13 @@ async function main() {
             const progress = readProgress(OUTPUT_DIR);
             if (previous.length || progress) {
                 startAt = resumePoint(queries, previous, progress, RUN_KEY);
-                if (startAt >= queries.length) {
+                // Searches done but websites still to read ("afterSearch", or
+                // a run stopped while reading them): read them, don't exit.
+                const unread = enricher.enabled ? previous.filter(l => l.website && !l.contacts_checked) : [];
+                if (startAt >= queries.length && unread.length) {
+                    console.log(`   ⏯️  All ${queries.length} searches were done; ${unread.length} websites still to read.`);
+                    if (!AFTER_SEARCH) for (const lead of unread) enricher.enqueue(lead).catch(() => {});
+                } else if (startAt >= queries.length) {
                     console.log(`   ✅ The previous ${COUNTRY.name}${COUNTRY.campaign ? ` ${COUNTRY.campaign}` : ''} run already finished all ${queries.length} queries (${previous.length} places).`);
                     console.log('      Nothing to resume. To search again from the start, add --fresh:');
                     console.log(`        npm run ${COUNTRY.script || 'start'} -- --fresh`);
@@ -165,9 +171,9 @@ async function main() {
                 }
                 allLeads.push(...previous);
                 seedSeen(seen, previous, queries);
-                console.log(`   ⏯️  Resuming: ${previous.length} places already found, continuing at query ${startAt + 1} of ${queries.length}`);
+                if (startAt < queries.length) console.log(`   ⏯️  Resuming: ${previous.length} places already found, continuing at query ${startAt + 1} of ${queries.length}`);
                 const pending = previous.filter(needsContactLookup);
-                if (pending.length && enricher.enabled && !AFTER_SEARCH) {
+                if (pending.length && enricher.enabled && !AFTER_SEARCH && startAt < queries.length) {
                     console.log(`   📇 Re-checking ${pending.length} websites the last run may not have finished reading`);
                     for (const lead of pending) enricher.enqueue(lead).catch(() => {});
                 }
