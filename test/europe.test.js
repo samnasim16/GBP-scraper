@@ -226,3 +226,10 @@ test('full Germany sushi run: company forms, footer words and streets are cut fr
     ];
     for (const [text, name] of cases) assert.equal(extractContact(text).name, name, text);
 });
+
+test('full Germany sushi run: a street cut at its ß and disclaimer text are not part of a name', async () => {
+    const { extractContact } = await import('../src/contacts.js');
+    assert.equal(extractContact('Inhaber: Apichat Srisang Derendorferstra').name, 'Apichat Srisang');
+    assert.equal(extractContact('Inhaber: Haifan Xiang Disclaimer Trotz sorgfältiger Kontrolle').name, 'Haifan Xiang');
+    assert.equal(extractContact('Inhaberin: Petra Schmidt').name, 'Petra Schmidt');
+});

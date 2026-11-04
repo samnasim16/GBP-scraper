@@ -282,7 +282,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 145 offline tests
+npm test                                                               # 147 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)
