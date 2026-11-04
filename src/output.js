@@ -19,7 +19,6 @@ import { isTarget, RANKED_TIERS } from './relevance.js';
 import { greetingFor, shortBusinessName } from './contacts.js';
 import { classifyWhatsApp, whatsappLink, loadWhatsAppTemplate } from './whatsapp.js';
 import { renderEmail } from './email-template.js';
-import { writeCleanOutput } from './clean.js';
 
 export const COLUMNS = [
     ['business_name',      'Business Name',     34],
@@ -160,6 +159,21 @@ export function buildMailMerge(rows, includeTiers) {
     return buildCSV(uniqueByEmail(rows.filter(r => r.email && isTarget(r, includeTiers))), cols);
 }
 
+/**
+ * Keep the first (best-ranked) row for each WhatsApp number. Eleven Atza
+ * Sushi branches in Israel shared +972502975776; it gets one message.
+ */
+export function uniqueByWhatsApp(rows) {
+    const seen = new Set();
+    return rows.filter(r => {
+        const key = String(r.whatsapp_number || '').replace(/\D/g, '');
+        if (!key) return true;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 /** Keep the first (best-ranked) row for each address. */
 export function uniqueByEmail(rows) {
     const seen = new Set();
@@ -277,13 +291,12 @@ export async function writeWorkbook(file, sheets) {
     await wb.xlsx.writeFile(file);
 }
 
-async function writeXlsx(rows, file, includeTiers, list) {
+async function writeXlsx(rows, file, includeTiers) {
     const targets = rows.filter(r => isTarget(r, includeTiers));
     await writeWorkbook(file, [
-        // A campaign's plain list (Europe sushi): every target, first.
-        ...(list && list.sheet ? [[list.sheet, targets]] : []),
-        // Everyone worth a WhatsApp message, best evidence first.
-        ['WhatsApp', targets.filter(r => r.whatsapp_priority < 4)],
+        // Everyone worth a WhatsApp message, best evidence first, one row
+        // per number: a chain's branches share one WhatsApp.
+        ['WhatsApp', uniqueByWhatsApp(targets.filter(r => r.whatsapp_priority < 4))],
         ['Outreach', uniqueByEmail(targets.filter(r => r.email))],
         ['No email found', targets.filter(r => !r.email)],
         ['All results', rows],
@@ -294,7 +307,7 @@ async function writeXlsx(rows, file, includeTiers, list) {
  * Create a saver bound to an output directory. Serialised so overlapping
  * writes can't clobber each other.
  */
-export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', list = null, clean = null, log = console.log } = {}) {
+export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', list = null, log = console.log } = {}) {
     fs.mkdirSync(outputDir, { recursive: true });
     let saving = false;
 
@@ -312,9 +325,7 @@ export function createSaver(outputDir, { template = null, sender = {}, includeTi
                     { flat: true, headers: Object.fromEntries(COLUMNS.map(([k, h]) => [k, h])) }), 'utf8');
             }
             try {
-                await writeXlsx(rows, path.join(outputDir, workbook), includeTiers, list);
-                // The client-ready copy (Sushi_Restaurants_Germany.xlsx / .csv).
-                if (clean) await writeCleanOutput(rows.filter(r => isTarget(r, includeTiers)), outputDir, clean);
+                await writeXlsx(rows, path.join(outputDir, workbook), includeTiers);
             } catch (e) {
                 if (!quiet) log(`⚠️  XLSX write skipped (${e.message}) — CSV still saved.`);
             }

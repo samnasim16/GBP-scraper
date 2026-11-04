@@ -101,7 +101,6 @@ async function refresh(file) {
         includeTiers: input.includeTiers || country.includeTiers || TARGET_TIERS.slice(0, 2),
         ...(country.workbook ? { workbook: country.workbook } : {}),
         ...(country.list ? { list: country.list } : {}),
-        ...(country.clean ? { clean: { ...country.clean, ...(input.cleanFile ? { file: input.cleanFile } : {}), ...(input.cleanTitle ? { title: input.cleanTitle } : {}) } } : {}),
     });
     await save(leads);
     await chrome.close();
