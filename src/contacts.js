@@ -544,13 +544,16 @@ export class ContactEnricher {
     async enrich(lead) {
         const site = clean(lead.website);
         const result = { emails: [], contactName: '', contactRole: '', siteText: '', social: {}, whatsapp: { numbers: [], linked: false, mentioned: false }, pagesRead: [], finalSite: '' };
+        // A many-country run (Europe) has one config but places in many
+        // countries: "0176…" on a German site is +49, not the run's default +44.
+        result.phoneCode = lead.phone_code || this.opts.phoneCode;
         if (lead.email) result.emails.push(lead.email);
 
         let host = '';
         try { host = new URL(site).hostname.replace(/^www\./, ''); } catch { /* no website */ }
         if (/(^|\.)(wa\.me|wa\.link|whatsapp\.com)$/i.test(host)) {
             // The listing's "website" is a WhatsApp chat link: that is the evidence.
-            const wa = extractWhatsApp(site, this.opts.phoneCode);
+            const wa = extractWhatsApp(site, result.phoneCode);
             result.whatsapp = { numbers: wa.numbers, linked: true, mentioned: true };
         } else if (site && /^https?:\/\//i.test(site) && !PLATFORM_DOMAIN.test(host)) {
             this.stats.sites++;
@@ -642,7 +645,7 @@ export class ContactEnricher {
 
     _absorb(html, result) {
         for (const e of extractEmails(html)) if (!result.emails.includes(e)) result.emails.push(e);
-        const wa = extractWhatsApp(html, this.opts.phoneCode);
+        const wa = extractWhatsApp(html, result.phoneCode || this.opts.phoneCode);
         for (const n of wa.numbers) if (!result.whatsapp.numbers.includes(n)) result.whatsapp.numbers.push(n);
         result.whatsapp.linked = result.whatsapp.linked || wa.linked;
         result.whatsapp.mentioned = result.whatsapp.mentioned || wa.mentioned;

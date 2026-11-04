@@ -351,6 +351,8 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 maps_url:           c.href || page.url(),
                 source_query:       query.text,
                 country:            country.code,
+                // The website lookup reads local numbers with this code.
+                phone_code:         country.phoneCode,
                 // Abroad, the address names the country: a Strasbourg search finds Kehl, Germany.
                 country_name:       (base.markets && base.markets[marketOfAddress(address, base.markets)] || market || country).name,
                 ...(country.campaign ? { campaign: country.campaign } : {}),

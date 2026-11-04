@@ -233,3 +233,25 @@ test('full Germany sushi run: a street cut at its ß and disclaimer text are not
     assert.equal(extractContact('Inhaber: Haifan Xiang Disclaimer Trotz sorgfältiger Kontrolle').name, 'Haifan Xiang');
     assert.equal(extractContact('Inhaberin: Petra Schmidt').name, 'Petra Schmidt');
 });
+
+test('full Germany sushi run: a German site\'s local WhatsApp number gets +49, not the run\'s default +44', async (t) => {
+    const http = await import('node:http');
+    const { ContactEnricher } = await import('../src/contacts.js');
+    const { createHttpClient } = await import('../src/http.js');
+    const server = http.createServer((req, res) => {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end('<html><body><h1>Berger Streetfood</h1><p>Bestellen per <a href="https://wa.me/017656393139">WhatsApp</a></p></body></html>');
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    t.after(() => server.close());
+    // The Europe run's config carries one phone code (+44); the place knows its own.
+    const enricher = new ContactEnricher({ http: createHttpClient({ transport: 'local' }), config: { delayMs: 0, phoneCode: EU.phoneCode }, log: () => {} });
+    const lead = { business_name: 'Berger Streetfood', website: `http://127.0.0.1:${server.address().port}/`, phone_code: '49' };
+    await enricher.enqueue(lead);
+    await enricher.drain();
+    assert.equal(lead.whatsapp_site_numbers, '+4917656393139');
+    // Written out next to "WhatsApp" (Berger Streetfood came back as +44 176…).
+    const { extractWhatsApp } = await import('../src/whatsapp.js');
+    assert.deepEqual(extractWhatsApp('<p>WhatsApp: 0176 56393139</p>', '49').numbers, ['+4917656393139']);
+    assert.deepEqual(extractWhatsApp('<a href="https://wa.me/4917656393139">x</a>', '44').numbers, ['+4917656393139']);
+});

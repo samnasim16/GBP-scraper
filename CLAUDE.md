@@ -26,7 +26,7 @@ npm run contacts -- --probe https://shop.de "Shop Name"
 npm run contacts -- output/leads.json
 npm run smoke:sushi:europe / npm run sushi:europe  # sushi, 46 European countries → output-eu-sushi(-smoke)/ (input.europe-sushi.json)
 npm run sushi:germany                # the user's own 10 "Sushi <city>" searches → output-de-sushi/ (input.germany-sushi.json)
-npm test                             # 147 tests, offline; browser tests skip without Chrome
+npm test                             # 148 tests, offline; browser tests skip without Chrome
 ```
 
 Use `--input path.json`, not `INPUT_FILE=`, because the env-var form fails silently in cmd.exe.
