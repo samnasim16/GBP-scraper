@@ -196,6 +196,73 @@ npm run sushi:germany        # input.germany-sushi.json → output-de-sushi/sush
 
 Websites are read after all the searches are done (`"contacts": { "afterSearch": true }`): reading them alongside the searches made Maps load only 14–34 places per city instead of up to about 120. `input.germany-sushi.json` runs exactly these searches: Sushi Berlin, Nürnberg, Düsseldorf, München, Hamburg, Köln, Frankfurt, Stuttgart, Leipzig, Dortmund. Change `"cities"` to change them; `"states": ["DE"]` keeps them German. Website lookup is on, so German Impressum pages give emails. Note that German law (UWG §7) restricts unsolicited advertising email even to businesses; this isn't legal advice.
 
+## Art buyers in the United States (Varnish AI)
+
+A separate campaign for **Varnish AI**, the web app that helps people sell artwork: the same scraper builds a directory of **galleries, auction houses, art dealers and art advisors** from Google Business Profiles in the US, which Varnish recommends to sellers. It has its own config, folder and templates, so it never touches the Judaica or sushi results.
+
+```bash
+npm run smoke:art:us     # New York only, 2 search terms, 10 places → output-us-art-smoke/
+npm run art:us           # every US art market → output-us-art/   (input.us-art.json)
+npm run contacts -- output-us-art/leads.json --input input.us-art.json   # re-read the websites
+```
+
+Varnish imports **`output-us-art/leads.json`**. The workbook is `art-leads.xlsx` (the usual four sheets, with the art columns after Category).
+
+- **Places:** New York and Brooklyn, Los Angeles (with Culver City, West Hollywood and Beverly Hills), San Francisco, Chicago, Miami, Miami Beach, Palm Beach and West Palm Beach, Boston, Washington, Philadelphia, Seattle, Santa Fe and Taos, Scottsdale and Sedona, Dallas, Houston, Denver and Aspen, Atlanta, Charleston, Nashville, Minneapolis, New Orleans, and the Hamptons, Hudson, Carmel and Naples. The gallery districts are searched one by one: Chelsea, the Upper East Side, Tribeca, the Lower East Side, SoHo, Williamsburg, Wynwood, the Design District, River North, Canyon Road, Houston's Museum District… To run only some states, set `"states"` in `input.us-art.json` (`NY CA FL IL TX MA DC PA WA NM AZ CO GA SC TN MN LA`).
+- **Search terms:** `Art gallery`, `Auction house`, `Art dealer` and `Art advisor` across every place first, then `Contemporary art gallery`, `Fine art gallery`, `Art auction` and `Art consultant`.
+- **Websites are read once every search is done** (`"afterSearch": true`), as in the sushi runs, so Maps keeps loading full result lists. For each place it reads the homepage, the contact / visit / info pages, and one submissions page and one consign page if the site links them.
+- **Who is in the directory:**
+
+| Tier | Meaning | In the directory? |
+|---|---|---|
+| **Gallery** | An art gallery: Maps files it as one, its name says gallery, or its site shows exhibitions and represented artists | ✅ |
+| **Auction house** | "Auction" in the name or category (Auctioneers, Auction Galleries) | ✅ |
+| **Art dealer** | An art dealer, a private dealer, "we buy and sell…", an antique shop that deals in fine art | ✅ |
+| **Art advisor** | Art advisory and art consulting | ✅ |
+| Not a buyer | Frame shops (unless the site shows exhibitions or represented artists), art-supply stores, paint-and-sip studios, art classes and schools, tattoo studios, print and copy shops, photographers, interior designers, furniture stores, house and mural painters, an artist's own studio, gift and craft shops, and anything that isn't about art | ❌ |
+| Non-profit / museum | Museums, art centers, arts councils, public art, foundations, university and college galleries, non-profit art spaces. A commercial gallery in Houston's Museum District or on Santa Fe's Museum Hill is still a gallery | ❌ |
+
+Most of the Not a buyer places and every non-profit are dropped before they are opened. A frame shop or studio that also calls itself a gallery is opened, because its website may show that it is one.
+
+### The fields Varnish reads (leads.json)
+
+Every art lead keeps the usual fields (`business_name`, `email`, `other_emails`, `contact_name`, `contact_role`, `phone`, `website`, `city`, `bundesland` (the state), `address`, `category`, `rating`, `review_count`, `instagram_url`, `maps_description`, `maps_url`, `country`, `country_name`, `campaign`, `observed_date`, and `relevance_tier` / `relevance_score` / `relevance_evidence`), and adds these. They come from the website once it is read, and from the Maps listing otherwise.
+
+| Field | Values | What it means |
+|---|---|---|
+| `art_type` | `gallery`, `auction_house`, `dealer`, `art_advisor`, or `""` | The kind of buyer, from the tier. Empty for Not a buyer and Non-profit / museum. |
+| `accepts_submissions` | `yes`, `no`, `unknown` | `no` when the site says it does not take artists' work ("we do not accept unsolicited submissions", "not currently accepting new artists", "unable to review portfolios", "submissions are closed", "please do not send portfolios", "by invitation only"…); `yes` with submission guidelines, an open call, "submit your work" or "artist submissions", or a submissions page. When both appear, `no` wins. |
+| `submission_url` | an absolute URL, or `""` | The submissions / open-call page among the pages read or linked. It can be on another site (a Submittable form) or a PDF, and it is kept when that page says no, because it states the policy. |
+| `accepts_consignments` | `yes`, `unknown` | `yes` when the site or listing talks about consigning, "sell your art", "selling with us", "we buy…", appraisals for a sale, or valuation and estimate requests. A refusal ("not accepting consignments") is `unknown`. |
+| `consign_url` | an absolute URL, or `""` | The consign / sell-with-us page (or, failing that, "we buy" or valuation page). |
+| `specialties` | `""` or words separated by `; ` | Lower case, from a fixed list, in this order: contemporary; modern; post-war; impressionist; old masters; american art; african american art; latin american; asian art; african art; native american; western art; outsider art; folk art; photography; prints; sculpture; works on paper; ceramics; glass; design; decorative arts; emerging artists. Only what the listing or site names: "near the Asian Art Museum" and "installation photography by…" don't count. |
+
+Example (one row of `leads.json`; the WhatsApp, greeting and email columns are there too):
+
+```json
+{
+  "business_name": "Hudson Line Gallery",
+  "relevance_tier": "Gallery",
+  "relevance_score": 99,
+  "relevance_evidence": "gallery, current exhibitions (site), on view through (site), represented artists (site), the gallery represents (site)",
+  "email": "info@hudsonlinegallery.com",
+  "other_emails": "submissions@hudsonlinegallery.com",
+  "website": "https://www.hudsonlinegallery.com/",
+  "city": "New York",
+  "bundesland": "NY",
+  "art_type": "gallery",
+  "accepts_submissions": "yes",
+  "submission_url": "https://www.hudsonlinegallery.com/artist-submissions",
+  "accepts_consignments": "unknown",
+  "consign_url": "",
+  "specialties": "contemporary; photography; sculpture; works on paper; emerging artists"
+}
+```
+
+What it can't see: a policy that is only in an image, a PDF or a page the site doesn't link from its homepage, contact or submissions pages; a FAQ that answers "Do you accept submissions?" with a bare "No."; and sites that only work with JavaScript, unless they also hide their email (then Chrome reads them). Those rows say `unknown`.
+
+- **The email and WhatsApp message** (`templates/art-email-en.txt`, `templates/art-whatsapp-en.txt`) are short and neutral: they introduce Varnish AI as a platform that refers sellers of artwork and ask whether the place may be listed. Varnish users write their own messages about each artwork, so the campaign is for the directory, not for mail-merge. Put your name and title in `"sender"` in `input.us-art.json`, and replace `[Postal address]` in the email before sending anything (see *A note on sending (US)*).
+
 ## WhatsApp: which shops have it, and who to contact first
 
 Every row gets three WhatsApp columns. The **WhatsApp** sheet lists every target you can message, best evidence first. In every sheet, shops with WhatsApp come before the rest.
@@ -268,7 +335,7 @@ All fields are optional.
 | Field | Default | Meaning |
 |---|---|---|
 | `country` | `"DE"` | `"DE"` Germany, `"UK"` England, `"FR"` France, `"BE"` Belgium, `"US"` United States, `"IL"` Israel. It sets the city list, search terms, phone code, contact pages and output folder. |
-| `campaign` | Judaica | `"sushi"` looks for sushi restaurants instead: its own places, search terms, tiers, templates and folder. With `"country": "IL"` (Israel, `output-il-sushi/`) or `"country": "EU"` (all of Europe, `output-eu-sushi/`). |
+| `campaign` | Judaica | `"sushi"` looks for sushi restaurants instead: its own places, search terms, tiers, templates and folder. With `"country": "IL"` (Israel, `output-il-sushi/`) or `"country": "EU"` (all of Europe, `output-eu-sushi/`). `"art"` with `"country": "US"` builds Varnish AI's directory of galleries, auction houses, art dealers and art advisors (`output-us-art/`). |
 | `sender` | – | `{ "name", "title" }` for the email signature. |
 | `states` | all | Bundesland codes to limit the run, e.g. `["BE","BY","HE"]`. Codes: BE HH HB BY BW HE NW NI RP SL SH MV BB SN ST TH. |
 | `cities` | built-in list | An explicit list of cities, which replaces the built-in one. |
@@ -289,7 +356,7 @@ All fields are optional.
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 152 offline tests
+npm test                                                               # 168 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)
@@ -343,6 +410,8 @@ This isn't legal advice.
 - you honour every opt-out within 10 business days.
 
 Send WhatsApp messages one by one, by hand, as the links already do. This isn't legal advice.
+
+The **art campaign's** email (Varnish AI) has the same opt-out line, but no postal address of its own: replace `[Postal address]` at the end of `templates/art-email-en.txt` with yours before you send it.
 
 ## A note on sending (England)
 

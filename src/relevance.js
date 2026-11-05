@@ -11,6 +11,7 @@
 import { clean } from './util.js';
 import { COUNTRIES } from './config.js';
 import { scoreSushi, SUSHI_TIERS } from './sushi.js';
+import { scoreArt, artNonProfit, museumWordsOut, ART_TIERS } from './art.js';
 
 /** Strong signals — words a shop only uses if it sells Jewish ritual objects. */
 const JUDAICA_STRONG = [
@@ -175,10 +176,17 @@ export function isPublicBody(lead) {
  */
 export function isSellable(lead) {
     const category = clean(lead.category);
-    const name = clean(lead.business_name);
+    // The art campaign: "Museum District Gallery" is a gallery in Houston's
+    // Museum District, not a museum.
+    const art = lead.campaign === 'art';
+    const name = clean(art ? museumWordsOut(lead.business_name) : lead.business_name);
     const retailCategory = RETAIL_CATEGORY.test(category);
     // Checked first: a city library called "Germania Judaica" is still the city.
     if (isPublicBody(lead)) return { ok: false, reason: 'public body (city / state website)' };
+    // …and art centers, arts councils, university galleries and foundations,
+    // which Maps files as an "Art gallery" (a retail category) as often as not.
+    const artReason = art ? artNonProfit(lead) : '';
+    if (artReason) return { ok: false, reason: artReason };
     if (!retailCategory && NON_PROFIT_CATEGORY.test(category)) {
         // A Judaica name under a wrong category (Maps files some shops as
         // "Public Library") still gets through — unless the name itself says
@@ -279,8 +287,11 @@ function domainWords(url) {
  * @returns {{ score:number, tier:string, evidence:string }}
  */
 export function scoreRelevance(lead, siteText = '') {
-    // A campaign looks for a different buyer: "sushi" scores restaurants.
+    // A campaign looks for a different buyer: "sushi" scores restaurants,
+    // "art" galleries, auction houses, dealers and advisors (with the links
+    // the contact lookup found, for submission_url and consign_url).
     if (lead.campaign === 'sushi') return scoreSushi(lead, siteText, isSellable(lead));
+    if (lead.campaign === 'art') return scoreArt(lead, siteText, isSellable(lead), lead._siteLinks);
     // Street names are not context: "NORMAL Rouen, Rue aux Juifs" is a
     // discount store on the Rue aux Juifs.
     const listing = clean([personNamesOut(lead.business_name), lead.category, lead.maps_description].join(' ')).toLowerCase()
@@ -364,8 +375,8 @@ export function scoreRelevance(lead, siteText = '') {
 /** Tiers worth emailing, best first. */
 export const TARGET_TIERS = ['Judaica seller', 'Jewish / Israeli retail', 'Glass & gift shop'];
 
-/** Sort order of the tiers, the sushi campaign's included; the rest rank last, by score. */
-export const RANKED_TIERS = [...TARGET_TIERS, ...SUSHI_TIERS.slice(0, 3)];
+/** Sort order of the tiers, the sushi and art campaigns' included; the rest rank last, by score. */
+export const RANKED_TIERS = [...TARGET_TIERS, ...SUSHI_TIERS.slice(0, 3), ...ART_TIERS.slice(0, 4)];
 
 /**
  * Should this row go on the outreach sheet?

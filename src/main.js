@@ -11,7 +11,8 @@
  *
  * Runs on this machine with your own Chrome. No accounts, no per-lead cost.
  * "campaign": "sushi" in the input file looks for sushi restaurants instead
- * (Israel), to sell glass plates and cups; see CAMPAIGNS in config.js.
+ * (Israel), to sell glass plates and cups; "campaign": "art" builds Varnish
+ * AI's directory of US art buyers; see CAMPAIGNS in config.js.
  *
  * Run:  npm start               (reads ./input.json, writes ./output/)
  */
@@ -66,7 +67,7 @@ const template = loadTemplate(emailTemplate);
 // An input file can rename the workbook and the list ("sushi-germany.xlsx").
 const WORKBOOK = input.workbook || COUNTRY.workbook || 'judaica-leads.xlsx';
 const LIST = COUNTRY.list ? { ...COUNTRY.list, ...(input.listFile ? { file: input.listFile } : {}) } : null;
-const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: LIST });
+const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: LIST, columns: COUNTRY.columns });
 // What progress.json belongs to: a sushi run never resumes a Judaica one.
 const RUN_KEY = COUNTRY.campaign ? `${COUNTRY.code}-${COUNTRY.campaign}` : COUNTRY.code;
 
@@ -123,6 +124,7 @@ async function main() {
             phoneCode: COUNTRY.phoneCode,
             keyPage: COUNTRY.contactKeyPage,
             guessPaths: COUNTRY.contactPaths,
+            followLinks: COUNTRY.followLinks,
             ...contacts,
         },
         log: console.log,
@@ -136,7 +138,7 @@ async function main() {
     });
 
     try {
-        console.log(`🚀 ${COUNTRY.title || 'Judaica Retailer Scraper'} — ${COUNTRY.name} — Jaffa Glass`);
+        console.log(`🚀 ${COUNTRY.title || 'Judaica Retailer Scraper'} — ${COUNTRY.name} — ${COUNTRY.client || 'Jaffa Glass'}`);
         factory = await createBrowserFactory({ config: browserConfig, wssEndpoint, log: console.log });
         const queries = buildQueryMatrix(LOCATIONS, CATEGORIES, COUNTRY.highYield);
         console.log(`   ${CATEGORIES.length} search terms × ${LOCATIONS.length} locations = ${queries.length} queries`);

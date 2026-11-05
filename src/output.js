@@ -2,7 +2,8 @@
  * Dedupe, sort, and write the deliverables.
  *
  *   output/judaica-leads.xlsx   Outreach · No email found · All results
- *                               (sushi-leads.xlsx for the sushi campaign)
+ *                               (sushi-leads.xlsx for the sushi campaign,
+ *                               art-leads.xlsx for the art campaign)
  *   output/mail-merge.csv       one row per address: To, Subject, Body — ready
  *                               for Gmail/Outlook mail merge (YAMM, GMass, Word)
  *   output/leads.csv / .json    every scraped row
@@ -58,6 +59,17 @@ export const CSV_COLUMNS = COLUMNS.map(c => c[0]);
 const LINK_COLUMNS = ['website', 'facebook_url', 'instagram_url', 'maps_url'];
 
 /**
+ * COLUMNS with a campaign's own columns after Category: the art campaign's
+ * Art Type, Specialties, Submissions… (CAMPAIGNS.art.US.columns). Every
+ * other run keeps the usual columns.
+ */
+export function columnsWith(extra = []) {
+    if (!extra || !extra.length) return COLUMNS;
+    const at = COLUMNS.findIndex(c => c[0] === 'category') + 1;
+    return [...COLUMNS.slice(0, at), ...extra, ...COLUMNS.slice(at)];
+}
+
+/**
  * Escape a CSV field. Also neutralises spreadsheet formula injection: a cell
  * starting with =, +, - or @ is executed by Excel, and text from the open web
  * is not trustworthy input.
@@ -106,6 +118,7 @@ export function prepareLeads(leads, { template = null, sender = {}, whatsappTemp
         keys.forEach(k => seen.add(k));
         const row = { ...l };
         delete row._siteText;
+        delete row._siteLinks;
         row.greeting = greetingFor(row);
         if (template) {
             const e = renderEmail(row, template, sender);
@@ -207,6 +220,13 @@ const XL = {
         'Japanese / Asian restaurant': { fill: 'FFDDEBF7', font: 'FF1F4E79' },
         'Other restaurant':            { fill: 'FFEDEDED', font: 'FF595959' },
         'Not a restaurant':            { fill: 'FFEDEDED', font: 'FF595959' },
+        // The art campaign.
+        'Gallery':                     { fill: 'FFC6EFCE', font: 'FF006100' },
+        'Auction house':               { fill: 'FFDDEBF7', font: 'FF1F4E79' },
+        'Art dealer':                  { fill: 'FFFFEB9C', font: 'FF7F6000' },
+        'Art advisor':                 { fill: 'FFE4DFEC', font: 'FF403151' },
+        'Not a buyer':                 { fill: 'FFEDEDED', font: 'FF595959' },
+        'Non-profit / museum':         { fill: 'FFFCE4D6', font: 'FF833C0B' },
     },
     whatsapp: {
         1: { fill: 'FFC6EFCE', font: 'FF006100' },
@@ -219,17 +239,19 @@ const XL = {
 const solid = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
 
 /** Write sheets ([title, rows] pairs) as one styled workbook. */
-export async function writeWorkbook(file, sheets) {
+export async function writeWorkbook(file, sheets, columns = COLUMNS) {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Jaffa Glass';
     const thin = { style: 'thin', color: { argb: XL.border } };
     const grid = { top: thin, left: thin, bottom: thin, right: thin };
+    // A campaign's own page links (submission_url, consign_url) are links too.
+    const linkColumns = columns.map(c => c[0]).filter(k => LINK_COLUMNS.includes(k) || /_url$/.test(k));
     for (const [title, data] of sheets) {
         const ws = wb.addWorksheet(title, {
             views: [{ state: 'frozen', ySplit: 1, xSplit: 1, zoomScale: 100 }],
             properties: { tabColor: { argb: XL.tabs[title] || 'FF1F3864' }, defaultRowHeight: 18 },
         });
-        ws.columns = COLUMNS.map(([key, header, width]) => ({ key, header, width }));
+        ws.columns = columns.map(([key, header, width]) => ({ key, header, width }));
         data.forEach((r, i) => {
             const row = ws.addRow(r);
             row.height = 18;
@@ -239,7 +261,7 @@ export async function writeWorkbook(file, sheets) {
                 cell.alignment = { vertical: 'middle', wrapText: false };
                 if (i % 2) cell.fill = solid(XL.band);
             });
-            for (const col of LINK_COLUMNS) {
+            for (const col of linkColumns) {
                 const cell = row.getCell(col);
                 const v = String(cell.value || '');
                 if (/^https?:\/\//i.test(v)) {
@@ -286,12 +308,12 @@ export async function writeWorkbook(file, sheets) {
             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             cell.border = grid;
         });
-        ws.autoFilter = { from: 'A1', to: { row: 1, column: COLUMNS.length } };
+        ws.autoFilter = { from: 'A1', to: { row: 1, column: columns.length } };
     }
     await wb.xlsx.writeFile(file);
 }
 
-async function writeXlsx(rows, file, includeTiers) {
+async function writeXlsx(rows, file, includeTiers, columns = COLUMNS) {
     const targets = rows.filter(r => isTarget(r, includeTiers));
     await writeWorkbook(file, [
         // Everyone worth a WhatsApp message, best evidence first, one row
@@ -300,32 +322,35 @@ async function writeXlsx(rows, file, includeTiers) {
         ['Outreach', uniqueByEmail(targets.filter(r => r.email))],
         ['No email found', targets.filter(r => !r.email)],
         ['All results', rows],
-    ]);
+    ], columns);
 }
 
 /**
  * Create a saver bound to an output directory. Serialised so overlapping
  * writes can't clobber each other.
  */
-export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', list = null, log = console.log } = {}) {
+export function createSaver(outputDir, { template = null, sender = {}, includeTiers, whatsappTemplate, workbook = 'judaica-leads.xlsx', list = null, columns = [], log = console.log } = {}) {
     fs.mkdirSync(outputDir, { recursive: true });
     let saving = false;
+    // A campaign's own columns (the art campaign's), after Category.
+    const cols = columnsWith(columns);
+    const csvColumns = cols.map(c => c[0]).filter(c => c !== 'email_body');
 
     return async function saveResults(leads, { quiet = false } = {}) {
         if (saving) return;
         saving = true;
         try {
             const rows = prepareLeads(leads, { template, sender, includeTiers, ...(whatsappTemplate !== undefined ? { whatsappTemplate } : {}) });
-            fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows, LEADS_CSV_COLUMNS, { flat: true }), 'utf8');
+            fs.writeFileSync(path.join(outputDir, 'leads.csv'), buildCSV(rows, csvColumns, { flat: true }), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'leads.json'), JSON.stringify(rows, null, 2), 'utf8');
             fs.writeFileSync(path.join(outputDir, 'mail-merge.csv'), buildMailMerge(rows, includeTiers), 'utf8');
             // The plain list: name, city, country, address, rating… of every target.
             if (list && list.file) {
                 fs.writeFileSync(path.join(outputDir, list.file), buildCSV(rows.filter(r => isTarget(r, includeTiers)), list.columns,
-                    { flat: true, headers: Object.fromEntries(COLUMNS.map(([k, h]) => [k, h])) }), 'utf8');
+                    { flat: true, headers: Object.fromEntries(cols.map(([k, h]) => [k, h])) }), 'utf8');
             }
             try {
-                await writeXlsx(rows, path.join(outputDir, workbook), includeTiers);
+                await writeXlsx(rows, path.join(outputDir, workbook), includeTiers, cols);
             } catch (e) {
                 if (!quiet) log(`⚠️  XLSX write skipped (${e.message}) — CSV still saved.`);
             }

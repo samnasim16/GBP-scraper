@@ -9,6 +9,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { EUROPE_MARKETS, EUROPE_SUSHI_CITIES, EUROPE_SUSHI_DISTRICTS } from './europe.js';
+import { ART_LINKS, ART_TIERS } from './art.js';
 
 const TEMPLATES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
@@ -259,6 +260,72 @@ export const US_CATEGORIES = [
 ];
 
 /**
+ * The art campaign (Varnish AI): galleries, auction houses, art dealers and
+ * art advisors in the United States. These are where the US art trade is:
+ * New York (Manhattan and Brooklyn) and Los Angeles (with Culver City, West
+ * Hollywood and Beverly Hills) first, then San Francisco, Chicago, Miami and
+ * Palm Beach (Art Basel Miami Beach, winter collectors), Boston, Philadelphia
+ * and Washington; Santa Fe and Taos,
+ * Scottsdale, Dallas and Houston for Western and Native American art; the
+ * regional hubs (Seattle, Denver, Atlanta, Nashville, Minneapolis, Charleston,
+ * New Orleans); and the resort towns where collectors buy (the Hamptons,
+ * Hudson, Aspen, Carmel, Naples, Sedona). Each city carries its state, as in
+ * US_CITIES: "Art gallery Charleston, SC" is not searched in West Virginia.
+ */
+export const US_ART_CITIES = {
+    NY: ['New York, NY', 'Brooklyn, NY', 'East Hampton, NY', 'Hudson, NY'],
+    CA: ['Los Angeles, CA', 'Culver City, CA', 'West Hollywood, CA', 'Beverly Hills, CA', 'San Francisco, CA', 'Carmel-by-the-Sea, CA'],
+    FL: ['Miami, FL', 'Miami Beach, FL', 'Palm Beach, FL', 'West Palm Beach, FL', 'Naples, FL'],
+    IL: ['Chicago, IL'],
+    TX: ['Dallas, TX', 'Houston, TX'],
+    MA: ['Boston, MA'],
+    DC: ['Washington, DC'],
+    PA: ['Philadelphia, PA'],
+    WA: ['Seattle, WA'],
+    NM: ['Santa Fe, NM', 'Taos, NM'],
+    AZ: ['Scottsdale, AZ', 'Sedona, AZ'],
+    CO: ['Denver, CO', 'Aspen, CO'],
+    GA: ['Atlanta, GA'],
+    SC: ['Charleston, SC'],
+    TN: ['Nashville, TN'],
+    MN: ['Minneapolis, MN'],
+    LA: ['New Orleans, LA'],
+};
+
+/**
+ * Gallery districts. Maps shows at most ~120 places per search, and Manhattan
+ * alone has more galleries than that, so the gallery neighbourhoods of the
+ * biggest markets are searched one by one.
+ */
+export const US_ART_DISTRICTS = {
+    'New York, NY': ['Chelsea', 'Upper East Side', 'Tribeca', 'Lower East Side', 'SoHo', 'Midtown'],
+    'Brooklyn, NY': ['Williamsburg', 'Bushwick', 'DUMBO'],
+    'Los Angeles, CA': ['Arts District', 'Downtown', 'Hollywood'],
+    'San Francisco, CA': ['Union Square', 'Dogpatch'],
+    'Chicago, IL': ['River North', 'West Loop'],
+    'Miami, FL': ['Wynwood', 'Design District'],
+    'Palm Beach, FL': ['Worth Avenue'],
+    'Santa Fe, NM': ['Canyon Road', 'Railyard'],
+    'Houston, TX': ['Museum District'],
+    'Dallas, TX': ['Design District'],
+    'Scottsdale, AZ': ['Old Town'],
+    'Washington, DC': ['Georgetown'],
+    'Boston, MA': ['Newbury Street', 'SoWa'],
+};
+
+/** One term per kind of buyer runs across every city first (highYield); the narrower ones follow. */
+export const US_ART_CATEGORIES = [
+    'Art gallery',
+    'Auction house',
+    'Art dealer',
+    'Art advisor',
+    'Contemporary art gallery',
+    'Fine art gallery',
+    'Art auction',
+    'Art consultant',
+];
+
+/**
  * Israel, by district. Judaica retail is densest in Jerusalem (Mea Shearim,
  * Geula, the Old City, Ben Yehuda / Mamilla for tourists), Bnei Brak (Rabbi
  * Akiva Street), Safed's artists' quarter, and the Haredi towns (Beit
@@ -501,7 +568,7 @@ export const COUNTRIES = {
  * Campaigns: the same scraper pointed at another kind of buyer. A campaign
  * replaces a market's search terms, places, scoring, templates, outreach
  * tiers and output folder; "campaign": "sushi" in the input file picks it.
- * The scoring is chosen by lead.campaign (relevance.js → sushi.js).
+ * The scoring is chosen by lead.campaign (relevance.js → sushi.js, art.js).
  */
 export const CAMPAIGNS = {
     sushi: {
@@ -543,6 +610,47 @@ export const CAMPAIGNS = {
             emailTemplate: path.join(TEMPLATES, 'sushi-email-en.txt'),
             whatsappTemplate: path.join(TEMPLATES, 'sushi-whatsapp-en.txt'),
             script: 'sushi:europe',
+        },
+    },
+    // Varnish AI's directory of art buyers: galleries, auction houses, art
+    // dealers and art advisors (the scoring and the leads.json fields are in
+    // art.js). The US only for now.
+    art: {
+        US: {
+            title: 'Art Buyer Directory',
+            client: 'Varnish AI',
+            regions: US_ART_CITIES,
+            districts: US_ART_DISTRICTS,
+            categories: US_ART_CATEGORIES,
+            highYield: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor'],
+            outputDir: 'output-us-art',
+            workbook: 'art-leads.xlsx',
+            includeTiers: ART_TIERS.slice(0, 4),
+            tiers: ART_TIERS,
+            // Frame shops, supply stores, paint-and-sip, tattoo… A frame shop
+            // that calls itself a gallery is kept: its site may show exhibitions.
+            dropAtFeed: ['Not a buyer'],
+            dropLabel: 'not-a-buyer',
+            // Galleries put their email on /contact, /visit or /info; the
+            // homepage fallback also tries /about.
+            contactPaths: ['/contact', '/visit', '/info', '/about', '/contact-us', '/about-us'],
+            // Also read one submissions page and one consign page, and keep
+            // the links for submission_url / consign_url.
+            followLinks: ART_LINKS,
+            // The art columns in the workbook and leads.csv, after Category
+            // (leads.json carries every field anyway).
+            columns: [
+                ['art_type',             'Art Type',        13],
+                ['specialties',          'Specialties',     30],
+                ['accepts_submissions',  'Submissions',     12],
+                ['submission_url',       'Submission Page', 34],
+                ['accepts_consignments', 'Consignments',    13],
+                ['consign_url',          'Consign Page',    34],
+            ],
+            // A short introduction to the Varnish AI directory, with an opt-out.
+            emailTemplate: path.join(TEMPLATES, 'art-email-en.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-en.txt'),
+            script: 'art:us',
         },
     },
 };

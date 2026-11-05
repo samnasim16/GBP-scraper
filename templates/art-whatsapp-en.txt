@@ -1,0 +1,5 @@
+{{greeting}},
+
+This is {{sender_name}} from Varnish AI, a platform that helps people sell artwork and refers each seller to the galleries, auction houses, dealers and art advisors that suit the work. We would like to list {{shop_name}} in our directory so that we can refer relevant sellers to you.
+
+Not interested? Reply and let us know, and we won't message you again.
