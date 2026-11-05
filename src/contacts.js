@@ -12,6 +12,8 @@
  *   - the Inhaber / Geschäftsführer / "Vertreten durch" name
  *   - the visible text, which feeds the Judaica relevance score
  *   - Facebook / Instagram links, as a second channel
+ *   - the links a campaign asks for (`followLinks`: the art campaign's
+ *     submission and consignment pages, one of each also read)
  *
  * The pure functions are exported for tests; `ContactEnricher` is the pool.
  */
@@ -428,6 +430,47 @@ export function findContactLinks(html, baseUrl, { max = 4 } = {}) {
     return [...scored.entries()].sort((a, b) => b[1] - a[1]).slice(0, max).map(([u]) => u);
 }
 
+/** Social sites: a "Submit your work" link to Instagram is not a page to read or point to. */
+const SOCIAL_HOST = /(^|\.)(facebook|instagram|twitter|tiktok|youtube|linkedin|pinterest|linktr)\.[a-z.]+$|(^|\.)x\.com$/;
+
+/** What a link pattern is tested against: the address (path and query) and the link text. */
+function linkHay(url, text) {
+    let where = url.pathname + url.search;
+    try { where = decodeURIComponent(where); } catch { /* keep it encoded */ }
+    return `${where} ${text}`.trim();
+}
+
+/**
+ * Links whose address or text matches one of `patterns`, absolute, in page
+ * order, the page itself first when its own address matches. A campaign uses
+ * it for pages beyond the contact ones: the art campaign's submission
+ * guidelines and consignment pages (which may be on another site, such as a
+ * Submittable form, or a PDF).
+ * @returns {{ url: string, text: string }[]}
+ */
+export function findLinks(html, pageUrl, patterns = []) {
+    let page;
+    try { page = new URL(pageUrl); } catch { return []; }
+    const out = [];
+    const add = (url, text) => {
+        if (!patterns.some(re => re.test(linkHay(url, text)))) return;
+        if (!out.some(l => l.url === url.toString())) out.push({ url: url.toString(), text });
+    };
+    page.hash = '';
+    add(page, '');
+    for (const m of String(html || '').matchAll(/<a\b[^>]*href\s*=\s*["']([^"'#]+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+        const href = decodeEntities(m[1]).trim();
+        if (/^(mailto|tel|javascript|data):/i.test(href)) continue;
+        let url;
+        try { url = new URL(href, page); } catch { continue; }
+        if (!/^https?:$/.test(url.protocol) || SOCIAL_HOST.test(url.hostname)) continue;
+        if (/\.(jpe?g|png|gif|webp|zip)$/i.test(url.pathname)) continue;
+        url.hash = '';
+        add(url, stripHtml(m[2]).slice(0, 120));
+    }
+    return out;
+}
+
 /** Where German sites keep the Impressum when the homepage doesn't link it. */
 export const GERMAN_CONTACT_PATHS = ['/impressum', '/kontakt', '/impressum/', '/pages/impressum', '/imprint'];
 /** UK sites have no Impressum; the address lives on the contact page. */
@@ -543,7 +586,7 @@ export class ContactEnricher {
     /** Returns { emails, contactName, contactRole, siteText, social } and applies them to `lead`. */
     async enrich(lead) {
         const site = clean(lead.website);
-        const result = { emails: [], contactName: '', contactRole: '', siteText: '', social: {}, whatsapp: { numbers: [], linked: false, mentioned: false }, pagesRead: [], finalSite: '' };
+        const result = { emails: [], contactName: '', contactRole: '', siteText: '', social: {}, whatsapp: { numbers: [], linked: false, mentioned: false }, pagesRead: [], finalSite: '', links: [] };
         // A many-country run (Europe) has one config but places in many
         // countries: "0176…" on a German site is +49, not the run's default +44.
         result.phoneCode = lead.phone_code || this.opts.phoneCode;
@@ -572,7 +615,7 @@ export class ContactEnricher {
             const tried = new Set([norm(site), norm(base)]);
             if (home) {
                 pages.push(home);
-                this._absorb(home, result);
+                this._absorb(home, result, base);
                 const links = findContactLinks(home, base, { max: this.opts.maxPagesPerSite });
                 const hasKeyPage = links.some(u => new RegExp(this.opts.keyPage, 'i').test(u));
                 const guesses = (this.opts.guessImpressum && !hasKeyPage) ? guessContactUrls(base, this.opts.guessPaths).slice(0, 2) : [];
@@ -581,7 +624,7 @@ export class ContactEnricher {
                     const body = await this._get(url, result);
                     if (!body) continue;
                     pages.push(body);
-                    this._absorb(body, result);
+                    this._absorb(body, result, url);
                     // Stop early once we have both an address and a person.
                     if (result.emails.length && result.contactName) break;
                 }
@@ -604,7 +647,7 @@ export class ContactEnricher {
                     const body = await this._get(url, result);
                     if (!body) continue;
                     pages.push(body);
-                    this._absorb(body, result);
+                    this._absorb(body, result, url);
                     // The homepage links the real contact page: try it next.
                     if (url === root) queue.unshift(...findContactLinks(body, root, { max: 2 }));
                 }
@@ -618,13 +661,33 @@ export class ContactEnricher {
                 const shown = await this._fetchRendered(base, result);
                 if (shown) {
                     pages.push(shown.body);
-                    this._absorb(shown.body, result);
+                    this._absorb(shown.body, result, shown.url);
                     for (const link of findContactLinks(shown.body, shown.url, { max: 2 })) {
                         if (result.emails.length) break;
                         const r = await this._fetchRendered(link, result);
-                        if (r) { pages.push(r.body); this._absorb(r.body, result); }
+                        if (r) { pages.push(r.body); this._absorb(r.body, result, r.url); }
                     }
                 }
+            }
+            // A campaign can ask for pages beyond the contact ones
+            // (`followLinks`, one pattern per page): the art campaign reads a
+            // gallery's submission guidelines and its consignment page, on
+            // the site itself, whatever was found above. Every matching link
+            // goes to the scorer (result.links → lead._siteLinks).
+            for (const re of this.opts.followLinks || []) {
+                const next = result.links.find(l => {
+                    try {
+                        const u = new URL(l.url);
+                        return re.test(linkHay(u, l.text)) && registrableDomain(u.hostname) === registrableDomain(new URL(base).hostname)
+                            && !/\.pdf$/i.test(u.pathname) && !tried.has(norm(l.url));
+                    } catch { return false; }
+                });
+                if (!next) continue;
+                tried.add(norm(next.url));
+                const body = await this._get(next.url, result);
+                if (!body) continue;
+                pages.push(body);
+                this._absorb(body, result, next.url);
             }
             result.siteText = pages.map(p => stripHtml(p)).join(' ').slice(0, 200000);
             for (const p of pages) {
@@ -643,8 +706,13 @@ export class ContactEnricher {
         return result;
     }
 
-    _absorb(html, result) {
+    _absorb(html, result, pageUrl = '') {
         for (const e of extractEmails(html)) if (!result.emails.includes(e)) result.emails.push(e);
+        if (pageUrl && this.opts.followLinks && this.opts.followLinks.length) {
+            for (const l of findLinks(html, pageUrl, this.opts.followLinks)) {
+                if (!result.links.some(x => x.url === l.url)) result.links.push(l);
+            }
+        }
         const wa = extractWhatsApp(html, result.phoneCode || this.opts.phoneCode);
         for (const n of wa.numbers) if (!result.whatsapp.numbers.includes(n)) result.whatsapp.numbers.push(n);
         result.whatsapp.linked = result.whatsapp.linked || wa.linked;
@@ -741,6 +809,8 @@ export function applyContacts(lead, result) {
     lead.facebook_url = lead.facebook_url || result.social.facebook || '';
     lead.instagram_url = lead.instagram_url || result.social.instagram || '';
     lead._siteText = result.siteText || '';
+    // The campaign's links (submission and consignment pages), for the scorer.
+    lead._siteLinks = result.links || [];
     if (result.whatsapp) {
         lead.whatsapp_site_numbers = result.whatsapp.numbers.join('; ');
         lead.whatsapp_site_linked = !!result.whatsapp.linked;

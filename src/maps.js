@@ -264,23 +264,29 @@ export async function scrapeQuery(page, query, ctx, opts) {
         const nk = nameKey(c.name, query.city);
         if ((pk && seen.has(pk)) || (c.name && seen.has(nk))) { drop.dup++; continue; }
         // Synagogues, communities, e.V.s, schools, museums: nobody to sell to.
-        if (!opts.keepNonProfits && !isSellable({ business_name: c.name, category: c.category }).ok) {
+        if (!opts.keepNonProfits && !isSellable({ business_name: c.name, category: c.category, campaign: country.campaign }).ok) {
             drop.nonProfit++; continue;
         }
         // Cheap pre-screen: a kosher restaurant is not a Judaica buyer. Only
         // drop when the name carries no Judaica word at all. A campaign
         // (sushi) wants restaurants and drops its own tiers instead: a
-        // supermarket's sushi counter, a fish shop.
-        const notBuyer = country.campaign
-            ? country.dropAtFeed && country.dropAtFeed.includes(scoreRelevance({ business_name: c.name, category: c.category, campaign: country.campaign, country: country.code }).tier)
-            : NON_RETAIL_CATEGORY.test(c.category) && scoreRelevance({ business_name: c.name }).tier !== 'Judaica seller';
+        // supermarket's sushi counter, a fish shop. A verdict the website can
+        // still overturn is kept for it to be read: "X Gallery & Framing" is
+        // a gallery if its site shows exhibitions (art.js, `provisional`).
+        let notBuyer;
+        if (country.campaign) {
+            const r = scoreRelevance({ business_name: c.name, category: c.category, campaign: country.campaign, country: country.code });
+            notBuyer = !!country.dropAtFeed && country.dropAtFeed.includes(r.tier) && !r.provisional;
+        } else {
+            notBuyer = NON_RETAIL_CATEGORY.test(c.category) && scoreRelevance({ business_name: c.name }).tier !== 'Judaica seller';
+        }
         if (c.category && notBuyer) {
             drop.notRetail++; continue;
         }
         if (opts.minReviews > 0 && c.reviewCount > 0 && c.reviewCount < opts.minReviews) { drop.reviews++; continue; }
         survivors.push({ ...c, pk, nk });
     }
-    log(`  Feed: ${cards.length} places | new: ${survivors.length} | dropped — dup:${drop.dup} non-profit:${drop.nonProfit} ${country.campaign ? 'not-restaurant' : 'not-retail'}:${drop.notRetail} closed:${drop.closed}${drop.reviews ? ` reviews:${drop.reviews}` : ''}`);
+    log(`  Feed: ${cards.length} places | new: ${survivors.length} | dropped — dup:${drop.dup} non-profit:${drop.nonProfit} ${country.dropLabel || (country.campaign ? 'not-restaurant' : 'not-retail')}:${drop.notRetail} closed:${drop.closed}${drop.reviews ? ` reviews:${drop.reviews}` : ''}`);
 
     for (const c of survivors) {
         if (allLeads.length >= opts.maxLeads) return;
@@ -378,9 +384,13 @@ export async function scrapeQuery(page, query, ctx, opts) {
     }
 }
 
+/**
+ * The relevance columns, plus any fields a campaign adds (the art campaign's
+ * art_type, accepts_submissions, submission_url… for the Varnish importer).
+ */
 export function relevanceFields(lead, siteText = '') {
     const r = scoreRelevance(lead, siteText);
-    return { relevance_tier: r.tier, relevance_score: r.score, relevance_evidence: r.evidence };
+    return { relevance_tier: r.tier, relevance_score: r.score, relevance_evidence: r.evidence, ...(r.fields || {}) };
 }
 
 /**

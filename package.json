@@ -1,7 +1,7 @@
 {
     "name": "germany-judaica-scraper",
     "version": "1.0.0",
-    "description": "Finds Judaica retailers in Germany, England, France, Belgium, the United States or Israel on Google Maps, pulls email, owner name and WhatsApp from each shop's website, and writes a prioritised outreach sheet for Jaffa Glass; and sushi restaurants in Israel and across Europe.",
+    "description": "Finds Judaica retailers in Germany, England, France, Belgium, the United States or Israel on Google Maps, pulls email, owner name and WhatsApp from each shop's website, and writes a prioritised outreach sheet for Jaffa Glass; sushi restaurants in Israel and across Europe; and US galleries, auction houses, art dealers and art advisors for Varnish AI.",
     "type": "module",
     "engines": {
         "node": ">=18"
@@ -24,6 +24,8 @@
         "sushi:europe": "node src/main.js --input ./input.europe-sushi.json",
         "smoke:sushi:europe": "node src/main.js --input ./input.europe-sushi-smoke.json",
         "sushi:germany": "node src/main.js --input ./input.germany-sushi.json",
+        "art:us": "node src/main.js --input ./input.us-art.json",
+        "smoke:art:us": "node src/main.js --input ./input.us-art-smoke.json",
         "contacts": "node src/contacts-cli.js",
         "test": "node --test test/*.test.js"
     },
