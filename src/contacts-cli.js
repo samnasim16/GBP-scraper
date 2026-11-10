@@ -4,6 +4,7 @@
  *   npm run contacts -- output/leads.json          refresh every row, rewrite output/
  *   npm run contacts -- output-uk/leads.json --input input.england.json
  *   npm run contacts -- output-il-sushi/leads.json --input input.israel-sushi.json
+ *   npm run contacts -- output-us-art/leads.json --input input.us-art.json
  *   npm run contacts -- --probe https://shop.de "Shop Name"   check one website and print what it finds
  */
 
@@ -14,7 +15,7 @@ import { ContactEnricher, greetingFor } from './contacts.js';
 import { createHttpClient } from './http.js';
 import { createSaver } from './output.js';
 import { relevanceFields } from './maps.js';
-import { loadInput, resolveCountry } from './config.js';
+import { loadInput, resolveCountry, resolveOutputDir } from './config.js';
 import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { TARGET_TIERS, isSellable } from './relevance.js';
 import { loadWhatsAppTemplate } from './whatsapp.js';
@@ -51,7 +52,7 @@ const probeAt = process.argv.indexOf('--probe');
 /** The contact-page conventions of the configured country (Impressum vs Contact). */
 function countryContacts(input) {
     const c = resolveCountry(input);
-    return { acceptLanguage: c.acceptLanguage, phoneCode: c.phoneCode, keyPage: c.contactKeyPage, guessPaths: c.contactPaths };
+    return { acceptLanguage: c.acceptLanguage, phoneCode: c.phoneCode, keyPage: c.contactKeyPage, guessPaths: c.contactPaths, followLinks: c.followLinks };
 }
 
 async function probe(url, name) {
@@ -63,13 +64,17 @@ async function probe(url, name) {
     const { code, campaign } = resolveCountry(input);
     const lead = { business_name: name || new URL(url).hostname, website: url, country: code, ...(campaign ? { campaign } : {}) };
     const result = await enricher.enrich(lead);
-    Object.assign(lead, relevanceFields(lead, lead._siteText));
+    const scored = relevanceFields(lead, lead._siteText);
+    Object.assign(lead, scored);
     console.log(JSON.stringify({
         email: lead.email, other_emails: lead.other_emails,
         contact_name: lead.contact_name, contact_role: lead.contact_role,
         greeting: greetingFor(lead),
         facebook: lead.facebook_url, instagram: lead.instagram_url,
         relevance: `${lead.relevance_tier} (${lead.relevance_score}) — ${lead.relevance_evidence}`,
+        // A campaign's own fields (the art campaign's art_type, submission_url…) and the links behind them.
+        ...Object.fromEntries(Object.entries(scored).filter(([k]) => !k.startsWith('relevance_'))),
+        ...(result.links.length ? { links_found: result.links } : {}),
         pages_fetched: enricher.stats.pages,
         // Every page tried, where redirects led, and whether it loaded.
         pages_read: result.pagesRead,
@@ -94,13 +99,14 @@ async function refresh(file) {
     })));
     const country = resolveCountry(input);
     const waFile = input.whatsappTemplate || country.whatsappTemplate;
-    const save = createSaver(path.resolve(input.outputDir || country.outputDir), {
+    const save = createSaver(path.resolve(resolveOutputDir(input, country)), {
         template: loadTemplate(input.emailTemplate || country.emailTemplate || DEFAULT_TEMPLATE_PATH),
         ...(waFile ? { whatsappTemplate: loadWhatsAppTemplate(waFile) } : {}),
         sender: input.sender || {},
         includeTiers: input.includeTiers || country.includeTiers || TARGET_TIERS.slice(0, 2),
         ...(country.workbook ? { workbook: country.workbook } : {}),
         ...(country.list ? { list: country.list } : {}),
+        ...(country.columns ? { columns: country.columns } : {}),
     });
     await save(leads);
     await chrome.close();

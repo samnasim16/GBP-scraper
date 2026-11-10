@@ -9,6 +9,8 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { EUROPE_MARKETS, EUROPE_SUSHI_CITIES, EUROPE_SUSHI_DISTRICTS } from './europe.js';
+import { WORLD_MARKETS, WORLD_ART_CITIES, WORLD_ART_DISTRICTS, WORLD_FOREIGN } from './world.js';
+import { ART_LINKS, ART_TIERS } from './art.js';
 
 const TEMPLATES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
 
@@ -259,6 +261,116 @@ export const US_CATEGORIES = [
 ];
 
 /**
+ * The art campaign (Varnish AI): galleries, auction houses, art dealers and
+ * art advisors in the United States. These are where the US art trade is:
+ * New York (Manhattan and Brooklyn) and Los Angeles (with Culver City, West
+ * Hollywood and Beverly Hills) first, then San Francisco, Chicago, Miami and
+ * Palm Beach (Art Basel Miami Beach, winter collectors), Boston, Philadelphia
+ * and Washington; Santa Fe and Taos,
+ * Scottsdale, Dallas and Houston for Western and Native American art; the
+ * regional hubs (Seattle, Denver, Atlanta, Nashville, Minneapolis, Charleston,
+ * New Orleans); and the resort towns where collectors buy (the Hamptons,
+ * Hudson, Aspen, Carmel, Naples, Sedona). Each city carries its state, as in
+ * US_CITIES: "Art gallery Charleston, SC" is not searched in West Virginia.
+ */
+export const US_ART_CITIES = {
+    NY: ['New York, NY', 'Brooklyn, NY', 'East Hampton, NY', 'Hudson, NY'],
+    CA: ['Los Angeles, CA', 'Culver City, CA', 'West Hollywood, CA', 'Beverly Hills, CA', 'San Francisco, CA', 'Carmel-by-the-Sea, CA'],
+    FL: ['Miami, FL', 'Miami Beach, FL', 'Palm Beach, FL', 'West Palm Beach, FL', 'Naples, FL'],
+    IL: ['Chicago, IL'],
+    TX: ['Dallas, TX', 'Houston, TX'],
+    MA: ['Boston, MA'],
+    DC: ['Washington, DC'],
+    PA: ['Philadelphia, PA'],
+    WA: ['Seattle, WA'],
+    NM: ['Santa Fe, NM', 'Taos, NM'],
+    AZ: ['Scottsdale, AZ', 'Sedona, AZ'],
+    CO: ['Denver, CO', 'Aspen, CO'],
+    GA: ['Atlanta, GA'],
+    SC: ['Charleston, SC'],
+    TN: ['Nashville, TN'],
+    MN: ['Minneapolis, MN'],
+    LA: ['New Orleans, LA'],
+};
+
+/**
+ * Gallery districts. Maps shows at most ~120 places per search, and Manhattan
+ * alone has more galleries than that, so the gallery neighbourhoods of the
+ * biggest markets are searched one by one.
+ */
+export const US_ART_DISTRICTS = {
+    'New York, NY': ['Chelsea', 'Upper East Side', 'Tribeca', 'Lower East Side', 'SoHo', 'Midtown'],
+    'Brooklyn, NY': ['Williamsburg', 'Bushwick', 'DUMBO'],
+    'Los Angeles, CA': ['Arts District', 'Downtown', 'Hollywood'],
+    'San Francisco, CA': ['Union Square', 'Dogpatch'],
+    'Chicago, IL': ['River North', 'West Loop'],
+    'Miami, FL': ['Wynwood', 'Design District'],
+    'Palm Beach, FL': ['Worth Avenue'],
+    'Santa Fe, NM': ['Canyon Road', 'Railyard'],
+    'Houston, TX': ['Museum District'],
+    'Dallas, TX': ['Design District'],
+    'Scottsdale, AZ': ['Old Town'],
+    'Washington, DC': ['Georgetown'],
+    'Boston, MA': ['Newbury Street', 'SoWa'],
+};
+
+/** One term per kind of buyer runs across every city first (highYield); the narrower ones follow. */
+export const US_ART_CATEGORIES = [
+    'Art gallery',
+    'Auction house',
+    'Art dealer',
+    'Art advisor',
+    'Contemporary art gallery',
+    'Fine art gallery',
+    'Art auction',
+    'Art consultant',
+];
+
+/**
+ * The art campaign in Israel. Tel Aviv-Yafo is the market — the Gordon
+ * Street galleries, Florentin and Kiryat HaMelacha's young galleries, Neve
+ * Tzedek, Old Jaffa and the Jaffa Port, Ben Yehuda and Dizengoff, where the
+ * auction houses are — then Jerusalem (Hutzot Hayotzer, Musrara, the German
+ * Colony, Talbiya, Ein Kerem), Haifa (Wadi Nisnas, the German Colony), the
+ * Sharon (Herzliya, Ra'anana, Kfar Saba, Netanya), Ramat Gan, the artists'
+ * villages and towns (Ein Hod, Safed's artists' quarter, Rosh Pina, Zikhron
+ * Ya'akov, Kiryat Tivon, Caesarea) and the south (Be'er Sheva, Eilat,
+ * Mitzpe Ramon). Maps shows ~120 places per search, so Tel Aviv-Yafo and
+ * Jerusalem are searched district by district too.
+ */
+export const ISRAEL_ART_CITIES = {
+    TA: ['Tel Aviv-Yafo', 'Ramat Gan', 'Herzliya'],
+    JM: ['Jerusalem'],
+    HA: ['Haifa', 'Ein Hod', "Zikhron Ya'akov", 'Caesarea', 'Kiryat Tivon'],
+    CE: ["Ra'anana", 'Kfar Saba', 'Netanya'],
+    NO: ['Safed', 'Rosh Pina'],
+    SO: ["Be'er Sheva", 'Eilat', 'Mitzpe Ramon'],
+};
+export const ISRAEL_ART_DISTRICTS = {
+    'Tel Aviv-Yafo': ['Gordon Street', 'Florentin', 'Neve Tzedek', 'Old Jaffa', 'Jaffa Port', 'Kiryat HaMelacha', 'Ben Yehuda Street', 'Dizengoff'],
+    Jerusalem: ['Hutzot Hayotzer', 'Musrara', 'German Colony', 'Talbiya', 'Ein Kerem', 'Mamilla'],
+    Haifa: ['Wadi Nisnas', 'German Colony'],
+    Herzliya: ['Herzliya Pituach'],
+    Safed: ['Artists Colony'],
+};
+/** Hebrew first, one term per kind of buyer in each language (highYield); the narrower ones follow. */
+export const ISRAEL_ART_CATEGORIES = [
+    'גלריה לאמנות',
+    'Art gallery',
+    'בית מכירות פומביות',
+    'Auction house',
+    'סוחר אמנות',
+    'Art dealer',
+    'יועץ אמנות',
+    'Art advisor',
+    'גלריה',
+    'אמנות ישראלית',
+    'מכירה פומבית',
+    'Art auction',
+    'Contemporary art gallery',
+];
+
+/**
  * Israel, by district. Judaica retail is densest in Jerusalem (Mea Shearim,
  * Geula, the Old City, Ben Yehuda / Mamilla for tourists), Bnei Brak (Rabbi
  * Akiva Street), Safed's artists' quarter, and the Haredi towns (Beit
@@ -495,13 +607,65 @@ export const COUNTRIES = {
         // Results outside Europe: a "Sushi Valencia" in Venezuela, a Paris in Texas.
         foreign: /,\s*(United States|USA|Canada|Mexico|Brazil|Argentina|Chile|Colombia|Venezuela|Peru|Australia|New Zealand|South Africa|Israel|Japan|China|India|Egypt|Morocco|Tunisia|Algeria|United Arab Emirates|Saudi Arabia|Qatar|Lebanon|Jordan|Georgia|Armenia|Azerbaijan|Kazakhstan|Thailand|Singapore|Philippines|Indonesia|Malaysia|Vietnam|South Korea)\s*$|,\s*[A-Z]{2}\s+\d{5}(-\d{4})?\s*$/,
     },
+    // The world's art markets in one run, for the art campaign only (the US
+    // and Israel have their own runs). As in Europe, each search runs as
+    // its own country: markets[query.state] (world.js).
+    WORLD: {
+        name: 'Worldwide',
+        campaignOnly: true,
+        gl: 'gb',
+        phoneCode: '44',
+        regionLabel: 'country',
+        markets: WORLD_MARKETS,
+        regions: WORLD_ART_CITIES,
+        districts: WORLD_ART_DISTRICTS,
+        categories: [],
+        highYield: [],
+        // English pages where a site has them: the art words read every
+        // language, but English is the one most galleries offer.
+        acceptLanguage: 'en-GB,en;q=0.9',
+        // Kapcsolat (Hungarian), iletişim (Turkish), kontak / hubungi (Indonesian,
+        // Malay), liên hệ (Vietnamese) too; kontakt covers Polish, Czech,
+        // Slovak, the Balkans and the Baltics.
+        contactKeyPage: 'contact|kontakt|impressum|mentions|contatti|contacto|contato|visit|info|kapcsolat|iletisim|kontak|hubungi|lien-he',
+        contactPaths: ['/contact', '/kontakt', '/contatti', '/contacto', '/contato', '/visit', '/info', '/about', '/impressum', '/kapcsolat', '/iletisim'],
+        outputDir: 'output-world',
+        addressTownWins: true,
+        foreign: WORLD_FOREIGN,
+    },
+};
+
+/** What every art-campaign market shares: the tiers, the feed drop, the links followed, the columns. */
+const ART_CAMPAIGN = {
+    title: 'Art Buyer Directory',
+    client: 'Varnish AI',
+    workbook: 'art-leads.xlsx',
+    includeTiers: ART_TIERS.slice(0, 4),
+    tiers: ART_TIERS,
+    // Frame shops, supply stores, paint-and-sip, tattoo… A frame shop
+    // that calls itself a gallery is kept: its site may show exhibitions.
+    dropAtFeed: ['Not a buyer'],
+    dropLabel: 'not-a-buyer',
+    // Also read one submissions page and one consign page, and keep
+    // the links for submission_url / consign_url.
+    followLinks: ART_LINKS,
+    // The art columns in the workbook and leads.csv, after Category
+    // (leads.json carries every field anyway).
+    columns: [
+        ['art_type',             'Art Type',        13],
+        ['specialties',          'Specialties',     30],
+        ['accepts_submissions',  'Submissions',     12],
+        ['submission_url',       'Submission Page', 34],
+        ['accepts_consignments', 'Consignments',    13],
+        ['consign_url',          'Consign Page',    34],
+    ],
 };
 
 /**
  * Campaigns: the same scraper pointed at another kind of buyer. A campaign
  * replaces a market's search terms, places, scoring, templates, outreach
  * tiers and output folder; "campaign": "sushi" in the input file picks it.
- * The scoring is chosen by lead.campaign (relevance.js → sushi.js).
+ * The scoring is chosen by lead.campaign (relevance.js → sushi.js, art.js).
  */
 export const CAMPAIGNS = {
     sushi: {
@@ -545,9 +709,68 @@ export const CAMPAIGNS = {
             script: 'sushi:europe',
         },
     },
+    // Varnish AI's directory of art buyers: galleries, auction houses, art
+    // dealers and art advisors (the scoring and the leads.json fields are in
+    // art.js). The US, Israel, and the world's other art markets.
+    art: {
+        US: {
+            ...ART_CAMPAIGN,
+            regions: US_ART_CITIES,
+            districts: US_ART_DISTRICTS,
+            categories: US_ART_CATEGORIES,
+            highYield: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor'],
+            outputDir: 'output-us-art',
+            // Galleries put their email on /contact, /visit or /info; the
+            // homepage fallback also tries /about.
+            contactPaths: ['/contact', '/visit', '/info', '/about', '/contact-us', '/about-us'],
+            // A short introduction to the Varnish AI directory, with an opt-out.
+            emailTemplate: path.join(TEMPLATES, 'art-email-en.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-en.txt'),
+            script: 'art:us',
+        },
+        // Israel, searched in Hebrew and English; the IL profile's address,
+        // phone (+972) and foreign-result rules apply.
+        IL: {
+            ...ART_CAMPAIGN,
+            regions: ISRAEL_ART_CITIES,
+            districts: ISRAEL_ART_DISTRICTS,
+            categories: ISRAEL_ART_CATEGORIES,
+            highYield: ISRAEL_ART_CATEGORIES.slice(0, 8),
+            outputDir: 'output-il-art',
+            // Israeli addresses name no district, and a Tel Aviv search finds
+            // Herzliya galleries, so the region column stays empty rather
+            // than repeat the searched district.
+            regionInAddress: true,
+            contactPaths: ['/contact', '/%D7%A6%D7%95%D7%A8-%D7%A7%D7%A9%D7%A8', '/visit', '/info', '/about', '/contact-us'],
+            // Hebrew, in the one-time request form Israel's anti-spam law allows.
+            emailTemplate: path.join(TEMPLATES, 'art-email-he.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-he.txt'),
+            script: 'art:il',
+        },
+        // The world's other art markets, 181 cities in 76 countries
+        // (world.js); every search runs as its own country. English terms:
+        // Maps maps them onto its categories in every language.
+        WORLD: {
+            ...ART_CAMPAIGN,
+            categories: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor', 'Contemporary art gallery', 'Fine art gallery'],
+            highYield: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor'],
+            outputDir: 'output-world-art',
+            // The state, province, emirate, oblast, department or governorate
+            // where the address names one (Australia, Canada, Brazil, Mexico,
+            // India, the UAE, Japan, Colombia, Türkiye, Ukraine, Chile,
+            // Uruguay, Thailand, Indonesia, the Philippines, Malaysia,
+            // Nigeria, Egypt…); empty elsewhere, never the country code.
+            regionInAddress: true,
+            // The English art templates: a neutral opt-out line and a
+            // [Postal address] for the user, nothing US-only.
+            emailTemplate: path.join(TEMPLATES, 'art-email-en.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-en.txt'),
+            script: 'art:world',
+        },
+    },
 };
 
-/** "DE", "UK", "GB", "England", "USA", "Israel" → a COUNTRIES entry (default Germany). */
+/** "DE", "UK", "GB", "England", "USA", "Israel", "World" → a COUNTRIES entry (default Germany). */
 export function resolveCountry(input = {}) {
     const raw = String(input.country || 'DE').trim().toUpperCase();
     const code = {
@@ -556,9 +779,14 @@ export function resolveCountry(input = {}) {
         USA: 'US', 'UNITED STATES': 'US', AMERICA: 'US', 'U.S.': 'US', 'U.S.A.': 'US',
         ISRAEL: 'IL', 'ISRAËL': 'IL', ISR: 'IL',
         EUROPE: 'EU',
+        WORLDWIDE: 'WORLD', GLOBAL: 'WORLD', INTERNATIONAL: 'WORLD',
     }[raw] || raw;
     const c = COUNTRIES[code];
-    if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);
+    if (!c) {
+        // "JP" is one of the world art run's countries, not a market of its own.
+        const hint = WORLD_MARKETS[code] ? ` (for the art campaign in ${WORLD_MARKETS[code].name}: "country": "WORLD", "states": ["${code}"])` : '';
+        throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}${hint}`);
+    }
     const campaign = String(input.campaign || '').trim().toLowerCase();
     if (!campaign || campaign === 'judaica') {
         if (c.campaignOnly) throw new Error(`${c.name} is set up for a campaign only: add "campaign": "${Object.keys(CAMPAIGNS).find(k => CAMPAIGNS[k][code])}"`);
@@ -567,7 +795,10 @@ export function resolveCountry(input = {}) {
     const markets = CAMPAIGNS[campaign];
     if (!markets) throw new Error(`Unknown campaign "${input.campaign}". Use one of: ${Object.keys(CAMPAIGNS).join(', ')}`);
     if (!markets[code]) {
-        throw new Error(`The ${campaign} campaign is set up for ${Object.keys(markets).map(k => COUNTRIES[k].name).join(', ')} only, not ${c.name}`);
+        // Germany is one of the world art run's countries: say how to run it alone.
+        const many = Object.keys(markets).find(k => COUNTRIES[k].markets && COUNTRIES[k].markets[code]);
+        const hint = many ? ` — for ${c.name} alone use "country": "${many}", "states": ["${code}"]` : '';
+        throw new Error(`The ${campaign} campaign is set up for ${Object.keys(markets).map(k => COUNTRIES[k].name).join(', ')} only, not ${c.name}${hint}`);
     }
     return { code, ...c, ...markets[code], campaign };
 }
@@ -607,6 +838,63 @@ export function loadInput(log = console.log) {
     return {};
 }
 
+/** "Kraków" = "Krakow", "Łódź" = "Lodz": city names compared without case or accents. */
+const cityKey = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[łŁ]/g, 'l').replace(/[øØ]/g, 'o').replace(/[đĐ]/g, 'd').replace(/ı/g, 'i').replace(/ß/g, 'ss').replace(/[æÆ]/g, 'ae')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * The searches for an input file's `places`: { code: [cities] }, each city
+ * searched as that code's region or market. A city the run already knows
+ * comes out exactly as the full run searches it (same code, same string:
+ * "krakow" → "Kraków", "Budapest, Hungary" → "Budapest", a US "Miami" under
+ * FL → "Miami, FL"). The profile's own code ("IL", "US") is accepted too:
+ * each known city goes to its region, a US "City, ST" to that state, and
+ * any other city stays under the code (a many-country run skips it: a city
+ * with no country has no market). An unknown code is skipped with a warning.
+ */
+function placeLocations(places, country, log) {
+    const REGIONS = country.regions;
+    // US cities carry their state ("Miami, FL"): a city without one can't be placed.
+    const suffixed = (code) => (REGIONS[code] || []).length > 0 && REGIONS[code].every(c => c.endsWith(`, ${code}`));
+    const allSuffixed = Object.keys(REGIONS).every(suffixed);
+    const namesOf = (code) => (country.markets && country.markets[code] ? (country.markets[code].names || [country.markets[code].name]) : [country.name]);
+    // "Budapest, Hungary" → "Budapest"; Israel's "Arad, Israel" → "Arad".
+    const bare = (code, city) => namesOf(code).reduce((c, n) => c.replace(new RegExp(`,\\s*${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), ''), city);
+    const known = (code, city) => {
+        const list = REGIONS[code] || [];
+        const key = cityKey(bare(code, city));
+        return list.find(c => cityKey(c) === cityKey(city)) || list.find(c => cityKey(bare(code, c)) === key)
+            || (suffixed(code) && list.find(c => cityKey(c) === cityKey(`${bare(code, city)}, ${code}`))) || '';
+    };
+    const out = [];
+    for (const [key, list] of Object.entries(places)) {
+        let code = String(key).trim().toUpperCase();
+        if (code === 'GB' && REGIONS.UK && !REGIONS.GB) code = 'UK';
+        const own = !REGIONS[code] && code === country.code;
+        if (!REGIONS[code] && !own) {
+            log(`⚠️  Unknown ${country.regionLabel} "${key}" in "places" — skipping. Known: ${Object.keys(REGIONS).join(', ')}`);
+            continue;
+        }
+        for (const raw of (Array.isArray(list) ? list : [list]).map(c => String(c ?? '').trim()).filter(Boolean)) {
+            if (!own) {
+                const listed = known(code, raw);
+                const addState = !listed && suffixed(code) && !/,\s*[A-Z]{2}$/.test(raw);
+                out.push({ state: code, city: listed || (addState ? `${raw}, ${code}` : raw) });
+                continue;
+            }
+            const region = Object.keys(REGIONS).find(r => known(r, raw));
+            const st = (raw.match(/,\s*([A-Z]{2})$/) || [])[1];
+            if (region) out.push({ state: region, city: known(region, raw) });
+            else if (st && REGIONS[st]) out.push({ state: st, city: raw });
+            else if (!country.markets && !allSuffixed) out.push({ state: code, city: raw });
+            else log(`⚠️  "${raw}" in "places" under "${key}" names no ${country.markets ? 'country' : country.regionLabel} — skipping. Put it under its code.`);
+        }
+    }
+    const seen = new Set();
+    return out.filter(l => !seen.has(`${l.state}|${l.city}`) && seen.add(`${l.state}|${l.city}`));
+}
+
 /**
  * Turn the raw config into a concrete list of { state, city } searches.
  *
@@ -614,17 +902,22 @@ export function loadInput(log = console.log) {
  *   cities: ["Worms"]    — an explicit list, which replaces the built-in one
  *                          (with one "states" code, the cities are in that
  *                          country: Europe's "states": ["DE"] + German cities)
+ *   places: { "HU": ["Budapest", "Pécs"], "PL": ["Kraków"] }
+ *                        — cities by region or country code, in one file and
+ *                          many countries; wins over states and cities
  *   districts: true      — also search the big cities district by district
  */
 export function resolveLocations(input = {}, log = console.log) {
-    const { states = [], cities = [], districts = true } = input;
+    const { states = [], cities = [], districts = true, places } = input;
     const country = resolveCountry(input);
     const REGIONS = country.regions;
     const DISTRICTS = country.districts;
     const out = [];
     const push = (state, city) => out.push({ state, city });
 
-    if (Array.isArray(cities) && cities.length > 0) {
+    if (hasPlaces(input)) {
+        out.push(...placeLocations(places, country, log));
+    } else if (Array.isArray(cities) && cities.length > 0) {
         // A many-country run (Europe) searches each place as its country.
         const only = Array.isArray(states) && states.length === 1 ? String(states[0]).trim().toUpperCase() : '';
         for (const c of [...new Set(cities.map(c => String(c).trim()))]) {
@@ -647,6 +940,23 @@ export function resolveLocations(input = {}, log = console.log) {
         }
     }
     return out;
+}
+
+/** Does the input file name its own `places` (a non-empty { code: [cities] })? */
+export function hasPlaces(input = {}) {
+    const p = input.places;
+    return !!p && typeof p === 'object' && !Array.isArray(p) && Object.keys(p).length > 0;
+}
+
+/**
+ * Where a run writes leads.json, the workbook and progress.json: the input
+ * file's "outputDir", else the market's folder. A "places" run (an input
+ * Varnish generates for a few cities) without one gets "<folder>-places",
+ * so it never resumes, or writes progress into, the full run's folder.
+ */
+export function resolveOutputDir(input = {}, country = resolveCountry(input)) {
+    if (input.outputDir) return String(input.outputDir);
+    return hasPlaces(input) ? `${country.outputDir}-places` : country.outputDir;
 }
 
 /** Build the query matrix, high-yield terms first across every location. */

@@ -172,7 +172,7 @@ export function extractFeedCards() {
  * "People also search for" cards whose ratings and review counts otherwise leak
  * into the wrong business.
  */
-export function extractDetail(phoneCode = '49', trunks = ['0']) {
+export function extractDetail(phoneCode = '49', trunks = ['0'], nationalLengths = [10]) {
     const panel = document.querySelector('div[role="main"]') || document.body;
     const clean = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
 
@@ -268,8 +268,10 @@ export function extractDetail(phoneCode = '49', trunks = ['0']) {
         else if (!trunks.length) d = phoneCode + d;
         else if (trunks.some(t => d.startsWith(t))) d = phoneCode + d.slice(trunks.find(t => d.startsWith(t)).length);
         // Ten digits with no trunk 0: a US number in the US, a national
-        // service number elsewhere (Israel's 1-700 / 1-599 lines).
-        else if (d.length === 10 && !d.startsWith(phoneCode)) d = (phoneCode === '1' ? '1' : phoneCode) + d;
+        // service number elsewhere (Israel's 1-700 / 1-599 lines). A market
+        // can name its own lengths (`nationalLengths`): a Brazilian mobile
+        // written "(11) 98765-4321" has eleven, a Tokyo landline nine.
+        else if (nationalLengths.includes(d.length) && !d.startsWith(phoneCode)) d = (phoneCode === '1' ? '1' : phoneCode) + d;
         if (d.length < 8 || d.length > 15) return null;
         return '+' + d;
     };

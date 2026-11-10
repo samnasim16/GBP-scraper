@@ -1,7 +1,7 @@
 {
     "name": "germany-judaica-scraper",
     "version": "1.0.0",
-    "description": "Finds Judaica retailers in Germany, England, France, Belgium, the United States or Israel on Google Maps, pulls email, owner name and WhatsApp from each shop's website, and writes a prioritised outreach sheet for Jaffa Glass; and sushi restaurants in Israel and across Europe.",
+    "description": "Finds Judaica retailers in Germany, England, France, Belgium, the United States or Israel on Google Maps, pulls email, owner name and WhatsApp from each shop's website, and writes a prioritised outreach sheet for Jaffa Glass; sushi restaurants in Israel and across Europe; and galleries, auction houses, art dealers and art advisors in the US, Israel and 76 more countries for Varnish AI.",
     "type": "module",
     "engines": {
         "node": ">=18"
@@ -24,6 +24,13 @@
         "sushi:europe": "node src/main.js --input ./input.europe-sushi.json",
         "smoke:sushi:europe": "node src/main.js --input ./input.europe-sushi-smoke.json",
         "sushi:germany": "node src/main.js --input ./input.germany-sushi.json",
+        "art:us": "node src/main.js --input ./input.us-art.json",
+        "smoke:art:us": "node src/main.js --input ./input.us-art-smoke.json",
+        "art:il": "node src/main.js --input ./input.il-art.json",
+        "smoke:art:il": "node src/main.js --input ./input.il-art-smoke.json",
+        "art:world": "node src/main.js --input ./input.world-art.json",
+        "smoke:art:world": "node src/main.js --input ./input.world-art-smoke.json",
+        "smoke:art:hu": "node src/main.js --input ./input.world-art-hu-smoke.json",
         "contacts": "node src/contacts-cli.js",
         "test": "node --test test/*.test.js"
     },

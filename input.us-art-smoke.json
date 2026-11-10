@@ -1,0 +1,22 @@
+{
+    "country": "US",
+    "campaign": "art",
+    "cities": [
+        "New York, NY"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "Art gallery",
+        "Auction house"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-us-art-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}

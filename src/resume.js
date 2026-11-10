@@ -19,6 +19,29 @@ import { placeKey, nameKey } from './maps.js';
 
 export const PROGRESS_FILE = 'progress.json';
 
+/**
+ * What a progress.json belongs to: the market, and the campaign if any
+ * ("IL", "IL-sushi", "IL-art", "WORLD-art"). A sushi or art run never
+ * resumes a Judaica one, even with the same number of queries.
+ */
+export function runKey(country = {}) {
+    return country.campaign ? `${country.code}-${country.campaign}` : country.code;
+}
+
+/**
+ * Which searches a progress.json was written for: a short hash of the query
+ * texts in order. Two runs with the same number of queries (a Varnish run
+ * for Budapest, then one for Kraków, in one folder) are not the same run.
+ */
+export function queryFingerprint(queries = []) {
+    let h = 0x811c9dc5;
+    for (const ch of queries.map(q => q.text).join('\n')) {
+        h ^= ch.codePointAt(0);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+}
+
 /** The rows a previous run saved, or [] when there are none. */
 export function loadPrevious(outputDir) {
     const file = path.join(outputDir, 'leads.json');
@@ -54,7 +77,9 @@ export function writeProgress(outputDir, progress) {
  * @param {string} country           this run's country code
  */
 export function resumePoint(queries, rows, progress, country) {
+    // A file written before fingerprints existed is judged by its count alone.
     if (progress && progress.country === country && progress.queries === queries.length
+        && (!progress.fingerprint || progress.fingerprint === queryFingerprint(queries))
         && Number.isInteger(progress.next)) {
         return Math.max(0, Math.min(progress.next, queries.length));
     }

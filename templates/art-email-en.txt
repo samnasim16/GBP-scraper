@@ -1,0 +1,13 @@
+Subject: Listing {{shop_name}} in the Varnish AI directory of art buyers
+
+{{greeting}},
+
+I'm {{sender_name}} from Varnish AI, a platform that helps people sell artwork and refers each seller to the galleries, auction houses, dealers and art advisors that suit the work. We would like to list {{shop_name}} in our directory so that we can refer relevant sellers to you; if you have guidelines for artist submissions or consignments, a link in your reply would help us send only suitable enquiries.
+
+If you would rather not hear from us again, just reply and let us know, and we will not contact you further.
+
+Best regards,
+{{sender_name}}
+{{sender_title}}
+Varnish AI
+[Postal address]

@@ -196,6 +196,107 @@ npm run sushi:germany        # input.germany-sushi.json → output-de-sushi/sush
 
 Websites are read after all the searches are done (`"contacts": { "afterSearch": true }`): reading them alongside the searches made Maps load only 14–34 places per city instead of up to about 120. `input.germany-sushi.json` runs exactly these searches: Sushi Berlin, Nürnberg, Düsseldorf, München, Hamburg, Köln, Frankfurt, Stuttgart, Leipzig, Dortmund. Change `"cities"` to change them; `"states": ["DE"]` keeps them German. Website lookup is on, so German Impressum pages give emails. Note that German law (UWG §7) restricts unsolicited advertising email even to businesses; this isn't legal advice.
 
+## Art buyers in the United States, Israel and worldwide (Varnish AI)
+
+A separate campaign for **Varnish AI**, the web app that helps people sell artwork: the same scraper builds a directory of **galleries, auction houses, art dealers and art advisors** from Google Business Profiles in the US (and Israel and the world's other art markets, below), which Varnish recommends to sellers. It has its own config, folder and templates, so it never touches the Judaica or sushi results.
+
+```bash
+npm run smoke:art:us     # New York only, 2 search terms, 10 places → output-us-art-smoke/
+npm run art:us           # every US art market → output-us-art/   (input.us-art.json)
+npm run contacts -- output-us-art/leads.json --input input.us-art.json   # re-read the websites
+```
+
+Varnish imports **`output-us-art/leads.json`**. The workbook is `art-leads.xlsx` (the usual four sheets, with the art columns after Category).
+
+- **Places:** New York and Brooklyn, Los Angeles (with Culver City, West Hollywood and Beverly Hills), San Francisco, Chicago, Miami, Miami Beach, Palm Beach and West Palm Beach, Boston, Washington, Philadelphia, Seattle, Santa Fe and Taos, Scottsdale and Sedona, Dallas, Houston, Denver and Aspen, Atlanta, Charleston, Nashville, Minneapolis, New Orleans, and the Hamptons, Hudson, Carmel and Naples. The gallery districts are searched one by one: Chelsea, the Upper East Side, Tribeca, the Lower East Side, SoHo, Williamsburg, Wynwood, the Design District, River North, Canyon Road, Houston's Museum District… To run only some states, set `"states"` in `input.us-art.json` (`NY CA FL IL TX MA DC PA WA NM AZ CO GA SC TN MN LA`).
+- **Search terms:** `Art gallery`, `Auction house`, `Art dealer` and `Art advisor` across every place first, then `Contemporary art gallery`, `Fine art gallery`, `Art auction` and `Art consultant`.
+- **Websites are read once every search is done** (`"afterSearch": true`), as in the sushi runs, so Maps keeps loading full result lists. For each place it reads the homepage, the contact / visit / info pages, and one submissions page and one consign page if the site links them.
+- **Who is in the directory:**
+
+| Tier | Meaning | In the directory? |
+|---|---|---|
+| **Gallery** | An art gallery: Maps files it as one, its name says gallery, or its site shows exhibitions and represented artists | ✅ |
+| **Auction house** | "Auction" in the name or category (Auctioneers, Auction Galleries) | ✅ |
+| **Art dealer** | An art dealer, a private dealer, "we buy and sell…", an antique shop that deals in fine art | ✅ |
+| **Art advisor** | Art advisory and art consulting | ✅ |
+| Not a buyer | Frame shops (unless the site shows exhibitions or represented artists), art-supply stores, paint-and-sip studios, art classes and schools, tattoo studios, print and copy shops, photographers, interior designers, furniture stores, house and mural painters, an artist's own studio, gift and craft shops, and anything that isn't about art | ❌ |
+| Non-profit / museum | Museums, art centers, arts councils, public art, foundations, university and college galleries, non-profit art spaces. A commercial gallery in Houston's Museum District or on Santa Fe's Museum Hill is still a gallery | ❌ |
+
+Most of the Not a buyer places and every non-profit are dropped before they are opened. A frame shop or studio that also calls itself a gallery is opened, because its website may show that it is one.
+
+### The fields Varnish reads (leads.json)
+
+Every art lead keeps the usual fields (`business_name`, `email`, `other_emails`, `contact_name`, `contact_role`, `phone`, `website`, `city`, `bundesland` (the state), `address`, `category`, `rating`, `review_count`, `instagram_url`, `maps_description`, `maps_url`, `country`, `country_name`, `campaign`, `observed_date`, and `relevance_tier` / `relevance_score` / `relevance_evidence`), and adds these. They come from the website once it is read, and from the Maps listing otherwise.
+
+| Field | Values | What it means |
+|---|---|---|
+| `art_type` | `gallery`, `auction_house`, `dealer`, `art_advisor`, or `""` | The kind of buyer, from the tier. Empty for Not a buyer and Non-profit / museum. |
+| `accepts_submissions` | `yes`, `no`, `unknown` | `no` when the site says it does not take artists' work ("we do not accept unsolicited submissions", "not currently accepting new artists", "unable to review portfolios", "submissions are closed", "please do not send portfolios", "by invitation only"…); `yes` with submission guidelines, an open call, "submit your work" or "artist submissions", or a submissions page. When both appear, `no` wins. |
+| `submission_url` | an absolute URL, or `""` | The submissions / open-call page among the pages read or linked. It can be on another site (a Submittable form) or a PDF, and it is kept when that page says no, because it states the policy. |
+| `accepts_consignments` | `yes`, `unknown` | `yes` when the site or listing talks about consigning, "sell your art", "selling with us", "we buy…", appraisals for a sale, or valuation and estimate requests. A refusal ("not accepting consignments") is `unknown`. |
+| `consign_url` | an absolute URL, or `""` | The consign / sell-with-us page (or, failing that, "we buy" or valuation page). |
+| `specialties` | `""` or words separated by `; ` | Lower case, from a fixed list (Varnish's own), in this order: contemporary; modern; post-war; impressionist; old masters; american art; african american art; latin american; asian art; african art; native american; western art; outsider art; folk art; photography; prints; sculpture; works on paper; ceramics; glass; design; decorative arts; emerging artists; israeli art; judaica. Always English, whatever the site's language. Only what the listing or site names: "near the Asian Art Museum" and "installation photography by…" don't count. |
+
+Example (one row of `leads.json`; the WhatsApp, greeting and email columns are there too):
+
+```json
+{
+  "business_name": "Hudson Line Gallery",
+  "relevance_tier": "Gallery",
+  "relevance_score": 99,
+  "relevance_evidence": "gallery, current exhibitions (site), on view through (site), represented artists (site), the gallery represents (site)",
+  "email": "info@hudsonlinegallery.com",
+  "other_emails": "submissions@hudsonlinegallery.com",
+  "website": "https://www.hudsonlinegallery.com/",
+  "city": "New York",
+  "bundesland": "NY",
+  "art_type": "gallery",
+  "accepts_submissions": "yes",
+  "submission_url": "https://www.hudsonlinegallery.com/artist-submissions",
+  "accepts_consignments": "unknown",
+  "consign_url": "",
+  "specialties": "contemporary; photography; sculpture; works on paper; emerging artists"
+}
+```
+
+What it can't see: a policy that is only in an image, a PDF or a page the site doesn't link from its homepage, contact or submissions pages; a FAQ that answers "Do you accept submissions?" with a bare "No."; and sites that only work with JavaScript, unless they also hide their email (then Chrome reads them). Those rows say `unknown`.
+
+- **The email and WhatsApp message** (`templates/art-email-en.txt`, `templates/art-whatsapp-en.txt`) are short and neutral: they introduce Varnish AI as a platform that refers sellers of artwork and ask whether the place may be listed. Varnish users write their own messages about each artwork, so the campaign is for the directory, not for mail-merge. Put your name and title in `"sender"` in `input.us-art.json`, and replace `[Postal address]` in the email before sending anything (see *A note on sending (US)*).
+
+### Art buyers in Israel
+
+```bash
+npm run smoke:art:il     # Tel Aviv-Yafo only, 2 search terms, 10 places → output-il-art-smoke/
+npm run art:il           # every Israeli art market → output-il-art/   (input.il-art.json)
+npm run contacts -- output-il-art/leads.json --input input.il-art.json
+```
+
+Varnish imports **`output-il-art/leads.json`**, with the same fields and values as the US run (`country_name` is `Israel`; `bundesland` is empty, because Israeli addresses name no district).
+
+- **Places:** Tel Aviv-Yafo first, district by district (Gordon Street, Florentin, Neve Tzedek, Old Jaffa, Jaffa Port, Kiryat HaMelacha, Ben Yehuda, Dizengoff); Jerusalem (Hutzot Hayotzer, Musrara, the German Colony, Talbiya, Ein Kerem, Mamilla); Haifa (Wadi Nisnas, the German Colony); Herzliya, Ramat Gan, Ra'anana, Kfar Saba, Netanya, Caesarea; the artists' villages and towns (Ein Hod, Safed's artists' quarter, Rosh Pina, Zikhron Ya'akov, Kiryat Tivon); Be'er Sheva, Eilat and Mitzpe Ramon. To run only some districts, set `"states"` (`TA JM HA CE NO SO`).
+- **Search terms:** Hebrew first, one per kind of buyer in Hebrew and in English, across every place first: `גלריה לאמנות`, `Art gallery`, `בית מכירות פומביות`, `Auction house`, `סוחר אמנות`, `Art dealer`, `יועץ אמנות`, `Art advisor`; then `גלריה`, `אמנות ישראלית`, `מכירה פומבית`, `Art auction`, `Contemporary art gallery`.
+- **Hebrew is read** in names, Maps descriptions and websites, with its prefixes (הגלריה, בגלריה): גלריה, בית מכירות פומביות, סוחרת אמנות, יועצת אמנות; frame shops (מסגרות) are not buyers unless the site shows exhibitions; museums, בית האמנים, municipal galleries, מתנ"סים and עמותות are non-profits (a בע"מ is not). Submissions: הגשת עבודות / קול קורא are `yes`, "איננו מקבלים הגשות" / "אין קבלת עבודות" / "סגור להגשות" are `no`. Consignments: מסירה למכירה, קבלת יצירות למכירה, "אנו קונים…", שמאות, הערכת שווי. Specialties are written in English ("אמנות ישראלית עכשווית" → `contemporary; israeli art`).
+- **The email and WhatsApp message are in Hebrew** (`templates/art-email-he.txt`, `templates/art-whatsapp-he.txt`), written as the one-time request Israel's anti-spam law allows: "פרסומת" at the start of the subject (and of the WhatsApp text), and "השיבו 'הסר'" to opt out (see *A note on sending (Israel)*). Replace `[כתובת למשלוח דואר]` with your address before sending.
+
+### Art buyers worldwide
+
+```bash
+npm run smoke:art:world  # London only, 2 search terms, 10 places → output-world-art-smoke/
+npm run smoke:art:hu     # Budapest only, 2 search terms, 10 places → output-world-art-hu-smoke/
+npm run art:world        # 76 countries in one run → output-world-art/   (input.world-art.json)
+npm run contacts -- output-world-art/leads.json --input input.world-art.json
+```
+
+Varnish imports **`output-world-art/leads.json`**, with the same fields and values as the US run. `country_name` is the English country name (`Japan`, `South Korea`, `United Arab Emirates`, `Hungary`, `Türkiye`…), and `bundesland` is the state, province, prefecture, emirate, oblast, department or governorate when the address names one (`NSW`, `ON`, `SP`, `CDMX`, `Maharashtra`, `Dubai`, `Tokyo`, `İstanbul`, `Lviv Oblast`, `Región Metropolitana`, `Maldonado`, `Bangkok`, `Bali`, `Metro Manila`, `Lagos`, `Cairo`…), otherwise empty (Hungary, Poland, Czechia and most of Europe name none).
+
+- **Countries (76):** the United Kingdom, France, Germany, Switzerland, Italy, Spain, the Netherlands, Belgium, Austria, Sweden, Denmark, Norway, Ireland, Portugal, Monaco; the rest of Europe — Bulgaria, Croatia, Cyprus, Czechia, Estonia, Finland, Greece, Hungary, Latvia, Lithuania, Luxembourg, Malta, Poland, Romania, Slovakia, Slovenia, Iceland, Liechtenstein, Andorra, San Marino, Serbia, Bosnia and Herzegovina, Montenegro, North Macedonia, Albania, Kosovo, Moldova, Ukraine, Türkiye; Hong Kong, Singapore, Japan, South Korea, Taiwan, India, Thailand, Indonesia, the Philippines, Malaysia, Vietnam; the United Arab Emirates, Qatar, Saudi Arabia, Kuwait, Lebanon; Australia, New Zealand; Canada, Mexico, Brazil, Argentina, Colombia, Chile, Peru, Uruguay; South Africa, Nigeria, Kenya, Egypt, Morocco, Ghana. The US and Israel have their own runs (above); mainland China is left out because Google Maps barely covers it; Russia and Belarus are left out because sanctions make selling art there impractical.
+- **Places:** 181 art cities, from London, Paris, Berlin and the fair cities (Basel, Maastricht, Venice, Hong Kong, Dubai…) to the resort towns where collectors buy (St. Moritz, Saint-Paul-de-Vence, Knokke, Monaco, Punta del Este, José Ignacio, Mykonos) and Budapest, Prague, Warsaw, Kraków, Athens, Istanbul, Bucharest, Cluj-Napoca, Sofia, Zagreb, Ljubljana, Bratislava, Helsinki, Tallinn, Riga, Vilnius, Belgrade, Kyiv, Lviv, Doha, Riyadh, Jeddah, Kuwait City, Beirut, Santiago, Lima, Montevideo, Bangkok, Jakarta, Yogyakarta, Ubud, Denpasar, Manila, Makati, Kuala Lumpur, Ho Chi Minh City, Hanoi, Lagos, Nairobi, Cairo, Marrakesh, Casablanca, Accra… The biggest markets are searched district by district (155 districts): Mayfair, St James's, Shoreditch and Fitzrovia in London; Le Marais, Saint-Germain-des-Prés, Avenue Matignon and Drouot in Paris; Mitte, Kreuzberg and Charlottenburg in Berlin; Central and Wong Chuk Hang in Hong Kong; Ginza and Roppongi in Tokyo; Samcheong-dong and Hannam-dong in Seoul; Roma Norte and Polanco in Mexico City; Jardins in São Paulo; Budapest's district V (Falk Miksa utca), VI and VII; Beyoğlu, Karaköy and Nişantaşı in Istanbul; Prague 1; Śródmieście in Warsaw; Kolonaki in Athens; Vitacura in Santiago; Bang Rak in Bangkok; Zamalek in Cairo; and more.
+- **Only some countries or cities:** set `"states"` in `input.world-art.json`: `["HU"]` runs Hungary (Budapest and its districts, Szentendre, Debrecen, Szeged, Pécs); add `"cities": ["Budapest"]` for Budapest alone; `["UK", "FR", "JP"]` runs those three. Or use `"places"`, cities by country code in one file: `"places": { "HU": ["Budapest", "Pécs"], "PL": ["Kraków"] }` (see the configuration table). Codes: `UK FR DE CH IT ES NL BE AT SE DK NO IE PT MC HK SG JP KR TW IN AE AU NZ CA MX BR AR CO ZA BG HR CY CZ EE FI GR HU LV LT LU MT PL RO SK SI IS LI AD SM RS BA ME MK AL XK MD UA TR QA SA KW LB CL PE UY TH ID PH MY VN NG KE EG MA GH`.
+- **Search terms:** `Art gallery`, `Auction house`, `Art dealer`, `Art advisor` across every place first, then `Contemporary art gallery` and `Fine art gallery`: 336 places × 6 = 2,016 searches, a week or more. A restart carries on where it stopped; `--fresh` starts over.
+- **Every search runs as its own country:** its Google region, its phone code (`+81`, `+55`, `+36`…, with each country's trunk prefix and number lengths), its address format, and its country name. A result from another country in the run keeps that country and is read as that country's address (a Basel search finds Weil am Rhein, Germany; a Singapore search finds Johor Bahru, Malaysia); one from outside it (the US for a Vancouver search, Macau for Hong Kong, Russia, Belarus) is dropped.
+- **Names and websites are read in their own language:** Galerie, Galleria, Galería, Galleri, Galerij, Galéria, galerisi, Galerija, γκαλερί, галерия, غاليري, แกลเลอรี่, phòng tranh, ギャラリー, 画廊, 갤러리; Auktionshaus, Hôtel des ventes, casa d'aste, subastas, leilões, veilinghuis, aukciósház, dom aukcyjny, aukční síň, müzayede, οίκος δημοπρασιών, casă de licitații, аукцион, مزاد, balai lelang, đấu giá, オークション, 경매; Kunsthandel, marchand d'art, műkereskedés, antykwariat sztuki; frame shops (Encadrement, Bilderrahmen, Cornici, keretezés, ramiarnia, rámování, çerçeve, κορνίζες, براويز, กรอบรูป, 額縁) are not buyers; museums, Kunsthallen, Kunstvereine, foundations (Fondation, Fundación, Stiftung, alapítvány, fundacja, nadace, vakıf, ίδρυμα), national and municipal galleries (Nemzeti Galéria, Zachęta, BWA, Národní galerie) and academies are non-profits. Submission and consignment wording is read in French, German, Italian, Spanish, Portuguese, Dutch, Japanese and Korean, consignments also in Hungarian, Polish, Czech, Turkish, Greek and Romanian; exhibitions and "our artists" in those and in Arabic, Indonesian, Vietnamese and Ukrainian; specialties are written in English.
+- **The email and WhatsApp message** are the English art templates (`templates/art-email-en.txt`, `templates/art-whatsapp-en.txt`): a neutral opt-out line and `[Postal address]` for you to fill in, nothing US-only. Rules on unsolicited business email differ by country (Germany's UWG §7 is strict even for businesses); this isn't legal advice.
+
 ## WhatsApp: which shops have it, and who to contact first
 
 Every row gets three WhatsApp columns. The **WhatsApp** sheet lists every target you can message, best evidence first. In every sheet, shops with WhatsApp come before the rest.
@@ -267,11 +368,12 @@ All fields are optional.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `country` | `"DE"` | `"DE"` Germany, `"UK"` England, `"FR"` France, `"BE"` Belgium, `"US"` United States, `"IL"` Israel. It sets the city list, search terms, phone code, contact pages and output folder. |
-| `campaign` | Judaica | `"sushi"` looks for sushi restaurants instead: its own places, search terms, tiers, templates and folder. With `"country": "IL"` (Israel, `output-il-sushi/`) or `"country": "EU"` (all of Europe, `output-eu-sushi/`). |
+| `country` | `"DE"` | `"DE"` Germany, `"UK"` England, `"FR"` France, `"BE"` Belgium, `"US"` United States, `"IL"` Israel; for a campaign only, `"EU"` (Europe, sushi) and `"WORLD"` (76 countries, art). It sets the city list, search terms, phone code, contact pages and output folder. |
+| `campaign` | Judaica | `"sushi"` looks for sushi restaurants instead: its own places, search terms, tiers, templates and folder. With `"country": "IL"` (Israel, `output-il-sushi/`) or `"country": "EU"` (all of Europe, `output-eu-sushi/`). `"art"` with `"country": "US"`, `"IL"` or `"WORLD"` builds Varnish AI's directory of galleries, auction houses, art dealers and art advisors (`output-us-art/`, `output-il-art/`, `output-world-art/`). |
 | `sender` | – | `{ "name", "title" }` for the email signature. |
 | `states` | all | Bundesland codes to limit the run, e.g. `["BE","BY","HE"]`. Codes: BE HH HB BY BW HE NW NI RP SL SH MV BB SN ST TH. |
 | `cities` | built-in list | An explicit list of cities, which replaces the built-in one. |
+| `places` | – | Cities by region or country code, in one file across countries: `{ "HU": ["Budapest", "Pécs"], "PL": ["Kraków"] }` for `"WORLD"`, `{ "FL": ["Miami, FL"] }` for the US, `{ "TA": ["Tel Aviv-Yafo"] }` or `{ "IL": ["Jerusalem"] }` for Israel. Wins over `states` and `cities`; `districts` still adds a known city's districts; an unknown code is skipped with a warning. A city the run already knows is searched exactly as the full run searches it ("krakow" and "Kraków, Poland" become "Kraków"; "Miami" under FL becomes "Miami, FL"). Without an `outputDir`, the run writes to `<folder>-places` (e.g. `output-world-art-places/`), so it never resumes or overwrites the full run. |
 | `districts` | `true` | Also search the Jewish districts of Berlin, Munich, Frankfurt and Hamburg. |
 | `searchCategories` | 10 German terms | Replaces the search terms (see `src/config.js`). |
 | `keepNonProfits` | `false` | Keep synagogues, communities, e.V.s, schools, museums etc. (they are dropped by default). |
@@ -283,20 +385,21 @@ All fields are optional.
 | `contacts.enabled` | `true` | Turns the website and Impressum lookup on or off. |
 | `contacts.maxPagesPerSite` | `4` | Homepage + Impressum/Kontakt/About pages to read per shop. |
 | `emailTemplate` | `templates/partnership-email.txt` | Path to a different template. |
+| `outputDir` | the market's folder | Where leads.json, the workbook and progress.json go. Each folder keeps its own progress, so give every small run its own. |
 
 ## 5. Useful commands
 
 ```bash
 npm run contacts -- --probe https://some-judaica-shop.de "Shop Name"   # test one website
 npm run contacts -- output/leads.json                                  # re-read every website, rewrite output/
-npm test                                                               # 152 offline tests
+npm test                                                               # 198 offline tests
 ```
 
 ## If a run stops (crash, Ctrl-C, computer switched off)
 
 Just run the same command again (`npm start` or `npm run england`). The new run carries on where the old one stopped:
 - **Places kept:** it loads the places already found and never looks them up twice.
-- **Where it restarts:** it continues from the search it was on, which is recorded in `progress.json` in the output folder.
+- **Where it restarts:** it continues from the search it was on, which is recorded in `progress.json` in the output folder. That file is trusted only by the same list of searches (a run for Kraków never resumes one for Budapest in the same folder).
 - **Websites re-checked:** it re-reads the websites the stopped run hadn't finished reading.
 
 Nothing already saved is overwritten.
@@ -343,6 +446,8 @@ This isn't legal advice.
 - you honour every opt-out within 10 business days.
 
 Send WhatsApp messages one by one, by hand, as the links already do. This isn't legal advice.
+
+The **art campaign's** email (Varnish AI) has the same opt-out line, but no postal address of its own: replace `[Postal address]` at the end of `templates/art-email-en.txt` with yours before you send it.
 
 ## A note on sending (England)
 

@@ -38,6 +38,75 @@ const MOBILE = [
     /^417[5-9]/,         // Switzerland
     /^436[5-9]/,         // Austria
     /^9725/,             // Israel 05…
+    // The art campaign's world run. Whole numbers (length checked), so a
+    // site's number missing its code is read as a mobile only when it is one.
+    /^393\d{8,9}$/,      // Italy 3…
+    /^34[67]\d{8}$/,     // Spain 6… / 7…
+    /^3519[1236]\d{7}$/, // Portugal 91/92/93/96
+    /^467[02369]\d{7}$/, // Sweden 070/072/073/076/079
+    /^47[49]\d{7}$/,     // Norway 4… / 9…
+    /^3538[35-9]\d{7}$/, // Ireland 083, 085–089
+    /^3776\d{8}$/,       // Monaco 6…
+    /^852[4569]\d{7}$/,  // Hong Kong 4/5/6/9
+    /^65[89]\d{7}$/,     // Singapore 8/9
+    /^81[789]0\d{8}$/,   // Japan 070/080/090
+    /^8210\d{7,8}$/,     // South Korea 010
+    /^8869\d{8}$/,       // Taiwan 09
+    /^91[6-9]\d{9}$/,    // India 6–9
+    /^9715[0-8]\d{7}$/,  // UAE 05x
+    /^614\d{8}$/,        // Australia 04
+    /^642\d{7,9}$/,      // New Zealand 02x
+    /^55\d{2}9\d{8}$/,   // Brazil: a 9 after the area code
+    /^549\d{10}$/,       // Argentina: +54 9 before the area code
+    /^573\d{9}$/,        // Colombia 3…
+    /^27(?:6\d|7[1-9]|8[1-4])\d{7}$/, // South Africa 06x, 071–079, 081–084
+    // The rest of Europe (no Russia or Belarus: see world.js).
+    /^359(?:8[7-9]|9[89])\d{7}$/, // Bulgaria 087–089, 098, 099
+    /^3859[1-9]\d{6,7}$/, // Croatia 091–099
+    /^3579\d{7}$/,       // Cyprus 9…
+    /^420[67]\d{8}$/,    // Czechia 6… / 7…
+    /^372(?:5\d{6,7}|8[1-4]\d{6})$/, // Estonia 5…, 81–84
+    /^358(?:4\d|50)\d{5,8}$/, // Finland 04x, 050
+    /^3069\d{8}$/,       // Greece 69…
+    /^36(?:20|30|31|50|70)\d{7}$/, // Hungary 06 20/30/31/50/70
+    /^3712\d{7}$/,       // Latvia 2…
+    /^3706\d{7}$/,       // Lithuania 6…
+    /^356(?:7[79]|9[89])\d{6}$/, // Malta 77, 79, 98, 99
+    /^48(?:45|5[0137]|6[069]|7[2389]|88)\d{7}$/, // Poland
+    /^407\d{8}$/,        // Romania 07…
+    /^4219\d{8}$/,       // Slovakia 09…
+    /^386(?:3[01]|4[01]|5[01]|6[4589]|7[01])\d{6}$/, // Slovenia
+    /^354[678]\d{6}$/,   // Iceland 6/7/8
+    /^423[67]\d{6}$/,    // Liechtenstein
+    /^376[346]\d{5}$/,   // Andorra 3/4/6
+    /^37866\d{6}$/,      // San Marino 66
+    /^3816\d{7,8}$/,     // Serbia 06x
+    /^3876\d{7,8}$/,     // Bosnia and Herzegovina 06x
+    /^3826\d{7}$/,       // Montenegro 06x
+    /^3897\d{7}$/,       // North Macedonia 07x
+    /^3556[6-9]\d{7}$/,  // Albania 066–069
+    /^3834[3-9]\d{6}$/,  // Kosovo 043–049
+    /^373[67]\d{7}$/,    // Moldova 06x / 07x
+    /^380(?:39|50|6[3678]|73|9[1-9])\d{7}$/, // Ukraine
+    /^905\d{9}$/,        // Türkiye 05xx
+    // The Gulf, the Levant, South America, Southeast Asia, Africa.
+    /^974[3567]\d{7}$/,  // Qatar 3/5/6/7
+    /^9665\d{8}$/,       // Saudi Arabia 05x
+    /^965[569]\d{7}$/,   // Kuwait 5/6/9
+    /^961(?:3\d{6}|(?:7[016-9]|81)\d{6})$/, // Lebanon 03, 70, 71, 76, 78, 79, 81
+    /^569\d{8}$/,        // Chile 9…
+    /^519\d{8}$/,        // Peru 9…
+    /^5989\d{7}$/,       // Uruguay 09x
+    /^66[689]\d{8}$/,    // Thailand 06/08/09
+    /^628\d{8,11}$/,     // Indonesia 08…
+    /^639\d{9}$/,        // Philippines 09…
+    /^601\d{8,9}$/,      // Malaysia 01x
+    /^84[35789]\d{8}$/,  // Vietnam 03/05/07/08/09
+    /^234(?:70|8[01]|9[01])\d{8}$/, // Nigeria 070, 080, 081, 090, 091
+    /^254(?:7\d|1[01])\d{7}$/, // Kenya 07xx, 010, 011
+    /^201[0125]\d{8}$/,  // Egypt 010, 011, 012, 015
+    /^212[67]\d{8}$/,    // Morocco 06 / 07
+    /^233[25]\d{8}$/,    // Ghana 02x / 05x
 ];
 
 /**
@@ -83,7 +152,11 @@ export function normaliseNumber(raw, phoneCode = '49') {
 const LINK_RE = /(?:wa\.me\/|api\.whatsapp\.com\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=|web\.whatsapp\.com\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=|whatsapp:\/\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=)(\+?[\d%\s().-]{7,20})/gi;
 
 /** Countries whose numbers never start with 0 after the country code. */
-const NO_ZERO_AFTER_CODE = ['972', '49', '44', '33', '32', '31', '43', '41', '46', '45', '47', '358', '353', '34', '351', '30', '48', '36', '420', '40', '90', '1'];
+const NO_ZERO_AFTER_CODE = ['972', '49', '44', '33', '32', '31', '43', '41', '46', '45', '47', '358', '353', '34', '351', '30', '48', '36', '420', '40', '90', '1',
+    '81', '82', '886', '852', '65', '91', '971', '61', '64', '27', '52', '54', '55', '57',
+    // The art run's other countries (not San Marino, whose numbers start 0549).
+    '359', '385', '357', '372', '371', '370', '356', '421', '386', '354', '423', '376', '381', '387', '382', '389', '355', '383', '373', '380',
+    '974', '966', '965', '961', '56', '51', '598', '66', '62', '63', '60', '84', '234', '254', '20', '212', '233'];
 
 /**
  * Numbers sites write wrongly into WhatsApp links, from the Israel and
@@ -97,6 +170,9 @@ const NO_ZERO_AFTER_CODE = ['972', '49', '44', '33', '32', '31', '43', '41', '46
 export function fixMissingCode(e164, phoneCode) {
     let d = String(e164 || '').replace(/\D/g, '');
     if (!d) return e164;
+    // One of the market's own mobiles first: a Colombian "wa.me/3101234567"
+    // is +57 310…, not the Netherlands with its trunk 0 kept (+31 0…).
+    if (phoneCode && !d.startsWith(phoneCode) && d.length <= 11 && isMobile(phoneCode + d)) return `+${phoneCode}${d}`;
     const code = NO_ZERO_AFTER_CODE.find(c => d.startsWith(c + '0'));
     if (code) return `+${code}${d.slice(code.length + 1)}`;
     if (!phoneCode || d.startsWith(phoneCode) || d.length > 11) return e164;
