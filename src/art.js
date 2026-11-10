@@ -3,7 +3,11 @@
  * consignment, represent its artists, or advise the collectors who do?
  * Varnish AI helps people sell artwork and recommends these buyers to them,
  * so the campaign builds a directory of galleries, auction houses, art
- * dealers and art advisors from Google Business Profiles in the US.
+ * dealers and art advisors from Google Business Profiles in the US and
+ * Israel. Hebrew names and sites are read too: the same lists carry Hebrew
+ * words (matched after the prefix letters ו ה ב כ ל ש, as in relevance.js),
+ * and every field keeps its English values (`specialties` are English words
+ * even when the site is Hebrew).
  *
  * Same idea as the Judaica scoring in relevance.js and sushi.js: every row is
  * scored on the words in its name, Maps category and description, and (once
@@ -32,8 +36,24 @@ const TIER_OF = Object.fromEntries(Object.entries(ART_TYPE).map(([tier, type]) =
  * gallery, not a hair salon, and "Barbara" is not a bar.
  */
 const WHOLE = '(?![\\p{L}\\p{N}])';
-const words = (alternatives, end = WHOLE) => new RegExp(`(?<![\\p{L}\\p{N}])(?:${alternatives.join('|')})${end}`, 'giu');
+/**
+ * `he`: Hebrew words, after up to two prefix letters (ו ה ב כ ל ש:
+ * "הגלריה", "בגלריה", "לאמנות") and with no end, so plurals and construct
+ * forms match ("גלריית", "תערוכות"); a word that needs an end says so. Not
+ * מ, as in relevance.js. `cjk`: Japanese, Chinese and Korean words, which
+ * match anywhere, because those scripts put no space between words
+ * ("銀座ギャラリー", "국제갤러리").
+ */
+const words = (alternatives, end = WHOLE, { he = [], cjk = [] } = {}) => new RegExp([
+    alternatives.length ? `(?<![\\p{L}\\p{N}])(?:${alternatives.join('|')})${end}` : '',
+    he.length ? `(?<![\\p{L}\\p{N}])[והבכלש]{0,2}(?:${he.join('|')})` : '',
+    cjk.length ? `(?:${cjk.join('|')})` : '',
+].filter(Boolean).join('|'), 'giu');
 const has = (re, text) => String(text || '').search(re) !== -1;
+/** A Hebrew word that must end there: "סוחר" (dealer), not "סוחרים". */
+const HE_END = '(?![\\p{L}])';
+/** בע"מ (Ltd): a company, whatever else its Hebrew name says. */
+const HE_COMPANY = /בע["״]?מ/;
 
 /** The distinct words found (lower case), and how often any of them occurs. */
 function find(re, text) {
@@ -72,11 +92,27 @@ const NONPROFIT_ART = words([
     'artists[\'’]? (?:guild|association|alliance|league)', 'art institute', 'institute of (?:contemporary )?arts?', 'community arts?',
     'non-?profit', 'not[- ]for[- ]profit', '501\\s?\\(?c\\)?\\s?\\(?3\\)?', 'universit(?:y|ies)', 'college', 'school of (?:the )?(?:arts?|design|visual arts|fine arts)',
     'foundation', 'kunsthalle', 'historical society', 'cultural (?:cent(?:er|re)|arts?|affairs)',
-]);
+], WHOLE, {
+    // Museums, art and culture centres, the artists' houses and workshops
+    // (בית האמנים, סדנאות האמנים), Ein Harod's משכן לאמנות, community
+    // centres, non-profits (עמותה, ע"ר, אגודת…), universities and colleges,
+    // the municipal galleries, city councils, archives and arts foundations.
+    he: ['מוזיאון', 'מוזאון', 'מרכז (?:ל|ה)?(?:אמנות|אומנות|תרבות)', 'היכל (?:ה)?תרבות', 'בית (?:ה)?אמנים', 'סדנאות (?:ה)?אמנים', 'משכן (?:ל)?(?:אמנות|אומנות)',
+        'מתנ["״]ס', 'עמות(?:ה|ת)', 'אגודת', 'ע["״]ר' + HE_END, 'אוניברסיט', 'מכלל(?:ה|ת)', 'גלרי(?:ה|ית) ה?עירונית', 'עיריית', 'מועצה (?:ה)?(?:מקומית|אזורית)',
+        'ארכיון', 'קרן (?:ל|ה)?(?:אמנות|אומנות|תרבות)'],
+});
 /** The Maps description says so: "Non-profit gallery…", "University gallery…". */
-const NONPROFIT_DESCRIPTION = words(['non-?profit', 'not[- ]for[- ]profit', '501\\s?\\(?c\\)?\\s?\\(?3\\)?', '(?:university|college)(?:[\'’]s)? (?:art )?(?:gallery|museum)']);
-/** …or the website: "X is a 501(c)(3) non-profit". "A portion goes to a non-profit" is not this. */
-const NONPROFIT_SITE = words(['(?:is|are) an? (?:registered |independent |private |public |community )?(?:non-?profit|not[- ]for[- ]profit|501\\s?\\(?c\\)?\\s?\\(?3\\)?)']);
+const NONPROFIT_DESCRIPTION = words(['non-?profit', 'not[- ]for[- ]profit', '501\\s?\\(?c\\)?\\s?\\(?3\\)?', '(?:university|college)(?:[\'’]s)? (?:art )?(?:gallery|museum)'], WHOLE, {
+    he: ['ללא מטרות רווח', 'מלכ["״]ר'],
+});
+/**
+ * …or the website: "X is a 501(c)(3) non-profit". "A portion goes to a
+ * non-profit" is not this. Hebrew: "…היא עמותה", "עמותה רשומה", and a
+ * registered non-profit's number (ע"ר 58-…).
+ */
+const NONPROFIT_SITE = words(['(?:is|are) an? (?:registered |independent |private |public |community )?(?:non-?profit|not[- ]for[- ]profit|501\\s?\\(?c\\)?\\s?\\(?3\\)?)'], WHOLE, {
+    he: ['(?:היא|הינה|הנה|הוא|הינו|הנו) (?:עמותה|מלכ["״]ר|ארגון ללא מטרות רווח)', 'עמותה רשומה', 'ע["״]ר\\s*(?:מס[\'׳.]?\\s*)?58'],
+});
 
 /**
  * Is this an art organisation we cannot sell through? Called by isSellable
@@ -85,7 +121,9 @@ const NONPROFIT_SITE = words(['(?:is|are) an? (?:registered |independent |privat
  * @returns {string} the reason, or '' when it is not one
  */
 export function artNonProfit(lead) {
-    const name = clean(museumWordsOut(lead.business_name));
+    let name = clean(museumWordsOut(lead.business_name));
+    // A company (בע"מ) is commercial, whatever its Hebrew name says.
+    if (HE_COMPANY.test(name)) name = name.replace(/[֐-׿"״'׳]+/g, ' ');
     const category = clean(lead.category);
     const hit = find(NONPROFIT_ART, name).words[0] || find(NONPROFIT_ART, category).words[0]
         || find(NONPROFIT_DESCRIPTION, clean(lead.maps_description)).words[0];
@@ -94,8 +132,8 @@ export function artNonProfit(lead) {
 
 // ─── Not buyers ───────────────────────────────────────────────────────────
 
-/** Picture framers. Many "art galleries" on Maps are frame shops. */
-const FRAME = words(['fram(?:e|es|ed|er|ers|ing)', 'framemak\\w*', 'framery']);
+/** Picture framers. Many "art galleries" on Maps are frame shops (Hebrew: מסגרות, מסגור, מסגרייה). */
+const FRAME = words(['fram(?:e|es|ed|er|ers|ing)', 'framemak\\w*', 'framery'], WHOLE, { he: ['מסגרות', 'מסגור', 'מסגרי', 'ממסגר', 'מסגרת'] });
 
 /**
  * Categories that are never a buyer, whatever the name says: art supplies,
@@ -125,50 +163,84 @@ const NOT_BUYER_NAME = words([
     'art suppl(?:y|ies)', 'art (?:school|class(?:es)?|lessons?|camps?|academy)', 'kids?[\'’]? art', 'children[\'’]?s art',
     'print shop', 'printing', 'copy cent(?:er|re)', 'interiors?', 'interior design\\w*', 'furniture', 'murals?', 'muralists?',
     'restoration', 'conservation', 'art handling', 'home staging',
-]);
+], WHOLE, {
+    // Craft and art-supply shops, classes and workshops, art schools,
+    // tattoo, printers, interior design, furniture, restoration.
+    he: ['חנות (?:ל)?(?:יצירה|חומרי)', 'חומרי (?:אמנות|אומנות|יצירה|ציור)', 'חוג(?:י|ים)? (?:ל)?(?:ציור|אמנות|אומנות|יצירה|קרמיקה|פיסול)', 'סדנ(?:ה|ת|אות) (?:ל)?(?:ציור|אמנות|אומנות|יצירה|קרמיקה|פיסול)',
+        'בית ספר (?:ל)?(?:אמנות|אומנות|ציור)', 'קעקוע', 'טאטו', 'בית דפוס', 'דפוס' + HE_END, 'הדפסות', 'עיצוב פנים', 'מעצב(?:ת)? פנים', 'רהיטים', 'רסטורציה', 'שחזור (?:ציורים|יצירות)'],
+});
 /** The Maps description of a paint-and-sip studio or tattoo parlour. */
 const NOT_BUYER_DESCRIPTION = words(['tattoo\\w*', 'paint(?:ing)?\\s*(?:and|&|n)\\s*sip', 'sip\\s*(?:and|&|n)\\s*paint', 'bring your own (?:wine|bottle|byob)']);
 
 /** An artist's own studio sells its own work, not anyone else's. */
 const ARTIST_CATEGORY = words(['artists?', 'art studio', 'sculptors?', 'potters?', 'ceramicists?', 'glass ?blow\\w*', 'craftsm[ae]n', 'art handcraft']);
-const ARTIST_NAME = words(['studios?', 'atelier', 'photography', 'photographer', 'photos?']);
+const ARTIST_NAME = words(['studios?', 'atelier', 'photography', 'photographer', 'photos?'], WHOLE, { he: ['סטודיו', 'צילום', 'צלם'] });
 /** Gift, souvenir and craft shops. */
 const GIFT_CATEGORY = words(['gifts?', 'gift shop', 'souvenirs?', 'handicrafts?', 'crafts?', 'novelty']);
+
+/** Gallery: גלריה, גלריית, גלריות (and גלרית, as some names spell it). */
+const GALLERY_HE = ['גלרי'];
+/** Auction: מכירה פומבית, מכירות פומביות, בית מכירות פומביות. */
+const AUCTION_HE = ['מכיר(?:ה|ות) ה?פומבי'];
+/** Dealer, in a name: סוחר / סוחרת (אמנות), סחר. */
+const DEALER_NAME_HE = ['סוח(?:ר|רת|רי)' + HE_END, 'סחר' + HE_END];
+/** Advisory, in a name next to art words: יועץ / יועצת, ייעוץ, and the independent curator (אוצר / אוצרת). */
+const ADVISOR_NAME_HE = ['יוע(?:ץ|צת|צים|צות)', 'ייעוץ', 'אוצר(?:ת)?' + HE_END];
+
 /** The words a buyer puts in its name. */
-const BUYER_NAME = words(['gall?er(?:y|ies|ie|ia|ía)', 'auction\\w*', 'dealers?', 'advis\\w*', 'consult\\w*']);
-const GALLERY = words(['gall?er(?:y|ies|ie|ia|ía)']);
+const BUYER_NAME = words(['gall?er(?:y|ies|ie|ia|ía)', 'auction\\w*', 'dealers?', 'advis\\w*', 'consult\\w*'], WHOLE, {
+    he: [...GALLERY_HE, ...AUCTION_HE, ...DEALER_NAME_HE, ...ADVISOR_NAME_HE],
+});
+const GALLERY = words(['gall?er(?:y|ies|ie|ia|ía)'], WHOLE, { he: GALLERY_HE });
 const FINE_ART = words(['fine arts?']);
 
 /** Categories a buyer can have: art, galleries, auction, antiques, appraisers, consultants. ("Car dealer" is not one.) */
-const ART_CATEGORY = words(['art', 'arts', 'fine arts?', 'gall?er\\w*', 'auction\\w*', 'antiques?', 'antiquarian', 'apprais\\w*', 'consult\\w*', 'advis\\w*', 'collectibles?']);
+const ART_CATEGORY = words(['art', 'arts', 'fine arts?', 'gall?er\\w*', 'auction\\w*', 'antiques?', 'antiquarian', 'apprais\\w*', 'consult\\w*', 'advis\\w*', 'collectibles?'], WHOLE, {
+    // Maps' English UI names categories in English; a few come in Hebrew ("מסעדה" in the sushi run).
+    he: [...GALLERY_HE, ...AUCTION_HE, 'אמנות', 'אומנות', 'עתיקות'],
+});
 /** Categories that say nothing: an advisor is often a "Corporate office" or a "Consultant". */
 const GENERIC_CATEGORY = /^(store|shop|business|company|corporate office|offices?|service|establishment|point of interest|business center|management company|)$/i;
 const ANTIQUE = words(['antiques?', 'antiquarian']);
 const APPRAISER = words(['apprais\\w*']);
 /** Art words for antique shops, appraisers and names that say nothing else. */
-const ART_WORD = words(['art', 'arts', 'artworks?', 'fine arts?', 'paintings?', 'gall?er(?:y|ies|ie|ia|ía)', 'collect(?:ors?|ions?|ing)']);
+const ART_WORD = words(['art', 'arts', 'artworks?', 'fine arts?', 'paintings?', 'gall?er(?:y|ies|ie|ia|ía)', 'collect(?:ors?|ions?|ing)'], WHOLE, {
+    // Art, arts, artists (not אמן alone: it is also "amen"), paintings, works, sculpture, collectors.
+    he: [...GALLERY_HE, 'אמנות', 'אומנות', 'אמנויות', 'אמנ(?:ים|ית|יות)' + HE_END, 'ציור(?:ים)?' + HE_END, 'יצירות', 'פיסול', 'אספנ'],
+});
 
 // ─── What kind of buyer ───────────────────────────────────────────────────
 
-/** "Auction", "Auctions", "Auctioneers", "Auction house". */
-const AUCTION = words(['auction\\w*'], '');
-/** Art advisory and consulting, from any text. */
-const ADVISOR = words(['art[- ](?:advis|consult)\\w*', '(?:fine[- ]art|collection|collections|curatorial|corporate art) (?:advis|consult)\\w*', 'art acquisition', 'collection management', 'corporate art (?:collections?|programs?|services)']);
+/** "Auction", "Auctions", "Auctioneers", "Auction house"; "מכירה פומבית", "בית מכירות פומביות". */
+const AUCTION = words(['auction\\w*'], '', { he: AUCTION_HE });
+/** Art advisory and consulting, from any text: "יועצת אמנות", "ייעוץ באמנות", "ייעוץ לאספנים", building and managing collections. */
+const ADVISOR = words(['art[- ](?:advis|consult)\\w*', '(?:fine[- ]art|collection|collections|curatorial|corporate art) (?:advis|consult)\\w*', 'art acquisition', 'collection management', 'corporate art (?:collections?|programs?|services)'], WHOLE, {
+    he: ['יוע(?:ץ|צת|צי|צות) (?:ל)?(?:אמנות|אומנות)', 'ייעוץ (?:ל|ב)?(?:אמנות|אומנות)', 'ייעוץ (?:ל)?אספנים', 'בניית אוספ', 'ניהול אוספ'],
+});
 /** In a name, "Advisory" or "Consulting" alone is enough once the listing is about art. */
-const ADVISOR_NAME = words(['advis(?:ory|ors?|ers?|ing)', 'consult(?:ants?|ancy|ing)', 'curat(?:orial|ion) services']);
+const ADVISOR_NAME = words(['advis(?:ory|ors?|ers?|ing)', 'consult(?:ants?|ancy|ing)', 'curat(?:orial|ion) services'], WHOLE, { he: ADVISOR_NAME_HE });
 const DEALER = words([
     '(?:fine[- ]art|art|private|art (?:and|&) antiques?|antiques? (?:and|&) (?:fine )?art) dealers?', 'dealers? (?:in|of) (?:[\\p{L}-]+ ){0,3}(?:art|paintings|prints|photographs|sculpture)',
     'private (?:sales|treaty)', 'secondary market',
     'we(?:[\'’]re| are)? (?:always |actively |currently )?(?:buy|buying|purchas\\w*|acquir\\w*)(?: and sell(?:ing)?)?[^.!?;\\n]{0,30}?(?:art|artworks?|paintings?|collections?|estates?|prints|sculptures?|photographs|works)',
     '(?:buying|purchasing) (?:fine )?(?:art|artworks?|paintings|collections|estates)',
-]);
-const DEALER_NAME = words(['dealers?']);
+], WHOLE, {
+    // Art dealer, art trade, buying and selling art, "we buy art / collections / estates".
+    he: ['סוח(?:ר|רת|רי) (?:ה)?(?:אמנות|אומנות|יצירות)', 'סחר (?:ב)?(?:אמנות|אומנות)', '(?:קונים|קנייה|קניה) ומ(?:וכרים|כירה|כירת) (?:של )?(?:אמנות|אומנות|יצירות|ציורים)',
+        '(?:אנו|אנחנו) קונים[^.!?;\\n]{0,30}?(?:אמנות|אומנות|יצירות|ציורים|אוספים|עזבונות)'],
+});
+const DEALER_NAME = words(['dealers?'], WHOLE, { he: DEALER_NAME_HE });
 
 /** A gallery's website: exhibitions and the artists it represents. */
-const EXHIBITIONS = words(['(?:current|upcoming|past|recent|future|new|forthcoming) exhibitions?', 'exhibitions? (?:on view|opening|calendar|schedule|archive|history)', 'now on view', 'on view (?:through|until|now)', 'opening reception']);
+const EXHIBITIONS = words(['(?:current|upcoming|past|recent|future|new|forthcoming) exhibitions?', 'exhibitions? (?:on view|opening|calendar|schedule|archive|history)', 'now on view', 'on view (?:through|until|now)', 'opening reception'], WHOLE, {
+    // Current, past and upcoming exhibitions, an exhibition opening, "on view now". "תערוכות" alone is an artist's CV too.
+    he: ['תערוכ(?:ה|ות) (?:ה)?(?:נוכחי(?:ת|ות)|קודמ(?:ת|ות)|עבר|הבא(?:ה|ות)|קרוב(?:ה|ות)|עתידי(?:ת|ות)|מתוכננ(?:ת|ות))', 'פתיחת (?:ה)?תערוכ', 'מוצג(?:ת|ות|ים)? כעת'],
+});
 /** "Our artists" is never a single artist's own site, but "Exhibitions" is (the CV). */
-const REPRESENTED = words(['(?:represented|gallery|our) artists', 'artists represented', '(?:the gallery|we) represents?', 'represent(?:s|ing)?[^.!?;\\n]{0,40}?artists']);
-const GALLERY_TEXT = words(['gall?er(?:y|ies|ie|ia|ía)', 'exhibitions?', 'represent(?:s|ing)? (?:[\\p{L}-]+ ){0,3}artists']);
+const REPRESENTED = words(['(?:represented|gallery|our) artists', 'artists represented', '(?:the gallery|we) represents?', 'represent(?:s|ing)?[^.!?;\\n]{0,40}?artists'], WHOLE, {
+    he: ['אמני (?:ה)?גלרי', '(?:ה)?אמנים שלנו', 'אמנים מיוצגים', '(?:ה)?גלרי(?:ה|יה) מייצגת', 'מייצג(?:ת|ים)?[^.!?;\\n]{0,40}?אמנים'],
+});
+const GALLERY_TEXT = words(['gall?er(?:y|ies|ie|ia|ía)', 'exhibitions?', 'represent(?:s|ing)? (?:[\\p{L}-]+ ){0,3}artists'], WHOLE, { he: [...GALLERY_HE, 'תערוכ'] });
 
 /**
  * What the text says the place is. Auction first, the most specific; a
@@ -219,6 +291,15 @@ const NO_SUBMISSIONS = [
     /\bno\s+(?:artist\s+)?(?:submissions|portfolios),?\s+please\b/i,
     new RegExp(`\\bplease\\s+${NEG}\\s+(?:send|submit|e-?mail|mail|drop off|bring)\\s+(?:us\\s+)?(?:your\\s+|any\\s+)?(?:unsolicited\\s+)?(?:portfolios?|submissions?|proposals?|images of (?:your )?work)`, 'i'),
     /\b(?:submissions?|representation|exhibitions?|artists)\b[^.!?;\n]{0,40}?\bby (?:invitation|referral) only\b/i,
+    // Hebrew: "איננו מקבלים הגשות", "לא מקבלים פניות", "אין קבלת עבודות",
+    // "סגור להגשות", "ההגשות נסגרו", "נא לא לשלוח תיקי עבודות", "ייצוג
+    // בהזמנה בלבד". Works refused "למכירה" (for sale) are consignments.
+    // "…בדואר, רק דרך הטופס" (by mail; only through the form) is a rule about how to send.
+    new RegExp(`(?<![\\p{L}])(?:אין|איננו|אינה|אינם|אנו לא|אנחנו לא|הגלריה לא|לא)\\s+(?:מקבל(?:ים|ת|ות)?|נקבל|בוחנ(?:ים|ת)|מטפל(?:ים|ת)|מתקבל(?:ות|ים)?)[^.!?;\\n]{0,30}?(?:הגשות|תיקי עבודות|תיק עבודות|פניות|עבודות|יצירות|אמנים חדשים)(?!\\s*(?:(?:ל|ב)?מכיר|דרך|באמצעות|ב(?:דואר|מייל|אימייל|וואטסאפ|פייסבוק|אינסטגרם|טלפון|הודעה)))`, 'u'),
+    new RegExp(`(?<![\\p{L}])אין קבלת (?:עבודות|הגשות|תיקי עבודות|תיק עבודות|אמנים|פניות)(?!\\s*(?:ל|ב)?מכיר)`, 'u'),
+    new RegExp(`(?<![\\p{L}])(?:נא|אנא)?\\s*(?:לא|אין) לשלוח (?:לנו )?(?:תיקי עבודות|תיק עבודות|עבודות|הגשות|יצירות)`, 'u'),
+    new RegExp(`(?<![\\p{L}])(?:ה)?הגש(?:ה|ות)\\s+(?:סגור(?:ה|ות)?|נסגר(?:ה|ו)?)|(?<![\\p{L}])סגור(?:ה|ים)?\\s+(?:ל|בפני\\s+)?הגשות`, 'u'),
+    new RegExp(`(?<![\\p{L}])(?:ה)?(?:הגשות|ייצוג|תערוכות|אמנים)[^.!?;\\n]{0,40}?(?:בהזמנה|בהמלצה) בלבד`, 'u'),
 ];
 
 /**
@@ -232,7 +313,13 @@ const YES_SUBMISSIONS = words([
     'submit (?:your |an? |new )?(?:work|art|artwork|portfolio|images|proposal)(?![^.!?;\\n]{0,40}(?:auction|apprais|valuation|evaluation|estimate|consign|for sale|to sell))',
     '(?:we|the gallery) (?:accept|welcome|review|consider)s? (?:artist |new |unsolicited )?(?:submissions|portfolios)',
     '(?:now |currently )?accepting (?:artist |new )?(?:submissions|portfolios)', 'portfolio reviews?',
-]);
+], WHOLE, {
+    // Submitting work or a portfolio (not "for sale" or for a valuation), an
+    // open call (קול קורא), "artists are invited to submit", the guidelines.
+    he: ['הגשת (?:עבודות|תיק(?:י)? (?:ה)?עבודות|יצירות|מועמדות (?:של |ל)?אמנים)(?![^.!?;\\n]{0,30}(?:מכיר|הערכ|שמאות))', 'קול(?:ות)? קור(?:א|אים)',
+        '(?:אמנים|אמניות|אמנים ואמניות) מוזמנ(?:ים|ות) להגיש', 'מוזמנ(?:ים|ות) להגיש (?:עבודות|תיק|תיקי|יצירות|הצעות)',
+        'שלחו (?:לנו )?(?:את )?(?:תיק(?:י)? (?:ה)?עבודות|עבודות|יצירות)(?![^.!?;\\n]{0,30}(?:מכיר|הערכ|שמאות))', 'הנחיות (?:ל)?הגשה', 'קבלת (?:תיקי עבודות|הגשות)'],
+});
 
 /**
  * Consigning or selling to them: "consign", "sell your art", "selling with
@@ -245,22 +332,35 @@ const CONSIGN = words([
     'apprais\\w*[^.!?;\\n]{0,40}?(?:sale|selling|sell|auction|consign\\w*)', '(?:auction|sale|selling) (?:estimates?|apprais\\w*|valuations?)',
     'valuation (?:requests?|forms?|days?|services?)', 'request (?:a |an |your )?(?:free )?(?:auction )?(?:estimate|valuation|appraisal|evaluation)s?',
     '(?:free|complimentary) (?:auction )?(?:estimates?|valuations?|apprais\\w*|evaluations?)',
-]);
+], WHOLE, {
+    // Handing work over for sale (מסירה למכירה), accepting works for sale,
+    // buying and selling art, "we buy…", appraisal (שמאות) and valuation
+    // (הערכת שווי), "sell your work through us".
+    he: ['מסירה למכירה', 'מסיר(?:ה|ת) (?:עבודות|יצירות|פריטים|אוספים|אוסף) (?:ל)?מכיר', '(?:קבלת|מקבל(?:ים|ת)) (?:עבודות|יצירות|פריטים) (?:ל)?מכיר',
+        '(?:קנייה|קניה) ומכירה של (?:אמנות|אומנות|יצירות|ציורים)', '(?:אנו|אנחנו) קונים[^.!?;\\n]{0,30}?(?:אמנות|אומנות|יצירות|ציורים|אוספים|עזבונות|פריטים)',
+        'שמאות', 'שמאי' + HE_END, 'הערכ(?:ת|ות) שווי', 'למכור (?:את )?(?:ה)?(?:יצירה|יצירות|ציור|ציורים|אוסף|עבודות)[^.!?;\\n]{0,20}?(?:שלכם|שלך|דרכנו|אצלנו|איתנו)'],
+});
 /** "We are not accepting consignments at this time." */
 const NO_CONSIGN = [
     new RegExp(`(?<![\\p{L}])${NEG}${ADVERBS}\\s+(?:accept|tak(?:e|es|ing)|offer|handl)\\w*(?:\\s+(?:any|new|outside|work|works|art|on))*\\s+consign`, 'iu'),
     /\bno consignments\b/i,
+    // "איננו מקבלים עבודות למכירה", "אין קבלת יצירות למכירה".
+    new RegExp(`(?<![\\p{L}])(?:אין|איננו|אנו לא|אנחנו לא|לא)\\s+(?:מקבל(?:ים|ת)?|קונים|קבלת)[^.!?;\\n]{0,20}?(?:עבודות|יצירות|פריטים)\\s+(?:ל|ב)?מכיר`, 'u'),
 ];
 
+/** Other languages' words for the link patterns. Hebrew: הגשת עבודות, קול קורא; מסירה למכירה, שמאות, הערכת שווי, אנו קונים. */
+const SUBMISSION_LINK_WORDS = ['הגשת[-_ ](?:עבודות|תיק|יצירות)', 'הגשות', 'קול[-_ ]קורא', 'קולות[-_ ]קוראים'];
+const NOT_SUBMISSION_LINK_WORDS = ['מכיר', 'שמאות', 'הערכ'];
+const CONSIGN_LINK_WORDS = ['מסירה', 'מסירת', 'שמאות', 'שמאי', 'הערכת[-_ ]שווי', '(?:אנו|אנחנו)[-_ ]קונים', 'קונים[-_ ](?:אמנות|יצירות|ציורים)'];
 /**
  * Links to the pages these fields point at: an address or link text that
  * says submission(s) / open call / submit your work, and one that says
  * consign / sell with us / we buy / valuation / appraisal. A "Consignment
  * submissions" link is a consignment page. Exported for the contact lookup,
- * which reads one page of each (CAMPAIGNS.art.US.followLinks).
+ * which reads one page of each (the art campaign's followLinks).
  */
-export const SUBMISSION_LINK = /^(?!.*(?:consign|auction|apprais|valuation|estimate|\bsell)).*?(?:submissions?|open[-_ ]?calls?\b|call[-_ ]for[-_ ](?:artists|entries|submissions|art)\b|submit[-_ ](?:your[-_ ])?(?:work|art|artwork|portfolio)\b)/i;
-export const CONSIGN_LINK = /consign|(?:^|[/\s])sell(?:ing)?(?:[-_ ](?:with[-_ ]?us|through[-_ ]us|your|art|artwork)|[/\s]|$)|how[-_ ]to[-_ ]sell|we[-_ ]buy|valuations?|apprais|(?:auction|free)[-_ ]estimates?|request[-_ ](?:an?[-_ ])?(?:estimate|valuation|appraisal)/i;
+export const SUBMISSION_LINK = new RegExp(`^(?!.*(?:consign|auction|apprais|valuation|estimate|\\bsell|${NOT_SUBMISSION_LINK_WORDS.join('|')})).*?(?:submissions?|open[-_ ]?calls?\\b|call[-_ ]for[-_ ](?:artists|entries|submissions|art)\\b|submit[-_ ](?:your[-_ ])?(?:work|art|artwork|portfolio)\\b|${SUBMISSION_LINK_WORDS.join('|')})`, 'iu');
+export const CONSIGN_LINK = new RegExp(`consign|(?:^|[/\\s])sell(?:ing)?(?:[-_ ](?:with[-_ ]?us|through[-_ ]us|your|art|artwork)|[/\\s]|$)|how[-_ ]to[-_ ]sell|we[-_ ]buy|valuations?|apprais|(?:auction|free)[-_ ]estimates?|request[-_ ](?:an?[-_ ])?(?:estimate|valuation|appraisal)|${CONSIGN_LINK_WORDS.join('|')}`, 'iu');
 export const ART_LINKS = [SUBMISSION_LINK, CONSIGN_LINK];
 
 /** What a link pattern is tested against: the address (path and query) and its text. */
@@ -293,45 +393,79 @@ function pickLink(links, re, ranks = []) {
 
 // ─── Specialties ──────────────────────────────────────────────────────────
 
+/** One pattern from several: `a|b`, global and Unicode. */
+const either = (...res) => new RegExp(res.map(r => r.source).join('|'), 'giu');
+/** Hebrew "art" with its prefix-free forms, for the specialty phrases: אמנות / אומנות. */
+const HE_ART = '(?:אמנות|אומנות)';
+
 /**
  * The fixed vocabulary of `specialties`, in the order they are listed. Each
  * entry counts only when the listing or the site names it. Single words that
  * mean many things ("modern", "contemporary", "design", "glass") need an art
  * word next to them: "contemporary framing", "modern furniture" and "glass
- * doors" are not specialties.
+ * doors" are not specialties. The values are English whatever the site's
+ * language ("אמנות עכשווית" is contemporary). The list is Varnish AI's own
+ * (lib/leads/labels.ts there, same order), which ends with israeli art and
+ * judaica.
  */
 export const SPECIALTIES = [
-    ['contemporary', words(['contemporary (?:art|arts|artists?|paintings?|works?|photography|sculpture|ceramics|craft|fine art|realism|prints?|abstract\\w*|african|asian|latin|native|american|chinese|indian|glass|gallery|masters?|works on paper)', '(?:modern|post-?war) (?:and|&) contemporary'])],
-    ['modern', words(['modern (?:art|arts|masters?|paintings?|works?|prints?|sculpture|american|british|european|and contemporary|& contemporary)', 'modernis[mt]s?'])],
-    ['post-war', words(['post-?war', 'postwar'])],
-    ['impressionist', words(['(?:post-)?impressionis[mt]s?'])],
-    ['old masters', words(['old masters?'])],
+    ['contemporary', words(['contemporary (?:art|arts|artists?|paintings?|works?|photography|sculpture|ceramics|craft|fine art|realism|prints?|abstract\\w*|african|asian|latin|native|american|chinese|indian|israeli|glass|gallery|masters?|works on paper)', '(?:modern|post-?war) (?:and|&) contemporary'], WHOLE, {
+        he: [`${HE_ART} (?:ה)?(?:ישראלית )?(?:ה)?עכשווית`, `${HE_ART} בת זמננו`, 'אמנ(?:ים|יות) עכשווי(?:ים|ות)', '(?:ציור|צילום|פיסול|יצירה) עכשווי(?:ת)?' + HE_END],
+    })],
+    ['modern', words(['modern (?:art|arts|masters?|paintings?|works?|prints?|sculpture|american|british|european|and contemporary|& contemporary)', 'modernis[mt]s?'], WHOLE, {
+        he: [`${HE_ART} (?:ה)?מודרנית`, 'מודרניז', 'מודרניסט'],
+    })],
+    ['post-war', words(['post-?war', 'postwar'], WHOLE, { he: [`${HE_ART} שלאחר המלחמה`] })],
+    ['impressionist', words(['(?:post-)?impressionis[mt]s?'], WHOLE, { he: ['אימפרסיוניז', 'אימפרסיוניסט'] })],
+    ['old masters', words(['old masters?'], WHOLE, { he: ['מאסטרים (?:ה)?ותיקים'] })],
     ['american art', words(['(?<!(?:native|latin|african|north|south|central|asian|mexican|indian|pan)[- ])american (?:art|paintings?|artists?|masters?|modernism|impressionis[mt]s?|realism|regionalism|illustration)', 'hudson river school'])],
     ['african american art', words(['african[- ]american (?:art|artists?|masters?|fine art)', 'black artists'])],
     ['latin american', words(['latin[- ]american', 'latin(?:o|x|e) (?:art|artists?)'])],
-    ['asian art', words(['asian (?:art|antiques?|artists?|contemporary|works of art)', '(?:chinese|japanese|korean|southeast asian|himalayan|tibetan) (?:art|paintings?|ceramics|porcelain|antiques?|prints|works of art|scrolls?|woodblocks?)', 'ukiyo-?e'])],
-    ['african art', words(['african (?:art|arts|artists?|sculpture|masks?|textiles?|contemporary art|tribal art)', 'tribal art'])],
+    ['asian art', words(['asian (?:art|antiques?|artists?|contemporary|works of art)', '(?:chinese|japanese|korean|southeast asian|himalayan|tibetan) (?:art|paintings?|ceramics|porcelain|antiques?|prints|works of art|scrolls?|woodblocks?)', 'ukiyo-?e'], WHOLE, {
+        he: [`${HE_ART} (?:ה)?(?:אסייתית|יפנית|סינית|הודית)`],
+    })],
+    ['african art', words(['african (?:art|arts|artists?|sculpture|masks?|textiles?|contemporary art|tribal art)', 'tribal art'], WHOLE, { he: [`${HE_ART} (?:ה)?אפריקאית`] })],
     ['native american', words(['native american (?:art|artists?|pottery|jewelry|rugs?|baskets?|weavings?|textiles?|antiques?|beadwork|paintings?)', '(?:pueblo|navajo|hopi|zuni|apache) (?:pottery|rugs?|textiles?|weavings?|jewelry|baskets?|art)', 'kachinas?', 'indigenous (?:art|artists?)', 'american indian art'])],
     ['western art', words(['western (?:art|american art|paintings?|bronzes?|artists?|landscapes?)', 'art of the (?:american )?west', 'cowboy art'])],
-    ['outsider art', words(['outsider art', 'self-taught (?:art|artists?)', 'art brut', 'visionary art'])],
-    ['folk art', words(['folk art'])],
-    ['photography', new RegExp(`(?<![\\p{L}\\p{N}])(?<!installation |installation view |exhibition |website |site |images? |photos? )(?:fine art |contemporary |vintage |documentary )?photograph(?:y|s|ic)(?![\\p{L}\\p{N}])(?!\\s*(?:by|credits?|:|©))`, 'giu')],
-    ['prints', words(['(?:fine art )?prints', 'printmak\\w*', 'lithograph\\w*', 'etchings?', 'screen ?prints?', 'serigraphs?', 'woodcuts?', 'editions and multiples', 'multiples'])],
-    ['sculpture', words(['sculptur(?:e|es|al)', 'sculptors?', 'bronzes'])],
-    ['works on paper', words(['works? on paper'])],
-    ['ceramics', words(['ceramics?', '(?:studio |art )?pottery', 'porcelain'])],
-    ['glass', words(['(?:studio|art|contemporary|blown|fused|sculptural|venetian|murano) glass', 'glass (?:art|sculptures?|artists?)'])],
+    ['outsider art', words(['outsider art', 'self-taught (?:art|artists?)', 'art brut', 'visionary art'], WHOLE, { he: ['(?:אמנות|אומנות) (?:ה)?אאוטסיידר'] })],
+    ['folk art', words(['folk art'], WHOLE, { he: [`${HE_ART} (?:ה)?עממית`] })],
+    ['photography', either(
+        new RegExp(`(?<![\\p{L}\\p{N}])(?<!installation |installation view |exhibition |website |site |images? |photos? )(?:fine art |contemporary |vintage |documentary )?photograph(?:y|s|ic)(?![\\p{L}\\p{N}])(?!\\s*(?:by|credits?|:|©))`, 'giu'),
+        // "צילום: יוסי" and "צילום יוסי לוי" are credits: photography counts
+        // as art photography, next to other media, or as the art of photography.
+        words([], WHOLE, { he: ['צילום (?:אמנותי|עכשווי|ישראלי|דוקומנטרי|אמנות)', 'צילומי (?:אמנות|אמן)', `${HE_ART} (?:ה)?צילום`, 'גלרי(?:ה|ית) (?:ל)?צילום',
+            'צילום(?=[^.!?;:\\n]{0,20}(?:ציור|פיסול|רישום|הדפס|וידאו|מיצב))', '(?:ציור|פיסול|רישום|הדפס|וידאו|מיצב)[^.!?;:\\n]{0,20}צילום'] }),
+    )],
+    ['prints', words(['(?:fine art )?prints', 'printmak\\w*', 'lithograph\\w*', 'etchings?', 'screen ?prints?', 'serigraphs?', 'woodcuts?', 'editions and multiples', 'multiples'], WHOLE, {
+        // הדפס / הדפסים, not הדפסה (printing).
+        he: ['הדפס(?:ים|י)?' + HE_END, 'תחריט', 'ליתוגרפי', 'סריגרפי', 'חיתוכי עץ'],
+    })],
+    ['sculpture', words(['sculptur(?:e|es|al)', 'sculptors?', 'bronzes'], WHOLE, { he: ['פיסול', 'פס(?:ל|לים|לת|לות)' + HE_END] })],
+    ['works on paper', words(['works? on paper'], WHOLE, { he: ['עבודות (?:על )?נייר'] })],
+    ['ceramics', words(['ceramics?', '(?:studio |art )?pottery', 'porcelain'], WHOLE, { he: ['קרמיקה', 'קדרות'] })],
+    ['glass', words(['(?:studio|art|contemporary|blown|fused|sculptural|venetian|murano) glass', 'glass (?:art|sculptures?|artists?)'], WHOLE, {
+        he: [`${HE_ART} (?:ה)?זכוכית`, 'זכוכית אמנותית', 'פיסול (?:ב)?זכוכית', 'ניפוח זכוכית'],
+    })],
     ['design', words(['(?:collectible|collectable|20th[- ]century|mid-century|midcentury|modernist|scandinavian|italian|french|historic|contemporary) design', 'design (?:objects|gallery)', 'mid-?century modern'])],
-    ['decorative arts', words(['decorative arts?', 'objets? d[\'’]art', 'fine (?:and|&) decorative'])],
-    ['emerging artists', words(['emerging (?:and (?:established|mid-career) )?(?:artists?|talent|art)'])],
+    ['decorative arts', words(['decorative arts?', 'objets? d[\'’]art', 'fine (?:and|&) decorative'], WHOLE, { he: [`${HE_ART} שימושית`, '(?:אמנויות|אומנויות) שימושיות'] })],
+    ['emerging artists', words(['emerging (?:and (?:established|mid-career) )?(?:artists?|talent|art)'], WHOLE, {
+        he: ['אמנ(?:ים|יות) צעיר(?:ים|ות)', 'אמנ(?:ים|יות) מתחיל(?:ים|ות)', 'אמנ(?:ים|יות) בתחילת דרכ'],
+    })],
+    ['israeli art', words(['israeli (?:art|artists?|painters?|painting|photograph\\w*|sculpt\\w*|contemporary art|modern art)', 'art (?:of|from) israel', '(?:contemporary|modern) israeli'], WHOLE, {
+        he: [`${HE_ART} (?:ה)?ישראלית`, 'אמנ(?:ים|יות) (?:ה)?ישראלי(?:ים|ות)', '(?:ציור|צילום|פיסול) (?:ה)?ישראלי' + HE_END, 'ציירים ישראלים'],
+    })],
+    ['judaica', words(['judaica', 'judaika', 'judaïca', 'jewish ceremonial art', 'jewish ritual (?:art|objects)'], WHOLE, { he: ['יודאיקה', 'יודאיקא', 'תשמישי קדושה'] })],
 ];
 
 /**
  * Museum names say nothing about the gallery: "near the Asian Art Museum",
  * "the Museum of Modern Art", "the Institute of Contemporary Art". They are
  * capitalised, which keeps "contemporary art and the museum shop" intact.
+ * Hebrew has no capitals: "מוזיאון" and the words after it, up to four
+ * ("מוזיאון הרצליה לאמנות עכשווית").
  */
 const MUSEUM_NAMES = /(?<![\p{L}])(?:(?:\p{Lu}[\p{L}'’.-]*\s+){0,3}Museum(?:\s+of(?:\s+the)?(?:\s+\p{Lu}[\p{L}'’.-]*){1,4})?|(?:Institute|Cent(?:er|re))\s+(?:of|for)\s+(?:\p{Lu}[\p{L}'’.-]*\s+){0,3}Arts?)(?![\p{L}])/gu;
+const MUSEUM_NAMES_HE = /(?<![\p{L}])[והבכלש]{0,2}(?:מוזיאון|מוזאון|משכן לאמנות)(?:\s+[^\s,.;:!?()"״]+){0,4}/gu;
 
 // ─── Scoring ──────────────────────────────────────────────────────────────
 
@@ -434,7 +568,7 @@ export function scoreArt(lead, siteText = '', sellable = { ok: true }, links = [
     const accepts_submissions = noSubmissions ? 'no' : (has(YES_SUBMISSIONS, all) || submissionUrl) ? 'yes' : 'unknown';
     const consignUrl = pickLink(links, CONSIGN_LINK, [/consign/i, /sell/i, /we[-_ ]buy/i]);
     const consigned = !NO_CONSIGN.some(re => re.test(all)) && (has(CONSIGN, all) || !!consignUrl);
-    const specialtyText = all.replace(MUSEUM_NAMES, ' ');
+    const specialtyText = all.replace(MUSEUM_NAMES, ' ').replace(MUSEUM_NAMES_HE, ' ');
     const specialties = SPECIALTIES.filter(([, re]) => has(re, specialtyText)).map(([word]) => word);
 
     // ─── Score ───

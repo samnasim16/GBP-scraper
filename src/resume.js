@@ -19,6 +19,15 @@ import { placeKey, nameKey } from './maps.js';
 
 export const PROGRESS_FILE = 'progress.json';
 
+/**
+ * What a progress.json belongs to: the market, and the campaign if any
+ * ("IL", "IL-sushi", "IL-art", "WORLD-art"). A sushi or art run never
+ * resumes a Judaica one, even with the same number of queries.
+ */
+export function runKey(country = {}) {
+    return country.campaign ? `${country.code}-${country.campaign}` : country.code;
+}
+
 /** The rows a previous run saved, or [] when there are none. */
 export function loadPrevious(outputDir) {
     const file = path.join(outputDir, 'leads.json');

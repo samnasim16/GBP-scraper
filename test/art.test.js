@@ -61,8 +61,7 @@ test('the art campaign is the US with its own terms, places, templates and folde
     assert.equal(US.campaign, undefined);
     assert.match(US.emailTemplate, /partnership-email-us\.txt$/);
     assert.ok(US.categories.includes('Judaica'));
-    assert.throws(() => resolveCountry({ country: 'DE', campaign: 'art' }), /United States only/);
-    assert.throws(() => resolveCountry({ country: 'IL', campaign: 'art' }), /United States only/);
+    assert.throws(() => resolveCountry({ country: 'DE', campaign: 'art' }), /set up for United States, Israel only, not Germany/);
 
     const locs = resolveLocations({ country: 'US', campaign: 'art' }, () => {});
     for (const city of ['New York, NY', 'Brooklyn, NY', 'Los Angeles, CA', 'San Francisco, CA', 'Chicago, IL', 'Miami, FL', 'Palm Beach, FL',

@@ -12,7 +12,7 @@
  * Runs on this machine with your own Chrome. No accounts, no per-lead cost.
  * "campaign": "sushi" in the input file looks for sushi restaurants instead
  * (Israel), to sell glass plates and cups; "campaign": "art" builds Varnish
- * AI's directory of US art buyers; see CAMPAIGNS in config.js.
+ * AI's directory of art buyers (US, Israel); see CAMPAIGNS in config.js.
  *
  * Run:  npm start               (reads ./input.json, writes ./output/)
  */
@@ -30,7 +30,7 @@ import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { isTarget, TARGET_TIERS } from './relevance.js';
 import { sleep } from './util.js';
 import { loadWhatsAppTemplate } from './whatsapp.js';
-import { loadPrevious, readProgress, writeProgress, resumePoint, seedSeen, needsContactLookup, backupPrevious } from './resume.js';
+import { loadPrevious, readProgress, writeProgress, resumePoint, seedSeen, needsContactLookup, backupPrevious, runKey } from './resume.js';
 
 loadDotEnv();
 
@@ -68,8 +68,8 @@ const template = loadTemplate(emailTemplate);
 const WORKBOOK = input.workbook || COUNTRY.workbook || 'judaica-leads.xlsx';
 const LIST = COUNTRY.list ? { ...COUNTRY.list, ...(input.listFile ? { file: input.listFile } : {}) } : null;
 const saveResults = createSaver(OUTPUT_DIR, { template, sender, includeTiers, whatsappTemplate, workbook: WORKBOOK, list: LIST, columns: COUNTRY.columns });
-// What progress.json belongs to: a sushi run never resumes a Judaica one.
-const RUN_KEY = COUNTRY.campaign ? `${COUNTRY.code}-${COUNTRY.campaign}` : COUNTRY.code;
+// What progress.json belongs to: a sushi or art run never resumes a Judaica one.
+const RUN_KEY = runKey(COUNTRY);
 
 // ─── CRASH SAFETY NET ─────────────────────────────────────────────────────
 let LEADS_REF = [];

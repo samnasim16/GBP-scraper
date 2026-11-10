@@ -121,6 +121,17 @@ export function stateFromAddress(address) {
 }
 
 /**
+ * The region column (`bundesland`) for a market whose profile sets
+ * `regionInAddress`: the state, province or emirate the address names, and
+ * nothing when it names none. Israeli addresses name no district, so an
+ * Israeli row has none.
+ */
+export function regionFromAddress(address, countryCode) {
+    if (countryCode === 'US') return stateFromAddress(address);
+    return '';
+}
+
+/**
  * The City column. German Maps addresses (English UI) name the district, not
  * the city: "50823 Ehrenfeld", "01279 Dresden-Leuben". So in Germany the
  * address town wins only when it is itself one of the cities we search (the
@@ -345,7 +356,9 @@ export async function scrapeQuery(page, query, ctx, opts) {
                 website:            d.websiteUrl || '',
                 city:               addrCity,
                 // A US address names its state; a Teaneck search can return a Monsey shop.
-                bundesland:         (country.stateInAddress && stateFromAddress(address)) || query.state,
+                // Some campaigns take the region only from the address (art: Varnish shows it).
+                bundesland:         country.regionInAddress ? regionFromAddress(address, country.code)
+                    : (country.stateInAddress && stateFromAddress(address)) || query.state,
                 address:            address,
                 category:           titleCase(clean(d.category) || clean(c.category)),
                 rating:             rating ?? '',

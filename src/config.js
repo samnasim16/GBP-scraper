@@ -326,6 +326,50 @@ export const US_ART_CATEGORIES = [
 ];
 
 /**
+ * The art campaign in Israel. Tel Aviv-Yafo is the market — the Gordon
+ * Street galleries, Florentin and Kiryat HaMelacha's young galleries, Neve
+ * Tzedek, Old Jaffa and the Jaffa Port, Ben Yehuda and Dizengoff, where the
+ * auction houses are — then Jerusalem (Hutzot Hayotzer, Musrara, the German
+ * Colony, Talbiya, Ein Kerem), Haifa (Wadi Nisnas, the German Colony), the
+ * Sharon (Herzliya, Ra'anana, Kfar Saba, Netanya), Ramat Gan, the artists'
+ * villages and towns (Ein Hod, Safed's artists' quarter, Rosh Pina, Zikhron
+ * Ya'akov, Kiryat Tivon, Caesarea) and the south (Be'er Sheva, Eilat,
+ * Mitzpe Ramon). Maps shows ~120 places per search, so Tel Aviv-Yafo and
+ * Jerusalem are searched district by district too.
+ */
+export const ISRAEL_ART_CITIES = {
+    TA: ['Tel Aviv-Yafo', 'Ramat Gan', 'Herzliya'],
+    JM: ['Jerusalem'],
+    HA: ['Haifa', 'Ein Hod', "Zikhron Ya'akov", 'Caesarea', 'Kiryat Tivon'],
+    CE: ["Ra'anana", 'Kfar Saba', 'Netanya'],
+    NO: ['Safed', 'Rosh Pina'],
+    SO: ["Be'er Sheva", 'Eilat', 'Mitzpe Ramon'],
+};
+export const ISRAEL_ART_DISTRICTS = {
+    'Tel Aviv-Yafo': ['Gordon Street', 'Florentin', 'Neve Tzedek', 'Old Jaffa', 'Jaffa Port', 'Kiryat HaMelacha', 'Ben Yehuda Street', 'Dizengoff'],
+    Jerusalem: ['Hutzot Hayotzer', 'Musrara', 'German Colony', 'Talbiya', 'Ein Kerem', 'Mamilla'],
+    Haifa: ['Wadi Nisnas', 'German Colony'],
+    Herzliya: ['Herzliya Pituach'],
+    Safed: ['Artists Colony'],
+};
+/** Hebrew first, one term per kind of buyer in each language (highYield); the narrower ones follow. */
+export const ISRAEL_ART_CATEGORIES = [
+    'גלריה לאמנות',
+    'Art gallery',
+    'בית מכירות פומביות',
+    'Auction house',
+    'סוחר אמנות',
+    'Art dealer',
+    'יועץ אמנות',
+    'Art advisor',
+    'גלריה',
+    'אמנות ישראלית',
+    'מכירה פומבית',
+    'Art auction',
+    'Contemporary art gallery',
+];
+
+/**
  * Israel, by district. Judaica retail is densest in Jerusalem (Mea Shearim,
  * Geula, the Old City, Ben Yehuda / Mamilla for tourists), Bnei Brak (Rabbi
  * Akiva Street), Safed's artists' quarter, and the Haredi towns (Beit
@@ -564,6 +608,32 @@ export const COUNTRIES = {
     },
 };
 
+/** What every art-campaign market shares: the tiers, the feed drop, the links followed, the columns. */
+const ART_CAMPAIGN = {
+    title: 'Art Buyer Directory',
+    client: 'Varnish AI',
+    workbook: 'art-leads.xlsx',
+    includeTiers: ART_TIERS.slice(0, 4),
+    tiers: ART_TIERS,
+    // Frame shops, supply stores, paint-and-sip, tattoo… A frame shop
+    // that calls itself a gallery is kept: its site may show exhibitions.
+    dropAtFeed: ['Not a buyer'],
+    dropLabel: 'not-a-buyer',
+    // Also read one submissions page and one consign page, and keep
+    // the links for submission_url / consign_url.
+    followLinks: ART_LINKS,
+    // The art columns in the workbook and leads.csv, after Category
+    // (leads.json carries every field anyway).
+    columns: [
+        ['art_type',             'Art Type',        13],
+        ['specialties',          'Specialties',     30],
+        ['accepts_submissions',  'Submissions',     12],
+        ['submission_url',       'Submission Page', 34],
+        ['accepts_consignments', 'Consignments',    13],
+        ['consign_url',          'Consign Page',    34],
+    ],
+};
+
 /**
  * Campaigns: the same scraper pointed at another kind of buyer. A campaign
  * replaces a market's search terms, places, scoring, templates, outreach
@@ -614,43 +684,41 @@ export const CAMPAIGNS = {
     },
     // Varnish AI's directory of art buyers: galleries, auction houses, art
     // dealers and art advisors (the scoring and the leads.json fields are in
-    // art.js). The US only for now.
+    // art.js). The US and Israel.
     art: {
         US: {
-            title: 'Art Buyer Directory',
-            client: 'Varnish AI',
+            ...ART_CAMPAIGN,
             regions: US_ART_CITIES,
             districts: US_ART_DISTRICTS,
             categories: US_ART_CATEGORIES,
             highYield: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor'],
             outputDir: 'output-us-art',
-            workbook: 'art-leads.xlsx',
-            includeTiers: ART_TIERS.slice(0, 4),
-            tiers: ART_TIERS,
-            // Frame shops, supply stores, paint-and-sip, tattoo… A frame shop
-            // that calls itself a gallery is kept: its site may show exhibitions.
-            dropAtFeed: ['Not a buyer'],
-            dropLabel: 'not-a-buyer',
             // Galleries put their email on /contact, /visit or /info; the
             // homepage fallback also tries /about.
             contactPaths: ['/contact', '/visit', '/info', '/about', '/contact-us', '/about-us'],
-            // Also read one submissions page and one consign page, and keep
-            // the links for submission_url / consign_url.
-            followLinks: ART_LINKS,
-            // The art columns in the workbook and leads.csv, after Category
-            // (leads.json carries every field anyway).
-            columns: [
-                ['art_type',             'Art Type',        13],
-                ['specialties',          'Specialties',     30],
-                ['accepts_submissions',  'Submissions',     12],
-                ['submission_url',       'Submission Page', 34],
-                ['accepts_consignments', 'Consignments',    13],
-                ['consign_url',          'Consign Page',    34],
-            ],
             // A short introduction to the Varnish AI directory, with an opt-out.
             emailTemplate: path.join(TEMPLATES, 'art-email-en.txt'),
             whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-en.txt'),
             script: 'art:us',
+        },
+        // Israel, searched in Hebrew and English; the IL profile's address,
+        // phone (+972) and foreign-result rules apply.
+        IL: {
+            ...ART_CAMPAIGN,
+            regions: ISRAEL_ART_CITIES,
+            districts: ISRAEL_ART_DISTRICTS,
+            categories: ISRAEL_ART_CATEGORIES,
+            highYield: ISRAEL_ART_CATEGORIES.slice(0, 8),
+            outputDir: 'output-il-art',
+            // Israeli addresses name no district, and a Tel Aviv search finds
+            // Herzliya galleries, so the region column stays empty rather
+            // than repeat the searched district.
+            regionInAddress: true,
+            contactPaths: ['/contact', '/%D7%A6%D7%95%D7%A8-%D7%A7%D7%A9%D7%A8', '/visit', '/info', '/about', '/contact-us'],
+            // Hebrew, in the one-time request form Israel's anti-spam law allows.
+            emailTemplate: path.join(TEMPLATES, 'art-email-he.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-he.txt'),
+            script: 'art:il',
         },
     },
 };
