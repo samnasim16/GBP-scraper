@@ -624,8 +624,11 @@ export const COUNTRIES = {
         // English pages where a site has them: the art words read every
         // language, but English is the one most galleries offer.
         acceptLanguage: 'en-GB,en;q=0.9',
-        contactKeyPage: 'contact|kontakt|impressum|mentions|contatti|contacto|contato|visit|info',
-        contactPaths: ['/contact', '/kontakt', '/contatti', '/contacto', '/contato', '/visit', '/info', '/about', '/impressum'],
+        // Kapcsolat (Hungarian), iletişim (Turkish), kontak / hubungi (Indonesian,
+        // Malay), liên hệ (Vietnamese) too; kontakt covers Polish, Czech,
+        // Slovak, the Balkans and the Baltics.
+        contactKeyPage: 'contact|kontakt|impressum|mentions|contatti|contacto|contato|visit|info|kapcsolat|iletisim|kontak|hubungi|lien-he',
+        contactPaths: ['/contact', '/kontakt', '/contatti', '/contacto', '/contato', '/visit', '/info', '/about', '/impressum', '/kapcsolat', '/iletisim'],
         outputDir: 'output-world',
         addressTownWins: true,
         foreign: WORLD_FOREIGN,
@@ -744,7 +747,7 @@ export const CAMPAIGNS = {
             whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-he.txt'),
             script: 'art:il',
         },
-        // The world's other art markets, ~90 cities in 30 countries
+        // The world's other art markets, 181 cities in 76 countries
         // (world.js); every search runs as its own country. English terms:
         // Maps maps them onto its categories in every language.
         WORLD: {
@@ -752,9 +755,11 @@ export const CAMPAIGNS = {
             categories: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor', 'Contemporary art gallery', 'Fine art gallery'],
             highYield: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor'],
             outputDir: 'output-world-art',
-            // The state, province or emirate where the address names one
-            // (Australia, Canada, Brazil, Mexico, India, the UAE, Japan,
-            // Colombia); empty elsewhere, never the country code.
+            // The state, province, emirate, oblast, department or governorate
+            // where the address names one (Australia, Canada, Brazil, Mexico,
+            // India, the UAE, Japan, Colombia, Türkiye, Ukraine, Chile,
+            // Uruguay, Thailand, Indonesia, the Philippines, Malaysia,
+            // Nigeria, Egypt…); empty elsewhere, never the country code.
             regionInAddress: true,
             // The English art templates: a neutral opt-out line and a
             // [Postal address] for the user, nothing US-only.
@@ -833,6 +838,63 @@ export function loadInput(log = console.log) {
     return {};
 }
 
+/** "Kraków" = "Krakow", "Łódź" = "Lodz": city names compared without case or accents. */
+const cityKey = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[łŁ]/g, 'l').replace(/[øØ]/g, 'o').replace(/[đĐ]/g, 'd').replace(/ı/g, 'i').replace(/ß/g, 'ss').replace(/[æÆ]/g, 'ae')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * The searches for an input file's `places`: { code: [cities] }, each city
+ * searched as that code's region or market. A city the run already knows
+ * comes out exactly as the full run searches it (same code, same string:
+ * "krakow" → "Kraków", "Budapest, Hungary" → "Budapest", a US "Miami" under
+ * FL → "Miami, FL"). The profile's own code ("IL", "US") is accepted too:
+ * each known city goes to its region, a US "City, ST" to that state, and
+ * any other city stays under the code (a many-country run skips it: a city
+ * with no country has no market). An unknown code is skipped with a warning.
+ */
+function placeLocations(places, country, log) {
+    const REGIONS = country.regions;
+    // US cities carry their state ("Miami, FL"): a city without one can't be placed.
+    const suffixed = (code) => (REGIONS[code] || []).length > 0 && REGIONS[code].every(c => c.endsWith(`, ${code}`));
+    const allSuffixed = Object.keys(REGIONS).every(suffixed);
+    const namesOf = (code) => (country.markets && country.markets[code] ? (country.markets[code].names || [country.markets[code].name]) : [country.name]);
+    // "Budapest, Hungary" → "Budapest"; Israel's "Arad, Israel" → "Arad".
+    const bare = (code, city) => namesOf(code).reduce((c, n) => c.replace(new RegExp(`,\\s*${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), ''), city);
+    const known = (code, city) => {
+        const list = REGIONS[code] || [];
+        const key = cityKey(bare(code, city));
+        return list.find(c => cityKey(c) === cityKey(city)) || list.find(c => cityKey(bare(code, c)) === key)
+            || (suffixed(code) && list.find(c => cityKey(c) === cityKey(`${bare(code, city)}, ${code}`))) || '';
+    };
+    const out = [];
+    for (const [key, list] of Object.entries(places)) {
+        let code = String(key).trim().toUpperCase();
+        if (code === 'GB' && REGIONS.UK && !REGIONS.GB) code = 'UK';
+        const own = !REGIONS[code] && code === country.code;
+        if (!REGIONS[code] && !own) {
+            log(`⚠️  Unknown ${country.regionLabel} "${key}" in "places" — skipping. Known: ${Object.keys(REGIONS).join(', ')}`);
+            continue;
+        }
+        for (const raw of (Array.isArray(list) ? list : [list]).map(c => String(c ?? '').trim()).filter(Boolean)) {
+            if (!own) {
+                const listed = known(code, raw);
+                const addState = !listed && suffixed(code) && !/,\s*[A-Z]{2}$/.test(raw);
+                out.push({ state: code, city: listed || (addState ? `${raw}, ${code}` : raw) });
+                continue;
+            }
+            const region = Object.keys(REGIONS).find(r => known(r, raw));
+            const st = (raw.match(/,\s*([A-Z]{2})$/) || [])[1];
+            if (region) out.push({ state: region, city: known(region, raw) });
+            else if (st && REGIONS[st]) out.push({ state: st, city: raw });
+            else if (!country.markets && !allSuffixed) out.push({ state: code, city: raw });
+            else log(`⚠️  "${raw}" in "places" under "${key}" names no ${country.markets ? 'country' : country.regionLabel} — skipping. Put it under its code.`);
+        }
+    }
+    const seen = new Set();
+    return out.filter(l => !seen.has(`${l.state}|${l.city}`) && seen.add(`${l.state}|${l.city}`));
+}
+
 /**
  * Turn the raw config into a concrete list of { state, city } searches.
  *
@@ -840,17 +902,22 @@ export function loadInput(log = console.log) {
  *   cities: ["Worms"]    — an explicit list, which replaces the built-in one
  *                          (with one "states" code, the cities are in that
  *                          country: Europe's "states": ["DE"] + German cities)
+ *   places: { "HU": ["Budapest", "Pécs"], "PL": ["Kraków"] }
+ *                        — cities by region or country code, in one file and
+ *                          many countries; wins over states and cities
  *   districts: true      — also search the big cities district by district
  */
 export function resolveLocations(input = {}, log = console.log) {
-    const { states = [], cities = [], districts = true } = input;
+    const { states = [], cities = [], districts = true, places } = input;
     const country = resolveCountry(input);
     const REGIONS = country.regions;
     const DISTRICTS = country.districts;
     const out = [];
     const push = (state, city) => out.push({ state, city });
 
-    if (Array.isArray(cities) && cities.length > 0) {
+    if (hasPlaces(input)) {
+        out.push(...placeLocations(places, country, log));
+    } else if (Array.isArray(cities) && cities.length > 0) {
         // A many-country run (Europe) searches each place as its country.
         const only = Array.isArray(states) && states.length === 1 ? String(states[0]).trim().toUpperCase() : '';
         for (const c of [...new Set(cities.map(c => String(c).trim()))]) {
@@ -873,6 +940,23 @@ export function resolveLocations(input = {}, log = console.log) {
         }
     }
     return out;
+}
+
+/** Does the input file name its own `places` (a non-empty { code: [cities] })? */
+export function hasPlaces(input = {}) {
+    const p = input.places;
+    return !!p && typeof p === 'object' && !Array.isArray(p) && Object.keys(p).length > 0;
+}
+
+/**
+ * Where a run writes leads.json, the workbook and progress.json: the input
+ * file's "outputDir", else the market's folder. A "places" run (an input
+ * Varnish generates for a few cities) without one gets "<folder>-places",
+ * so it never resumes, or writes progress into, the full run's folder.
+ */
+export function resolveOutputDir(input = {}, country = resolveCountry(input)) {
+    if (input.outputDir) return String(input.outputDir);
+    return hasPlaces(input) ? `${country.outputDir}-places` : country.outputDir;
 }
 
 /** Build the query matrix, high-yield terms first across every location. */

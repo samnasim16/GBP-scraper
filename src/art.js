@@ -6,10 +6,12 @@
  * dealers and art advisors from Google Business Profiles in the US, Israel
  * and the world's other art markets (world.js). Names and sites are read in
  * their own language: the same lists carry Hebrew words (matched after the
- * prefix letters ו ה ב כ ל ש, as in relevance.js), the main European
- * languages, and Japanese, Korean and Chinese (matched anywhere). Every
- * field keeps its English values (`specialties` are English words whatever
- * the site's language).
+ * prefix letters ו ה ב כ ל ש, as in relevance.js), Arabic words (after
+ * و ف ب ل ك and the article ال), the European languages (Hungarian, Polish,
+ * Czech, Greek, Turkish, Romanian and the Cyrillic ones included),
+ * Indonesian and Vietnamese, and Japanese, Korean, Chinese and Thai
+ * (matched anywhere). Every field keeps its English values (`specialties`
+ * are English words whatever the site's language).
  *
  * Same idea as the Judaica scoring in relevance.js and sushi.js: every row is
  * scored on the words in its name, Maps category and description, and (once
@@ -42,15 +44,21 @@ const WHOLE = '(?![\\p{L}\\p{N}])';
  * `he`: Hebrew words, after up to two prefix letters (ו ה ב כ ל ש:
  * "הגלריה", "בגלריה", "לאמנות") and with no end, so plurals and construct
  * forms match ("גלריית", "תערוכות"); a word that needs an end says so. Not
- * מ, as in relevance.js. `cjk`: Japanese, Chinese and Korean words, which
- * match anywhere, because those scripts put no space between words
- * ("銀座ギャラリー", "국제갤러리").
+ * מ, as in relevance.js. `ar`: Arabic words, after the conjunction or
+ * preposition (و ف ب ل ك) and the article (ال, لل) Arabic glues on
+ * ("والمزاد", "للفنون"), with no end unless the word gives one. `cjk`:
+ * Japanese, Chinese, Korean and Thai words, which match anywhere, because
+ * those scripts put no space between words ("銀座ギャラリー", "국제갤러리",
+ * "แกลเลอรี่ร่วมสมัย").
  */
-const words = (alternatives, end = WHOLE, { he = [], cjk = [] } = {}) => new RegExp([
+const words = (alternatives, end = WHOLE, { he = [], cjk = [], ar = [] } = {}) => new RegExp([
     alternatives.length ? `(?<![\\p{L}\\p{N}])(?:${alternatives.join('|')})${end}` : '',
     he.length ? `(?<![\\p{L}\\p{N}])[והבכלש]{0,2}(?:${he.join('|')})` : '',
+    ar.length ? `(?<![\\p{L}\\p{N}])[وفبلك]?(?:ال|لل)?(?:${ar.join('|')})` : '',
     cjk.length ? `(?:${cjk.join('|')})` : '',
 ].filter(Boolean).join('|'), 'giu');
+/** An Arabic word that must end there: "فن" (art), not "فندق" (hotel). */
+const AR_END = '(?![\\p{L}])';
 const has = (re, text) => String(text || '').search(re) !== -1;
 /** A Hebrew word that must end there: "סוחר" (dealer), not "סוחרים". */
 const HE_END = '(?![\\p{L}])';
@@ -73,9 +81,9 @@ function find(re, text) {
 /**
  * "Museum" that names a place, not an institution: a commercial gallery in
  * Houston's Museum District, on Santa Fe's Museum Hill or in Miami's Museum
- * Park; and a frame shop's "museum-quality framing".
+ * Park; a frame shop's "museum-quality framing"; Budapest's Múzeum körút.
  */
-const MUSEUM_PLACE = /(?<![\p{L}])museum[- ](?:district|mile|row|quarter|square|hill|campus|park|way|walk|plaza|place|street|avenue|drive|road|boulevard|lane|st|ave|dr|rd|blvd|ln|quality)(?![\p{L}])\.?/giu;
+const MUSEUM_PLACE = /(?<![\p{L}])museum[- ](?:district|mile|row|quarter|square|hill|campus|park|way|walk|plaza|place|street|avenue|drive|road|boulevard|lane|st|ave|dr|rd|blvd|ln|quality)(?![\p{L}])\.?|(?<![\p{L}])múzeum (?:körút\p{L}*|utc[aá]\p{L}*|krt\.?|u\.)(?![\p{L}])/giu;
 
 /** The business name without its museum-district words. Used by isSellable for this campaign too. */
 export function museumWordsOut(name) {
@@ -109,8 +117,34 @@ const NONPROFIT_ART = words([
         'école (?:nationale |supérieure |municipale |régionale )?des beaux-arts', 'accademia (?:di|delle) belle arti', '(?:academia|escuela|escola) de (?:bellas|belas) artes', 'academie (?:voor|van) beeldende kunsten?',
         'universit(?:é|à|ät|eit|et|ad|ade|ario|aria)', 'associazione culturale', 'asociaci[oó]n cultural', 'association culturelle', 'kunstvereniging',
         'galleria (?:nazionale|civica|comunale|regionale)', 'nationalgalerie', 'staatsgalerie', 'stadtgalerie', 'städtische galerie', 'galerie (?:municipale|nationale)',
-        'galer[ií]a (?:municipal|nacional)', 'ayuntamiento', 'municipalidad', 'prefeitura', 'comune di', 'gemeente'],
+        'galer[ií]a (?:municipal|nacional)', 'ayuntamiento', 'municipalidad', 'prefeitura', 'comune di', 'gemeente',
+        // The rest of Europe: museums (Múzeum, Muzeul, Muzej, Muuseum, Müze,
+        // Μουσείο, Музей; Finnish taidemuseo), foundations (alapítvány,
+        // fundacja, nadace, nadácia, vakıf, fundația, zaklada, säätiö, ίδρυμα,
+        // фондация), associations, Kunsthallen (Műcsarnok, taidehalli), the
+        // national, municipal and regional galleries (Nemzeti Galéria, Zachęta,
+        // galeria miejska, BWA, Národní galerie, Moravská galerie, Slovenská
+        // národná galéria, Moderna galerija, πινακοθήκη), culture houses and
+        // centres, universities and academies of fine arts.
+        'múzeum\\p{L}*', '\\p{L}+múzeum\\p{L}*', 'alapítvány\\p{L}*', 'egyesület\\p{L}*', 'műcsarnok', 'nemzeti galéria', 'városi galéria', 'fővárosi képtár',
+        'művelődési (?:ház|központ)', 'kulturális központ', 'egyetem\\p{L}*',
+        'fundacj\\p{L}*', 'stowarzyszeni\\p{L}*', 'galeria miejska', 'miejska galeria', 'galeria (?:sztuki )?narodowa', 'narodowa galeria', 'zachęt[ay]', 'centrum (?:sztuki|kultury)',
+        '(?:miejski |gminny )?dom kultury', 'biuro wystaw artystycznych', 'bwa', 'akademi[ae] sztuk pięknych', 'uniwersytet\\p{L}*',
+        'nadace', 'nadační', 'nadáci[ae]', 'spolek', 'národní galerie', 'městská galerie', 'krajská galerie', 'oblastní galerie', 'galerie výtvarného umění', 'galerie hlavního města prahy',
+        'moravská galerie', 'slovenská národná galéria', 'mestská galéria', 'galéria mesta bratislavy', 'kulturní centrum', 'kultúrne centrum', 'dům umění', 'dom umenia',
+        'univerzit\\p{L}*', 'akademie výtvarných umění',
+        'muzej\\p{L}*', 'zaklad[ae]', 'zadužbin\\p{L}*', 'udruga', 'udruženje', 'moderna galerija', 'umjetnička galerija', 'gradska galerija', 'galerija grada', 'sveučilište', 'univerzitet\\p{L}*', 'kulturni centar', 'dom kulture',
+        'muuseum\\p{L}*', '\\p{L}+muuseum\\p{L}*', 'muzejs', 'muziej\\p{L}*', 'sihtasutus', '\\p{L}+museo', 'säätiö\\p{L}*', 'taidehalli', 'yliopisto',
+        'μουσε[ιί]\\p{L}*', '[ιί]δρυμα', 'ιδρ[υύ]ματ\\p{L}*', 'πινακοθ[ηή]κ\\p{L}*', 'πανεπιστ[ηή]μι\\p{L}*', 'δημοτικ[ηή] (?:πινακοθ[ηή]κη|γκαλερ[ιί])', 'πολιτιστικ[οό] κ[εέ]ντρο', 'κ[εέ]ντρο (?:σ[υύ]γχρονης )?τ[εέ]χνης', 'σ[υύ]λλογο[ςσ]',
+        'müze(?:si|leri|nin|de|ler)?', 'vak(?:[ıi]f|f[ıi])', 'derne(?:k|ği)', 'belediye\\p{L}*', 'üniversite\\p{L}*', '(?:kültür|sanat|kültür ve sanat) merkezi',
+        'muze(?:ul|ului|u|e)', 'funda[țţt]i(?:a|ei|e)', 'asocia[țţt]i(?:a|ei)', 'centrul (?:cultural|de art[ăa])', 'galeria na[țţt]ional[ăa]', 'universitat\\p{L}*',
+        'музе\\p{L}*', 'фондаци\\p{L}*', 'фундаці\\p{L}*', 'фонд', 'университет\\p{L}*', 'університет\\p{L}*', 'универзитет\\p{L}*', 'национал\\p{L}* (?:художествена )?галери\\p{L}*', 'національн\\p{L}* (?:художн\\p{L}* )?музей',
+        // Indonesia and Malaysia (Galeri Nasional, Balai Seni Negara, Taman Budaya, yayasan), Vietnam (bảo tàng, Hội Mỹ thuật).
+        'yayasan', 'universitas', 'universiti', 'galeri nasional', 'taman budaya', 'balai (?:seni (?:visual )?negara|budaya)', 'bảo tàng', 'trung tâm văn hóa', 'đại học', 'hội mỹ thuật'],
 ], WHOLE, {
+    // Arabic: museums, associations, universities, ministries and public
+    // authorities (هيئة الفنون البصرية), cultural centres and foundations.
+    ar: ['متحف', 'متاحف', 'جمعية', 'جامعة', 'وزارة', 'هيئة', 'مركز (?:ال)?ثقافي', 'مؤسسة (?:ال)?(?:ثقافية|فنية|غير ربحية)'],
     // Museums, art and culture centres, the artists' houses and workshops
     // (בית האמנים, סדנאות האמנים), Ein Harod's משכן לאמנות, community
     // centres, non-profits (עמותה, ע"ר, אגודת…), universities and colleges,
@@ -121,11 +155,14 @@ const NONPROFIT_ART = words([
     // Art museums and museums, art centres, foundations, universities, and
     // the public ones (municipal, prefectural, national).
     cjk: ['美術館', '美术馆', '博物館', '博物馆', '미술관', '박물관', 'アートセンター', '아트센터', '藝術中心', '艺术中心', '文化センター', '文化中心', '문화재단',
-        '基金會', '基金会', '財団', '재단', '大学', '大學', '대학교', '市立', '県立', '都立', '府立', '国立', '國立', '국립', '시립', '公立'],
+        '基金會', '基金会', '財団', '재단', '大学', '大學', '대학교', '市立', '県立', '都立', '府立', '国立', '國立', '국립', '시립', '公立',
+        // Thai: museums, foundations, universities, the Bangkok Art and Culture Centre.
+        'พิพิธภัณฑ์', 'มูลนิธิ', 'มหาวิทยาลัย', 'หอศิลปวัฒนธรรม'],
 });
 /** The Maps description says so: "Non-profit gallery…", "University gallery…". */
 const NONPROFIT_DESCRIPTION = words(['non-?profit', 'not[- ]for[- ]profit', '501\\s?\\(?c\\)?\\s?\\(?3\\)?', '(?:university|college)(?:[\'’]s)? (?:art )?(?:gallery|museum)',
-    'registered charity', 'sans but lucratif', '(?:à|a) but non lucratif', 'gemeinnützig\\p{L}*', 'senza scopo di lucro', 'sin (?:ánimo|animo|fines) de lucro', 'sem fins lucrativos', 'zonder winstoogmerk', 'ideell förening'], WHOLE, {
+    'registered charity', 'sans but lucratif', '(?:à|a) but non lucratif', 'gemeinnützig\\p{L}*', 'senza scopo di lucro', 'sin (?:ánimo|animo|fines) de lucro', 'sem fins lucrativos', 'zonder winstoogmerk', 'ideell förening',
+    'nonprofit', 'non-profit', 'organizacj\\p{L}* pożytku publicznego', 'non-profit szervezet', 'közhasznú', 'neziskov\\p{L}*', 'kâr amacı gütmeyen', 'fără scop lucrativ', 'μη κερδοσκοπικ\\p{L}*', 'nirlaba'], WHOLE, {
     he: ['ללא מטרות רווח', 'מלכ["״]ר'],
     cjk: ['非営利', '비영리', '非營利', '非营利'],
 });
@@ -175,7 +212,10 @@ const FRAME = words(['fram(?:e|es|ed|er|ers|ing)', 'framemak\\w*', 'framery',
     // Encadrement, Bilderrahmen, Einrahmung, Cornici, Marquería, Molduras, Lijstenmakerij, Inramning, Rammeverksted.
     'encadr\\p{L}*', 'bilderrahm\\p{L}*', 'einrahm\\p{L}*', 'rahmen\\p{L}*', 'rahmung', 'cornic(?:i|iaio|iai|eria|erie)', 'marquer[ií]as?', 'enmarca\\p{L}*',
     'moldur(?:a|as|aria|arias)', 'lijsten\\p{L}*', 'inlijst\\p{L}*', 'inramning\\p{L}*', 'ramaffär', 'rammeverksted', 'indramning\\p{L}*', 'rammemager\\p{L}*',
-], WHOLE, { he: ['מסגרות', 'מסגור', 'מסגרי', 'ממסגר', 'מסגרת'], cjk: ['額縁', '額装', '額屋', '액자', '畫框', '画框', '裱框', '裝裱', '装裱'] });
+    // Képkeretezés, oprawa obrazów / ramiarnia, rámování / rámařství, çerçeve, κορνίζες, înrămare, uokvirivanje, kehystämö, pigura / bingkai, khung tranh, багетна майстерня.
+    'keretez\\p{L}*', 'képkeret\\p{L}*', 'keretüzlet', 'oprawa obraz\\p{L}*', 'oprawa grafik', 'oprawy obraz\\p{L}*', 'ramiarni\\p{L}*', 'rámov\\p{L}*', 'rámař\\p{L}*', 'rámy',
+    'çerçeve\\p{L}*', 'κορν[ιί]ζ\\p{L}*', 'înr[ăa]m\\p{L}*', 'uokvir\\p{L}*', 'kehystämö', 'kehystys', 'pigura', 'bingkai', 'khung tranh', 'багетн\\p{L}*',
+], WHOLE, { he: ['מסגרות', 'מסגור', 'מסגרי', 'ממסגר', 'מסגרת'], ar: ['براويز', 'برواز', 'تأطير'], cjk: ['額縁', '額装', '額屋', '액자', '畫框', '画框', '裱框', '裝裱', '装裱', 'กรอบรูป'] });
 
 /**
  * Categories that are never a buyer, whatever the name says: art supplies,
@@ -210,6 +250,12 @@ const NOT_BUYER_NAME = words([
     'corsi di (?:pittura|disegno)', 'escuela de arte', 'clases de (?:pintura|dibujo)', 'escola de arte', 'aulas de (?:pintura|desenho)', 'tekenschool', 'schildercursus\\p{L}*',
     'imprimerie', 'druckerei', 'tipograf[ií]a', 'copisteria', 'copistería', 'restaurierung', 'restaurator\\p{L}*', 'restauro', 'restauratie\\p{L}*',
     'innenarchitekt\\p{L}*', 'raumausstatt\\p{L}*', 'arredamento', 'interiorismo', 'möbel\\p{L}*',
+    // The same in Hungarian, Polish, Czech, Croatian and Serbian, Turkish, Greek, Romanian, Indonesian and the Cyrillic languages.
+    'tetovál\\p{L}*', 'tatua[żz]\\p{L}*', 'tetován\\p{L}*', 'tetova[žz]\\p{L}*', 'dövme\\p{L}*', 'τατουάζ', 'tatuaj\\p{L}*', 'тату\\p{L}*',
+    'nyomda\\p{L}*', 'drukarni\\p{L}*', 'tiskárn\\p{L}*', 'matbaa\\p{L}*', 'tipografie', 'percetakan',
+    'művészellátó', 'artykuły (?:plastyczne|artystyczne)', 'výtvarné potřeby', 'sanat malzemeleri', 'kırtasiye', 'alat lukis',
+    'rajziskola', 'festőiskola', 'művészeti iskola', 'szkoła (?:rysunku|malarstwa|plastyczna|artystyczna)', 'výtvarná škola', 'sanat (?:kursu|okulu|atölyesi)', 'resim (?:kursu|atölyesi)',
+    'școal[ăa] de art[ăa]', 'sekolah seni', 'kursus (?:melukis|seni)',
 ], WHOLE, {
     // Craft and art-supply shops, classes and workshops, art schools,
     // tattoo, printers, interior design, furniture, restoration.
@@ -222,7 +268,7 @@ const NOT_BUYER_DESCRIPTION = words(['tattoo\\w*', 'paint(?:ing)?\\s*(?:and|&|n)
 
 /** An artist's own studio sells its own work, not anyone else's. */
 const ARTIST_CATEGORY = words(['artists?', 'art studio', 'sculptors?', 'potters?', 'ceramicists?', 'glass ?blow\\w*', 'craftsm[ae]n', 'art handcraft']);
-const ARTIST_NAME = words(['studios?', 'atelier', 'photography', 'photographer', 'photos?', 'ateli(?:ê|e)', 'fotograf(?:ie|ia|ía|i|o|a|en)?', 'photographie', 'taller', 'werkstatt'], WHOLE, {
+const ARTIST_NAME = words(['studios?', 'atelier', 'photography', 'photographer', 'photos?', 'ateli(?:ê|e)', 'fotograf(?:ie|ia|ía|i|o|a|en)?', 'photographie', 'taller', 'werkstatt', 'stúdió', 'ateliér', 'pracownia'], WHOLE, {
     he: ['סטודיו', 'צילום', 'צלם'],
     cjk: ['アトリエ', 'スタジオ', '工房', '스튜디오', '작업실', '공방', '工作室'],
 });
@@ -231,9 +277,18 @@ const GIFT_CATEGORY = words(['gifts?', 'gift shop', 'souvenirs?', 'handicrafts?'
 
 /** Gallery: גלריה, גלריית, גלריות (and גלרית, as some names spell it). */
 const GALLERY_HE = ['גלרי'];
-/** …Galleri(et), Galerij, Galerías, Galerien, Kunstgalerie; ギャラリー, 画廊, 갤러리, 화랑, 藝廊 (Galerie, Galleria, Galería, Galeria are the English pattern's). */
-const GALLERY_OTHER = ['gall?er(?:i|iet|ij|ijen|ías|ias|ien)', '(?:kunst|konst)gall?er\\p{L}*'];
-const GALLERY_CJK = ['ギャラリー', '画廊', '畫廊', '갤러리', '화랑', '藝廊', '艺廊'];
+/**
+ * …Galleri(et), Galerij, Galerías, Galerien, Kunstgalerie; Galéria
+ * (Hungarian, Slovak), galerisi (Turkish), Galerija (the Balkans, the
+ * Baltics), galerii (Estonian), taidegalleria, γκαλερί, галерия / галерея /
+ * галерија, phòng tranh; ギャラリー, 画廊, 갤러리, 화랑, 藝廊, แกลเลอรี่;
+ * غاليري / جاليري and معرض فني (Galerie, Galleria, Galería, Galeria, Galeri
+ * are the English pattern's).
+ */
+const GALLERY_OTHER = ['gall?er(?:i|iet|ij|ijen|ías|ias|ien)', '(?:kunst|konst|taide)gall?er\\p{L}*', 'galéri\\p{L}*', 'galeri(?:si|leri|miz|mize|nin)', 'gall?erij(?:a|e|os|ų|ās)', 'galerii\\p{L}*',
+    'γκαλερ[ιί]', 'галер\\p{L}*', 'phòng tranh'];
+const GALLERY_CJK = ['ギャラリー', '画廊', '畫廊', '갤러리', '화랑', '藝廊', '艺廊', 'แกลเลอรี่', 'แกลเลอรี', 'แกลอรี่', 'แกลลอรี่'];
+const GALLERY_AR = ['غاليري', 'جاليري', 'قاليري', 'كاليري', 'معرض (?:ال)?فن(?:ي|ون)' + AR_END, 'معرض (?:لل)?فنون', 'معارض (?:ال)?فن(?:ية|ون)', 'صالة (?:عرض )?(?:ال)?فن(?:ون|ية)'];
 /** Auction: מכירה פומבית, מכירות פומביות, בית מכירות פומביות. */
 const AUCTION_HE = ['מכיר(?:ה|ות) ה?פומבי'];
 /**
@@ -242,28 +297,36 @@ const AUCTION_HE = ['מכיר(?:ה|ות) ה?פומבי'];
  * leilões / leiloeiro, veilinghuis. (No end: these go into AUCTION, which has none.)
  */
 const AUCTION_OTHER = ['auktion\\p{L}*', '\\p{L}+auktion\\p{L}*', 'ench[èe]res', 'h[ôo]tel des ventes', 'maisons? de ventes?', 'commissaires?[- ]priseurs?', 'case? d[\'’]aste',
-    'aste(?![\\p{L}])', 'asta(?![\\p{L}])', 'subastas?', 'leil(?:ão|ões|ao|oes)', 'leiloeir\\p{L}*', 'veiling\\p{L}*', '\\p{L}+veiling\\p{L}*'];
-const AUCTION_CJK = ['オークション', '競売', '경매', '옥션', '拍賣', '拍卖'];
+    'aste(?![\\p{L}])', 'asta(?![\\p{L}])', 'subastas?', 'leil(?:ão|ões|ao|oes)', 'leiloeir\\p{L}*', 'veiling\\p{L}*', '\\p{L}+veiling\\p{L}*',
+    // Aukció / aukciósház / árverés (Hungarian), aukcja / dom aukcyjny (Polish), aukce / aukční síň (Czech), aukcija, aukcionas,
+    // huutokauppa, oksjon, izsole, uppboð, müzayede / mezat (Turkish), δημοπρασία, casă de licitații, аукцион / аукціон, balai lelang / lelang, đấu giá.
+    'auk[cč]\\p{L}*', 'árverés\\p{L}*', 'árverez\\p{L}*', 'huutokaup\\p{L}*', 'oksjon\\p{L}*', 'izsol\\p{L}*', 'uppbo[ðd]\\p{L}*', 'müzayede\\p{L}*', 'mezat\\p{L}*',
+    'δημοπρασ[ιί]\\p{L}*', 'ΔΗΜΟΠΡΑΣΙ\\p{L}*', 'cas[ăa] de licita[țţt]ii', 'licita[țţt]i\\p{L}* de art[ăa]', 'аукц\\p{L}*', 'balai lelang', 'lelang(?![\\p{L}])', 'đấu giá'];
+const AUCTION_CJK = ['オークション', '競売', '경매', '옥션', '拍賣', '拍卖', 'ประมูล'];
+const AUCTION_AR = ['مزاد', 'مزادات'];
 /** Dealer, in a name: סוחר / סוחרת (אמנות), סחר; Händler, marchand, mercante, marchante. */
 const DEALER_NAME_HE = ['סוח(?:ר|רת|רי)' + HE_END, 'סחר' + HE_END];
-const DEALER_NAME_OTHER = ['händler\\p{L}*', 'marchand(?:e|s)?', 'mercant(?:e|i)', 'marchantes?'];
+const DEALER_NAME_OTHER = ['händler\\p{L}*', 'marchand(?:e|s)?', 'mercant(?:e|i)', 'marchantes?', 'marszand\\p{L}*', 'műkereske\\p{L}*'];
 /** Advisory, in a name next to art words: יועץ / יועצת, ייעוץ, and the independent curator (אוצר / אוצרת); Beratung, conseil, consulenza, asesoría, advies… */
 const ADVISOR_NAME_HE = ['יוע(?:ץ|צת|צים|צות)', 'ייעוץ', 'אוצר(?:ת)?' + HE_END];
-const ADVISOR_NAME_OTHER = ['beratung', 'berater\\p{L}*', 'conseils?', 'consulen(?:za|te|ti)', 'asesor\\p{L}*', 'consultor\\p{L}*', 'assessoria', 'advies', 'adviseur\\p{L}*', 'rådgiv\\p{L}*'];
+const ADVISOR_NAME_OTHER = ['beratung', 'berater\\p{L}*', 'conseils?', 'consulen(?:za|te|ti)', 'asesor\\p{L}*', 'consultor\\p{L}*', 'assessoria', 'advies', 'adviseur\\p{L}*', 'rådgiv\\p{L}*',
+    'tanácsad\\p{L}*', 'doradztw\\p{L}*', 'doradc\\p{L}*', 'poradenstv\\p{L}*', 'danışman\\p{L}*'];
 const ADVISOR_NAME_CJK = ['コンサル', 'アドバイザー', '컨설팅', '자문', '顧問', '顾问'];
 
 /** The words a buyer puts in its name. */
 const BUYER_NAME = words(['gall?er(?:y|ies|ie|ia|ía)', 'auction\\w*', 'dealers?', 'advis\\w*', 'consult\\w*', ...GALLERY_OTHER, ...AUCTION_OTHER, ...DEALER_NAME_OTHER, ...ADVISOR_NAME_OTHER], WHOLE, {
     he: [...GALLERY_HE, ...AUCTION_HE, ...DEALER_NAME_HE, ...ADVISOR_NAME_HE],
+    ar: [...GALLERY_AR, ...AUCTION_AR],
     cjk: [...GALLERY_CJK, ...AUCTION_CJK, ...ADVISOR_NAME_CJK],
 });
-const GALLERY = words(['gall?er(?:y|ies|ie|ia|ía)', ...GALLERY_OTHER], WHOLE, { he: GALLERY_HE, cjk: GALLERY_CJK });
+const GALLERY = words(['gall?er(?:y|ies|ie|ia|ía)', ...GALLERY_OTHER], WHOLE, { he: GALLERY_HE, ar: GALLERY_AR, cjk: GALLERY_CJK });
 const FINE_ART = words(['fine arts?']);
 
 /** Categories a buyer can have: art, galleries, auction, antiques, appraisers, consultants. ("Car dealer" is not one.) */
 const ART_CATEGORY = words(['art', 'arts', 'fine arts?', 'gall?er\\w*', 'auction\\w*', 'antiques?', 'antiquarian', 'apprais\\w*', 'consult\\w*', 'advis\\w*', 'collectibles?', ...GALLERY_OTHER, ...AUCTION_OTHER], WHOLE, {
     // Maps' English UI names categories in English; a few come in Hebrew ("מסעדה" in the sushi run) or another language.
     he: [...GALLERY_HE, ...AUCTION_HE, 'אמנות', 'אומנות', 'עתיקות'],
+    ar: [...GALLERY_AR, ...AUCTION_AR],
     cjk: [...GALLERY_CJK, ...AUCTION_CJK, '美術', '미술', 'アート'],
 });
 /** Categories that say nothing: an advisor is often a "Corporate office" or a "Consultant". */
@@ -274,22 +337,30 @@ const APPRAISER = words(['apprais\\w*']);
 const ART_WORD = words(['art', 'arts', 'artworks?', 'fine arts?', 'paintings?', 'gall?er(?:y|ies|ie|ia|ía)', 'collect(?:ors?|ions?|ing)',
     // Kunst, d'art, arte, beaux-arts / bellas artes / belle arti, paintings, works of art, collections.
     'kunst', 'konst', 'd[\'’]art', 'arte', 'beaux-arts', 'bellas artes', 'belas artes', 'belle arti', 'peintures?', 'tableaux', 'gemälde', 'dipinti', 'pinturas?', 'schilderijen',
-    'kunstwerke?', '(?:œuvres?|oeuvres?) d[\'’]art', 'obras? de arte', 'opere d[\'’]arte', 'colecci[oó]n(?:es)?', 'cole[cç](?:ão|ao|ões|oes)', 'collezion[ei]', 'sammlung(?:en)?', ...GALLERY_OTHER], WHOLE, {
+    'kunstwerke?', '(?:œuvres?|oeuvres?) d[\'’]art', 'obras? de arte', 'opere d[\'’]arte', 'colecci[oó]n(?:es)?', 'cole[cç](?:ão|ao|ões|oes)', 'collezion[ei]', 'sammlung(?:en)?', ...GALLERY_OTHER,
+    // Művészet / festmény, sztuka / obrazy, umění / umenie, umjetnost / umetnost, taide, τέχνη / ζωγραφική, sanat / resim, artă / tablouri, seni, nghệ thuật / mỹ thuật, изкуство / уметност / мистецтво.
+    'művészet\\p{L}*', 'műalkotás\\p{L}*', 'festmény\\p{L}*', 'képzőművész\\p{L}*', 'sztuk[aię]', 'obraz(?:y|ów)', 'uměn[íi]', 'výtvarn\\p{L}*', 'umeni[ea]', 'umjetn\\p{L}*', 'umetn\\p{L}*',
+    'taide\\p{L}*', 'τ[εέ]χν(?:η|ης|ες|ών|ων)', 'ζωγραφ\\p{L}*', 'sanat(?:[ıi]|sal|ç[ıi]\\p{L}*)?', 'resim(?:ler)?', 'art[ăa]', 'tablouri', 'seni', 'nghệ thuật', 'mỹ thuật',
+    'изкуств\\p{L}*', 'уметн\\p{L}*', 'мистецтв\\p{L}*'], WHOLE, {
     // Art, arts, artists (not אמן alone: it is also "amen"), paintings, works, sculpture, collectors.
     he: [...GALLERY_HE, 'אמנות', 'אומנות', 'אמנויות', 'אמנ(?:ים|ית|יות)' + HE_END, 'ציור(?:ים)?' + HE_END, 'יצירות', 'פיסול', 'אספנ'],
-    cjk: ['美術', 'アート', '미술', '아트', '藝術', '艺术', ...GALLERY_CJK],
+    // Art (فن, فنون, فني), paintings (لوحات).
+    ar: [...GALLERY_AR, 'فن(?:ون|ي|ية)?' + AR_END, 'لوحات'],
+    cjk: ['美術', 'アート', '미술', '아트', '藝術', '艺术', ...GALLERY_CJK, 'ศิลปะ', 'ศิลป์'],
 });
 
 // ─── What kind of buyer ───────────────────────────────────────────────────
 
 /** "Auction", "Auctions", "Auctioneers", "Auction house"; "מכירה פומבית", "בית מכירות פומביות". */
-const AUCTION = words(['auction\\w*', ...AUCTION_OTHER], '', { he: AUCTION_HE, cjk: AUCTION_CJK });
+const AUCTION = words(['auction\\w*', ...AUCTION_OTHER], '', { he: AUCTION_HE, ar: AUCTION_AR, cjk: AUCTION_CJK });
 /** Art advisory and consulting, from any text: "יועצת אמנות", "ייעוץ באמנות", "ייעוץ לאספנים", building and managing collections. */
 const ADVISOR = words(['art[- ](?:advis|consult)\\w*', '(?:fine[- ]art|collection|collections|curatorial|corporate art) (?:advis|consult)\\w*', 'art acquisition', 'collection management', 'corporate art (?:collections?|programs?|services)',
     // Conseil en art, Kunstberatung, kunstadvies, konstrådgivning, consulenza artistica, asesoría de arte, consultoria de arte.
     'conseil(?:s|ler|lère|lers)? en (?:art|œuvres d[\'’]art|oeuvres d[\'’]art)', 'kunstberat\\p{L}*', 'konstrådgiv\\p{L}*', 'kunstrådgiv\\p{L}*', 'kunstadvi\\p{L}*',
     'consulen(?:za|te|ti) (?:artistic[ao]|d[\'’]arte|in arte)', 'asesor(?:ía|ia|es|a|as)? (?:de|en) arte', 'asesor(?:ía|ia) artística', 'consultor(?:ía|ia|es|a)? (?:de|en) arte',
-    'consultoria (?:de|em) arte', 'assessoria (?:de|em) arte'], WHOLE, {
+    'consultoria (?:de|em) arte', 'assessoria (?:de|em) arte',
+    // Művészeti tanácsadás, doradztwo artystyczne, poradenství v oblasti umění, sanat danışmanlığı.
+    'művészeti tanácsad\\p{L}*', 'doradztwo artystyczne', 'doradc\\p{L}* (?:ds\\. )?sztuki', 'poradenství v oblasti umění', 'sanat danışman\\p{L}*'], WHOLE, {
     he: ['יוע(?:ץ|צת|צי|צות) (?:ל)?(?:אמנות|אומנות)', 'ייעוץ (?:ל|ב)?(?:אמנות|אומנות)', 'ייעוץ (?:ל)?אספנים', 'בניית אוספ', 'ניהול אוספ'],
     cjk: ['アートコンサル\\p{L}*', 'アートアドバイザー', '아트 ?컨설팅', '미술 ?컨설팅', '藝術顧問', '艺术顾问'],
 });
@@ -307,6 +378,10 @@ const DEALER = words([
     '(?:an- und verkauf|ankauf) von (?:kunst|gemälden|bildern|grafik|sammlungen|nachlässen)', 'acquistiamo[^.!?;\\n]{0,30}?(?:opere|dipinti|quadri|collezioni)',
     'compramos[^.!?;\\n]{0,30}?(?:obras?|arte|cuadros|quadros|pinturas|colecciones|cole[cç][õo]es)', 'wij kopen[^.!?;\\n]{0,30}?(?:kunst|schilderijen|collecties)',
     'vi köper[^.!?;\\n]{0,30}?(?:konst|tavlor|samlingar)',
+    // Műkereskedés / műkereskedő, antykwariat sztuki, handel sztuką, obchod s uměním, έμπορος τέχνης, comerciant de artă; "we buy…" in Hungarian, Polish, Czech.
+    'műkereske\\p{L}*', 'antykwariat\\p{L}* (?:sztuki|artystyczn\\p{L}*)', 'handel (?:sztuką|dziełami sztuki)', 'obchod s (?:uměním|obrazy)', '[εέ]μπορ\\p{L}* (?:[εέ]ργων )?τ[εέ]χνης', 'comerciant\\p{L}* de art[ăa]',
+    'vásárolunk[^.!?;\\n]{0,30}?(?:festmény|műtárgy|grafik|hagyaték)\\p{L}*', '(?:festmény|műtárgy)\\p{L}* felvásárl\\p{L}*', 'skup (?:dzieł sztuki|obrazów|antyków)', 'kupimy[^.!?;\\n]{0,30}?(?:obraz|dzieł|grafik|kolekcj)\\p{L}*',
+    'výkup (?:obrazů|starožitností|umění)', 'vykoupíme[^.!?;\\n]{0,30}?(?:obrazy|starožitnosti|sbírky)',
 ], WHOLE, {
     // Art dealer, art trade, buying and selling art, "we buy art / collections / estates".
     he: ['סוח(?:ר|רת|רי) (?:ה)?(?:אמנות|אומנות|יצירות)', 'סחר (?:ב)?(?:אמנות|אומנות)', '(?:קונים|קנייה|קניה) ומ(?:וכרים|כירה|כירת) (?:של )?(?:אמנות|אומנות|יצירות|ציורים)',
@@ -325,11 +400,21 @@ const EXHIBITIONS = words(['(?:current|upcoming|past|recent|future|new|forthcomi
     'exposici(?:ón|on|ones) (?:actual(?:es)?|en curso|pasadas?|anteriores|próximas?|proximas?|vigentes?)', '(?:próximas?|proximas?) exposici(?:ón|on|ones)', 'inauguración',
     'exposi[cç](?:ão|ao|ões|oes) (?:atua(?:l|is)|em cartaz|passadas?|anteriores|futuras?|em curso)', '(?:próximas?|proximas?) exposi[cç](?:ão|ao|ões|oes)', 'em cartaz',
     '(?:huidige|komende|lopende|vorige|eerdere|actuele) (?:tentoonstelling|expositie)(?:en|s)?',
-    '(?:aktuell|aktuella|pågående|kommande|tidigare) utställning(?:ar|en)?', '(?:aktuelle?|kommende|tidligere|nuværende|nåværende) (?:udstilling|utstilling)(?:er|en)?'], WHOLE, {
+    '(?:aktuell|aktuella|pågående|kommande|tidigare) utställning(?:ar|en)?', '(?:aktuelle?|kommende|tidligere|nuværende|nåværende) (?:udstilling|utstilling)(?:er|en)?',
+    // Hungarian, Polish, Czech and Slovak, Turkish, Greek, Romanian, Indonesian, Vietnamese, Ukrainian, Bulgarian and Serbian; an opening (wernisaż, vernisáž, vernisaj).
+    '(?:aktuális|jelenlegi|korábbi|közelgő|következő|elmúlt|futó) kiállítás\\p{L}*', 'kiállítás ?megnyitó\\p{L}*',
+    '(?:aktualn\\p{L}*|bieżąc\\p{L}*|minion\\p{L}*|nadchodząc\\p{L}*|poprzedni\\p{L}*|archiwum) wystaw\\p{L}*', 'wernisaż\\p{L}*',
+    '(?:aktuální|probíhající|minulé|připravované|nadcházející|předchozí|aktuálne|pripravované) výstav\\p{L}*', 'vernisáž\\p{L}*',
+    '(?:güncel|mevcut|geçmiş|gelecek|yaklaşan|önceki|devam eden) sergi\\p{L}*', 'sergi açılışı',
+    '(?:τρ[εέ]χουσ\\p{L}*|προηγο[υύ]μεν\\p{L}*|επερχ[οό]μεν\\p{L}*|παρελθο[υύ]σ\\p{L}*) [εέ]κθ[εέ]σ\\p{L}*', 'εγκα[ιί]νια',
+    'expozi[țţt]i\\p{L}* (?:curent\\p{L}*|actual\\p{L}*|trecute|viitoare)', 'vernisaj\\p{L}*', 'pameran (?:saat ini|sebelumnya|mendatang|terkini)', 'triển lãm (?:hiện tại|sắp tới|đã qua)',
+    '(?:поточн\\p{L}*|минул\\p{L}*|майбутн\\p{L}*) виставк\\p{L}*', '(?:текущ\\p{L}*|предстоящ\\p{L}*|минал\\p{L}*|тренутн\\p{L}*|претходн\\p{L}*) изложб\\p{L}*'], WHOLE, {
     // Current, past and upcoming exhibitions, an exhibition opening, "on view now". "תערוכות" alone is an artist's CV too.
     he: ['תערוכ(?:ה|ות) (?:ה)?(?:נוכחי(?:ת|ות)|קודמ(?:ת|ות)|עבר|הבא(?:ה|ות)|קרוב(?:ה|ות)|עתידי(?:ת|ות)|מתוכננ(?:ת|ות))', 'פתיחת (?:ה)?תערוכ', 'מוצג(?:ת|ות|ים)? כעת'],
     cjk: ['開催中', '過去の展覧会', '今後の展覧会', '次回展覧会', '現在の展覧会', '展覧会情報', '현재 ?전시', '지난 ?전시', '예정 ?전시', '전시 ?중', '진행 ?중인 ?전시', '과거 ?전시',
         '當前展覽', '当前展览', '現正展出', '现正展出', '過往展覽', '过往展览', '即將展覽', '即将展览'],
+    // The current, past and coming exhibitions.
+    ar: ['معرض (?:ال)?حالي', 'معارض (?:ال)?(?:سابقة|قادمة|حالية)'],
 });
 /** "Our artists" is never a single artist's own site, but "Exhibitions" is (the CV). */
 const REPRESENTED = words(['(?:represented|gallery|our) artists', 'artists represented', '(?:the gallery|we) represents?', 'represent(?:s|ing)?[^.!?;\\n]{0,40}?artists',
@@ -339,14 +424,18 @@ const REPRESENTED = words(['(?:represented|gallery|our) artists', 'artists repre
     'artisti (?:della galleria|rappresentati)', 'i nostri artisti', 'la galleria rappresenta', 'rappresenta[^.!?;\\n]{0,40}?artisti',
     'artistas (?:de la galer[ií]a|da galeria|representad[oa]s)', 'nuestros artistas', 'nossos artistas', '(?:la|a) galer[ií]a representa', 'representa[^.!?;\\n]{0,40}?artistas',
     'kunstenaars van de galerie', 'onze kunstenaars', 'galeriekunstenaars', 'vertegenwoordigt[^.!?;\\n]{0,40}?kunstenaars',
-    'våra konstnärer', 'galleriets (?:konstnärer|kunstnere)', 'representerar[^.!?;\\n]{0,40}?konstnärer', 'vores kunstnere', 'våre kunstnere', 'repr(?:æ|e)senterer[^.!?;\\n]{0,40}?kunstnere'], WHOLE, {
+    'våra konstnärer', 'galleriets (?:konstnärer|kunstnere)', 'representerar[^.!?;\\n]{0,40}?konstnärer', 'vores kunstnere', 'våre kunstnere', 'repr(?:æ|e)senterer[^.!?;\\n]{0,40}?kunstnere',
+    'művészeink', 'a galéria művészei', 'nasi artyści', 'artyści galerii', 'naši umělci', 'umělci galerie', 'sanatçılarımız', 'galeri sanatçıları', 'οι καλλιτ[εέ]χνες μας',
+    'artiștii (?:noștri|galeriei)', 'seniman kami', 'nghệ sĩ của chúng tôi', 'наші художники', 'нашите художници'], WHOLE, {
     he: ['אמני (?:ה)?גלרי', '(?:ה)?אמנים שלנו', 'אמנים מיוצגים', '(?:ה)?גלרי(?:ה|יה) מייצגת', 'מייצג(?:ת|ים)?[^.!?;\\n]{0,40}?אמנים'],
     cjk: ['取扱作家', '取り扱い作家', '所属作家', '전속 ?작가', '소속 ?작가', '代理藝術家', '代理艺术家', '合作藝術家', '合作艺术家'],
 });
 const GALLERY_TEXT = words(['gall?er(?:y|ies|ie|ia|ía)', 'exhibitions?', 'represent(?:s|ing)? (?:[\\p{L}-]+ ){0,3}artists', ...GALLERY_OTHER,
-    'expositions?', 'ausstellung(?:en)?', 'mostr[ae]', 'exposici(?:ón|on|ones)', 'exposi[cç](?:ão|ao|ões|oes)', 'tentoonstelling(?:en)?', 'utställning(?:ar)?', '(?:udstilling|utstilling)(?:er)?'], WHOLE, {
+    'expositions?', 'ausstellung(?:en)?', 'mostr[ae]', 'exposici(?:ón|on|ones)', 'exposi[cç](?:ão|ao|ões|oes)', 'tentoonstelling(?:en)?', 'utställning(?:ar)?', '(?:udstilling|utstilling)(?:er)?',
+    'kiállítás\\p{L}*', 'wystaw[ay]', 'výstav[ay]', 'sergiler', 'sergisi', '[εέ]κθ[εέ]σ(?:η|εις)', 'expozi[țţt]i(?:e|i|a)', 'pameran', 'triển lãm', 'виставк\\p{L}*', 'изложб\\p{L}*'], WHOLE, {
     he: [...GALLERY_HE, 'תערוכ'],
-    cjk: [...GALLERY_CJK, '展覧会', '展示会', '전시', '展覽', '展览'],
+    ar: GALLERY_AR,
+    cjk: [...GALLERY_CJK, '展覧会', '展示会', '전시', '展覽', '展览', 'นิทรรศการ'],
 });
 
 /**
@@ -479,6 +568,13 @@ const CONSIGN = words([
     'avalia(?:ção|cao|ções|coes) gratuitas?', 'solicite (?:uma )?avalia(?:ção|cao)', 'compramos[^.!?;\\n]{0,30}?(?:obras?|arte|cuadros|quadros|pinturas|colecciones|cole[cç][õo]es)',
     'verkopen via (?:ons|onze veiling)', 'inbreng\\p{L}*[^.!?;\\n]{0,40}?veiling', 'gratis taxatie', 'taxatiedag\\p{L}*', 'taxatie aanvragen', 'wij kopen[^.!?;\\n]{0,30}?(?:kunst|schilderijen|collecties)',
     'gratis (?:värdering|vurdering)', 'värderingsdag\\p{L}*', 'indlever\\p{L}*', 'innlever\\p{L}*', 'lämna in[^.!?;\\n]{0,30}?(?:auktion|försäljning)',
+    // Hungarian (értékbecslés, bizományi értékesítés, "vásárolunk…"), Polish (bezpłatna wycena, komis, skup), Czech (odhad, výkup, komisní prodej),
+    // Turkish (müzayedeye eser kabulü, ekspertiz), Greek (δωρεάν εκτίμηση), Romanian (evaluare gratuită, cumpărăm tablouri).
+    'értékbecslés\\p{L}*', 'bizomány\\p{L}*', 'aukcióra (?:beadás|átvétel)\\p{L}*', 'tételek beadás\\p{L}*', 'vásárolunk[^.!?;\\n]{0,30}?(?:festmény|műtárgy|grafik|hagyaték)\\p{L}*', '(?:festmény|műtárgy)\\p{L}* felvásárl\\p{L}*',
+    'bezpłatn\\p{L}* wycen\\p{L}*', 'wycen[ay] (?:dzieł|obiektów|obrazów|kolekcji)', 'przyjmujemy (?:obiekty|dzieła|obrazy)[^.!?;\\n]{0,30}?(?:aukcj|sprzeda|komis)\\p{L}*', 'komis\\p{L}* (?:dzieł|obrazów|sztuki)',
+    'skup (?:dzieł sztuki|obrazów|antyków)', 'kupimy[^.!?;\\n]{0,30}?(?:obraz|dzieł|grafik|kolekcj)\\p{L}*',
+    'bezplatn\\p{L}* odhad\\p{L}*', 'odhad (?:ceny|hodnoty)', 'výkup (?:obrazů|starožitností|umění)', 'vykoupíme[^.!?;\\n]{0,30}?(?:obrazy|starožitnosti|sbírky)', 'komisní prodej', 'přijímáme (?:díla|obrazy|předměty)[^.!?;\\n]{0,30}?(?:auk[cč]|prodej)\\p{L}*',
+    'müzayedeye (?:eser|ürün)\\p{L}*', 'eser kabul\\p{L}*', 'ücretsiz ekspertiz', 'δωρε[αά]ν εκτ[ιί]μηση', 'αγορ[αά]ζουμε (?:[εέ]ργα|π[ιί]νακες)', 'evaluare gratuit[ăa]', 'cump[ăa]r[ăa]m (?:tablouri|opere|obiecte de art[ăa])',
 ], WHOLE, {
     // Handing work over for sale (מסירה למכירה), accepting works for sale,
     // buying and selling art, "we buy…", appraisal (שמאות) and valuation
@@ -522,11 +618,14 @@ const SUBMISSION_LINK_WORDS = ['הגשת[-_ ](?:עבודות|תיק|יצירות
     'candidature[-_ ](?:artisti|per[-_ ]artisti)', 'convocatorias?', 'convocat[óo]rias?', 'open[-_ ]oproep', 'aanmelden[-_ ](?:als[-_ ])?kunstenaar',
     '作品募集', '公募', '作家募集', '공모', '徵集', '征集'];
 const NOT_SUBMISSION_LINK_WORDS = ['מכיר', 'שמאות', 'הערכ', 'einliefer', 'schätz', 'estimation', 'vendre', 'valutazion', 'stima', 'tasaci', 'avalia', 'taxatie', 'inbreng',
-    'v[äa]rdering', 'vurdering', 'auktion', 'ench[èe]res', 'subasta', 'leil', 'veiling', '買取', '査定', '委託', '위탁', '估價', '估价', '拍賣', '拍卖'];
+    'v[äa]rdering', 'vurdering', 'auktion', 'ench[èe]res', 'subasta', 'leil', 'veiling', '買取', '査定', '委託', '위탁', '估價', '估价', '拍賣', '拍卖',
+    '[ée]rt[ée]kbecsl', 'bizom[áa]ny', 'auk[cč]', 'wycen', 'odhad', 'v[ýy]kup', 'ekspertiz', 'müzayede'];
 const CONSIGN_LINK_WORDS = ['מסירה', 'מסירת', 'שמאות', 'שמאי', 'הערכת[-_ ]שווי', '(?:אנו|אנחנו)[-_ ]קונים', 'קונים[-_ ](?:אמנות|יצירות|ציורים)',
     'vendre', 'estimations?', 'd[ée]p[ôo]t[-_ ]vente', 'einliefer', 'verkaufen', 'schätz', 'ankauf', 'vendere', 'vendi[-_ ]con[-_ ]noi', 'valutazion', 'stime',
     'tasaci', 'vender', 'avalia', 'verkopen', 'taxatie', 'inbreng', 'v[äa]rdering', 'vurdering', 'innlever', 'indlever',
-    '買取', '査定', '委託(?:販売|出品)', '出品(?!作家|作品|リスト)', '위탁 ?(?:판매|출품|경매)', '매입', '估價', '估价', '委託拍賣', '委托拍卖', '徵集拍品', '征集拍品'];
+    '買取', '査定', '委託(?:販売|出品)', '出品(?!作家|作品|リスト)', '위탁 ?(?:판매|출품|경매)', '매입', '估價', '估价', '委託拍賣', '委托拍卖', '徵集拍品', '征集拍品',
+    // Értékbecslés, bizomány (Hungarian), wycena, skup (Polish), odhad, výkup (Czech), eser kabul, ekspertiz (Turkish).
+    '[ée]rt[ée]kbecsl[ée]s', 'bizom[áa]ny', 'wycen[ay]', 'skup[-_ ](?:dzie|obraz|antyk|sztuk)', 'odhad[-_ ](?:ceny|hodnoty|umeleck|obraz)', 'v[ýy]kup[-_ ]', 'eser[-_ ]kabul', 'ekspertiz'];
 /**
  * Links to the pages these fields point at: an address or link text that
  * says submission(s) / open call / submit your work, and one that says
@@ -589,9 +688,15 @@ const NO_CREDIT = '(?![\\p{L}\\p{N}])(?!\\s*(?:[:：©]|(?:par|de|von|di|da|por|
 export const SPECIALTIES = [
     ['contemporary', words(['contemporary (?:art|arts|artists?|paintings?|works?|photography|sculpture|ceramics|craft|fine art|realism|prints?|abstract\\w*|african|asian|latin|native|american|chinese|indian|israeli|glass|gallery|masters?|works on paper)', '(?:modern|post-?war) (?:and|&) contemporary',
         'art contemporain', 'artistes contemporains', 'création contemporaine', 'zeitgenössische (?:kunst|künstler\\p{L}*|malerei|fotografie|positionen)', 'gegenwartskunst',
-        'arte contemporanea', 'artisti contemporanei', 'arte contempor[áa]neo', 'artistas contempor[áa]neos', 'arte contempor[âa]nea', 'hedendaagse kunst', 'eigentijdse kunst', 'samtidskonst', 'samtidskunst', 'nutidskunst'], WHOLE, {
+        'arte contemporanea', 'artisti contemporanei', 'arte contempor[áa]neo', 'artistas contempor[áa]neos', 'arte contempor[âa]nea', 'hedendaagse kunst', 'eigentijdse kunst', 'samtidskonst', 'samtidskunst', 'nutidskunst',
+        // Kortárs művészet, sztuka współczesna, současné umění, súčasné umenie, suvremena / savremena / sodobna umetnost, nykytaide, σύγχρονη τέχνη,
+        // çağdaş sanat, artă contemporană, seni kontemporer, nghệ thuật đương đại, сучасне мистецтво, съвременно изкуство, савремена уметност.
+        'kortárs (?:művészet\\p{L}*|képzőművészet\\p{L}*|művész\\p{L}*|alkotó\\p{L}*|festészet\\p{L}*)', 'sztuk[aięi] współczesn\\p{L}*', 'współczesn\\p{L}* sztuk\\p{L}*', 'současn\\p{L}* uměn[íi]\\p{L}*', 'súčasn\\p{L}* umeni[ea]',
+        'suvremen\\p{L}* umjetnost\\p{L}*', 'savremen\\p{L}* umetnost\\p{L}*', 'sodobn\\p{L}* umetnost\\p{L}*', 'nykytaide\\p{L}*', 'σ[υύ]γχρον\\p{L}* τ[εέ]χν(?:η|ης)', 'çağdaş sanat\\p{L}*',
+        'art[ăa] contemporan[ăa]', 'artei contemporane', 'seni kontemporer', 'seni kontemporari', 'nghệ thuật đương đại', 'сучасн\\p{L}* мистецтв\\p{L}*', 'съвременн\\p{L}* изкуств\\p{L}*', 'савремен\\p{L}* уметност\\p{L}*'], WHOLE, {
         he: [`${HE_ART} (?:ה)?(?:ישראלית )?(?:ה)?עכשווית`, `${HE_ART} בת זמננו`, 'אמנ(?:ים|יות) עכשווי(?:ים|ות)', '(?:ציור|צילום|פיסול|יצירה) עכשווי(?:ת)?' + HE_END],
-        cjk: ['現代美術', '現代アート', 'コンテンポラリー', '현대 ?미술', '동시대 ?미술', '컨템포러리', '當代藝術', '当代艺术'],
+        ar: ['فن (?:ال)?معاصر', 'فنون (?:ال)?معاصرة'],
+        cjk: ['現代美術', '現代アート', 'コンテンポラリー', '현대 ?미술', '동시대 ?미술', '컨템포러리', '當代藝術', '当代艺术', 'ศิลปะร่วมสมัย'],
     })],
     ['modern', words(['modern (?:art|arts|masters?|paintings?|works?|prints?|sculpture|american|british|european|and contemporary|& contemporary)', 'modernis[mt]s?',
         'art moderne', 'maîtres modernes', 'moderne kunst', 'klassische moderne', 'kunst der moderne', 'arte moderna', 'arte moderno', 'modern konst', 'modernisme', 'modernismo', 'modernismus'], WHOLE, {
@@ -695,10 +800,13 @@ const MUSEUM_NAMES_HE = /(?<![\p{L}])[והבכלש]{0,2}(?:מוזיאון|מוז
  * …and in the other languages, read before the English pattern: "Musée
  * d'Art Moderne de Paris", "Museo de Arte Contemporáneo", "Museum für
  * Moderne Kunst", "Moderna Museet", "Fondation Cartier pour l'Art
- * Contemporain"; 東京都現代美術館, 국립현대미술관, 台北當代藝術館 (the whole run of
- * characters before 美術館 / 미술관 / 藝術館).
+ * Contemporain", "Muzeum Sztuki Współczesnej", "Centrum Sztuki
+ * Współczesnej", "Kortárs Művészeti Múzeum", "Çağdaş Sanat Müzesi",
+ * "Μουσείο Σύγχρονης Τέχνης", "Muzeul Național de Artă Contemporană";
+ * 東京都現代美術館, 국립현대미술관, 台北當代藝術館 (the whole run of characters
+ * before 美術館 / 미술관 / 藝術館).
  */
-const MUSEUM_NAMES_OTHER = /(?<![\p{L}])(?:Musée|Museo|Museu|Muzeum|Kunstmuseum|Kunsthalle|Konsthall|Fondation|Fundación|Fondazione|Fundação|Stiftung|Museum(?=\s+(?:für|voor|van|de|di|del|der)\s))(?:\s+(?:(?:d['’]|de|del|della|delle|des|du|der|für|voor|van|di|do|da|dos|das|pour|per|para|la|le|les|l['’])\s*)*\p{Lu}[\p{L}'’.-]*){1,5}|(?<![\p{L}])(?:\p{Lu}[\p{L}'’.-]*\s+){1,3}(?:Museet|Kunsthalle|Konsthall)(?![\p{L}])|[\p{Script=Han}\p{Script=Katakana}\p{Script=Hiragana}ー・]*(?:美術館|美术馆|博物館|博物馆|藝術館|艺术馆)|\p{Script=Hangul}*(?:미술관|박물관)/gu;
+const MUSEUM_NAMES_OTHER = /(?<![\p{L}])(?:Musée|Museo|Museu|Muzeum|Muzeul|Muzej|Μουσείο|Музей|Kunstmuseum|Kunsthalle|Konsthall|Fondation|Fundación|Fondazione|Fundação|Stiftung|Centrum(?=\s+Sztuki)|Museum(?=\s+(?:für|voor|van|de|di|del|der)\s))(?:\s+(?:(?:d['’]|de|del|della|delle|des|du|der|für|voor|van|di|do|da|dos|das|pour|per|para|la|le|les|l['’]|w|v|u|za|na)\s*)*\p{Lu}[\p{L}'’.-]*){1,5}|(?<![\p{L}])(?:\p{Lu}[\p{L}'’.-]*\s+){1,4}(?:Museet|Kunsthalle|Konsthall|Múzeum|Müzesi|Müze)(?![\p{L}])|[\p{Script=Han}\p{Script=Katakana}\p{Script=Hiragana}ー・]*(?:美術館|美术馆|博物館|博物馆|藝術館|艺术馆)|\p{Script=Hangul}*(?:미술관|박물관)/gu;
 
 // ─── Scoring ──────────────────────────────────────────────────────────────
 

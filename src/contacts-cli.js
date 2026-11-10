@@ -15,7 +15,7 @@ import { ContactEnricher, greetingFor } from './contacts.js';
 import { createHttpClient } from './http.js';
 import { createSaver } from './output.js';
 import { relevanceFields } from './maps.js';
-import { loadInput, resolveCountry } from './config.js';
+import { loadInput, resolveCountry, resolveOutputDir } from './config.js';
 import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { TARGET_TIERS, isSellable } from './relevance.js';
 import { loadWhatsAppTemplate } from './whatsapp.js';
@@ -99,7 +99,7 @@ async function refresh(file) {
     })));
     const country = resolveCountry(input);
     const waFile = input.whatsappTemplate || country.whatsappTemplate;
-    const save = createSaver(path.resolve(input.outputDir || country.outputDir), {
+    const save = createSaver(path.resolve(resolveOutputDir(input, country)), {
         template: loadTemplate(input.emailTemplate || country.emailTemplate || DEFAULT_TEMPLATE_PATH),
         ...(waFile ? { whatsappTemplate: loadWhatsAppTemplate(waFile) } : {}),
         sender: input.sender || {},

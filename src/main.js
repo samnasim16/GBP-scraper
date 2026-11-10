@@ -20,7 +20,7 @@
 import path from 'node:path';
 import process from 'node:process';
 
-import { loadDotEnv, loadInput, resolveLocations, buildQueryMatrix, resolveCountry } from './config.js';
+import { loadDotEnv, loadInput, resolveLocations, buildQueryMatrix, resolveCountry, resolveOutputDir } from './config.js';
 import { createBrowserFactory, isSessionDead } from './browser.js';
 import { createSaver, prepareLeads } from './output.js';
 import { scrapeQuery, relevanceFields } from './maps.js';
@@ -30,7 +30,7 @@ import { loadTemplate, DEFAULT_TEMPLATE_PATH } from './email-template.js';
 import { isTarget, TARGET_TIERS } from './relevance.js';
 import { sleep } from './util.js';
 import { loadWhatsAppTemplate } from './whatsapp.js';
-import { loadPrevious, readProgress, writeProgress, resumePoint, seedSeen, needsContactLookup, backupPrevious, runKey } from './resume.js';
+import { loadPrevious, readProgress, writeProgress, resumePoint, seedSeen, needsContactLookup, backupPrevious, runKey, queryFingerprint } from './resume.js';
 
 loadDotEnv();
 
@@ -62,7 +62,8 @@ const FRESH = process.argv.includes('--fresh');
 const AFTER_SEARCH = !!contacts.afterSearch;
 // Each market writes to its own folder, so an England run never overwrites
 // the Germany results.
-const OUTPUT_DIR = path.resolve(process.cwd(), input.outputDir || COUNTRY.outputDir);
+// A "places" run without its own "outputDir" gets "<folder>-places".
+const OUTPUT_DIR = path.resolve(process.cwd(), resolveOutputDir(input, COUNTRY));
 const template = loadTemplate(emailTemplate);
 // An input file can rename the workbook and the list ("sushi-germany.xlsx").
 const WORKBOOK = input.workbook || COUNTRY.workbook || 'judaica-leads.xlsx';
@@ -250,7 +251,7 @@ async function main() {
                 }
             }
 
-            writeProgress(OUTPUT_DIR, { country: RUN_KEY, queries: queries.length, next: qi + 1, last: queries[qi].text });
+            writeProgress(OUTPUT_DIR, { country: RUN_KEY, queries: queries.length, fingerprint: queryFingerprint(queries), next: qi + 1, last: queries[qi].text });
             if (allLeads.length - lastSavedCount >= SAVE_EVERY) {
                 await saveResults(allLeads);
                 lastSavedCount = allLeads.length;

@@ -399,3 +399,15 @@ test('Israel art: the Hebrew email and WhatsApp message ask once to list the buy
     assert.ok(fs.existsSync(path.join(dir, 'art-leads.xlsx')));
     fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('Israel art "places": by district code, or under "IL"; known cities come out as the full run has them', () => {
+    const locs = resolveLocations({ country: 'IL', campaign: 'art', places: { TA: ['Tel Aviv-Yafo'], IL: ['Jerusalem', 'Kfar Yona', 'Tel Aviv-Yafo, Israel'] }, districts: false }, () => {});
+    assert.deepEqual(locs.map(l => `${l.state} ${l.city}`), ['TA Tel Aviv-Yafo', 'JM Jerusalem', 'IL Kfar Yona']);
+    const full = resolveLocations({ country: 'IL', campaign: 'art' }, () => {});
+    for (const l of locs.slice(0, 2)) assert.ok(full.some(f => f.state === l.state && f.city === l.city), l.city);
+    // Districts come with a known city.
+    const withDistricts = resolveLocations({ country: 'IL', campaign: 'art', places: { IL: ['Jerusalem'] } }, () => {});
+    assert.ok(withDistricts.some(l => l.state === 'JM' && l.city === 'Hutzot Hayotzer, Jerusalem'));
+    // "Arad" alone is Arad, Romania: under IL it is the sushi run's own "Arad, Israel".
+    assert.deepEqual(resolveLocations({ country: 'IL', campaign: 'sushi', places: { IL: ['arad'] }, districts: false }, () => {}), [{ state: 'SO', city: 'Arad, Israel' }]);
+});

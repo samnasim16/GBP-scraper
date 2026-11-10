@@ -541,3 +541,16 @@ test('the art email and WhatsApp message introduce Varnish AI, with an opt-out a
     const [r] = prepareLeads([place('Hudson Line Gallery', 'Art gallery', { relevance_tier: 'Gallery', phone: '+12125550100' })], { whatsappTemplate: wa, includeTiers: ART.includeTiers });
     assert.match(r.whatsapp_link, /^https:\/\/wa\.me\/12125550100\?text=.*Varnish%20AI/);
 });
+
+test('US art "places": cities by state code, as the full run searches them; a city without its state gets it', () => {
+    const warnings = [];
+    const locs = resolveLocations({ country: 'US', campaign: 'art', places: { FL: ['Miami, FL', 'Tampa'], il: ['Chicago'], US: ['Santa Fe, NM', 'Nowhere'], ZZ: ['Atlantis'] }, districts: true },
+        (m) => warnings.push(m));
+    // Districts come with a known city (Wynwood, River North, Canyon Road…).
+    assert.deepEqual(locs.map(l => `${l.state} ${l.city}`), ['FL Miami, FL', 'FL Tampa, FL', 'IL Chicago, IL', 'NM Santa Fe, NM', 'FL Wynwood, Miami, FL',
+        'FL Design District, Miami, FL', 'IL River North, Chicago, IL', 'IL West Loop, Chicago, IL', 'NM Canyon Road, Santa Fe, NM', 'NM Railyard, Santa Fe, NM']);
+    // "IL" is Illinois here; "US" places a "City, ST"; a city with no state, and an unknown code, are skipped.
+    assert.equal(warnings.length, 2);
+    const full = resolveLocations({ country: 'US', campaign: 'art' }, () => {});
+    for (const l of locs.filter(x => !/Tampa/.test(x.city))) assert.ok(full.some(f => f.state === l.state && f.city === l.city), `${l.state} ${l.city}`);
+});

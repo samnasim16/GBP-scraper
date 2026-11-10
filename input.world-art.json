@@ -5,7 +5,7 @@
         "name": "",
         "title": ""
     },
-    "states_comment": "Leave empty for every country, or pick some, e.g. [\"UK\", \"FR\", \"JP\"]. Codes: UK FR DE CH IT ES NL BE AT SE DK NO IE PT MC HK SG JP KR TW IN AE AU NZ CA MX BR AR CO ZA",
+    "states_comment": "Leave empty for every country (76; about 2,000 searches), or pick some: [\"HU\"] runs Hungary (Budapest and its gallery districts, Szentendre, Debrecen, Szeged, Pécs); [\"HU\"] with \"cities\": [\"Budapest\"] runs Budapest alone (its districts too while \"districts\" is true); [\"UK\", \"FR\", \"JP\"] runs those three. Russia and Belarus are left out (sanctions). Codes: UK FR DE CH IT ES NL BE AT SE DK NO IE PT MC HK SG JP KR TW IN AE AU NZ CA MX BR AR CO ZA BG HR CY CZ EE FI GR HU LV LT LU MT PL RO SK SI IS LI AD SM RS BA ME MK AL XK MD UA TR QA SA KW LB CL PE UY TH ID PH MY VN NG KE EG MA GH",
     "states": [],
     "cities": [],
     "districts": true,

@@ -162,10 +162,11 @@ export const EUROPE_SUSHI_DISTRICTS = {
 /**
  * Every name an address may end with, for the Country column: "Germany" → DE.
  * UAE addresses separate their parts with " - " ("Al Quoz - Dubai - United
- * Arab Emirates").
+ * Arab Emirates"). A postcode may come before the name without a comma
+ * ("…, 1055 Hungary", "98000 Monaco").
  */
 export function marketOfAddress(address, markets = EUROPE_MARKETS) {
-    const last = String(address || '').split(/,|\s[-–]\s/).map(p => p.trim()).filter(Boolean).pop() || '';
+    const last = (String(address || '').split(/,|\s[-–]\s/).map(p => p.trim()).filter(Boolean).pop() || '').replace(/^\d{3,6}\s+/, '');
     for (const [code, m] of Object.entries(markets)) {
         if ((m.names || [m.name]).some(n => n.toLowerCase() === last.toLowerCase())) return code;
     }

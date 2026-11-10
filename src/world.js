@@ -2,7 +2,9 @@
  * The world's art markets, for the art campaign: one run, many countries,
  * each searched as itself (as europe.js does for the sushi run). The US and
  * Israel have their own runs; mainland China is left out, because Google
- * Maps barely covers it.
+ * Maps barely covers it; Russia and Belarus are left out because sanctions
+ * make selling art there impractical (payments, shipping and export
+ * licences), so a buyer there is no use to a seller.
  *
  * A market gives Google's `gl`, the phone code, `trunks` (the national
  * prefixes dropped after the code; "0" when not given), `nationalLengths`
@@ -14,6 +16,25 @@
 import { EUROPE_MARKETS } from './europe.js';
 
 const europe = (codes) => Object.fromEntries(codes.map(c => [c, EUROPE_MARKETS[c]]));
+
+/**
+ * The rest of Europe, from the sushi run's entries, with how many digits a
+ * national number has once its trunk 0 is gone ("1 234 5678" in Budapest is
+ * +36 1 234 5678, not +1…). The trunk-free markets (Cyprus, Czechia,
+ * Estonia, Greece, Latvia, Luxembourg, Malta, Poland, Iceland,
+ * Liechtenstein, Andorra, San Marino) add the code to every national number
+ * already; Finland's lengths vary too much to guess; Türkiye's 10 is the
+ * default. Prague's and Bratislava's addresses name the district ("110 00
+ * Staré Město", "811 01 Bratislava-Staré Mesto"), so the searched city stays
+ * there unless the address names another searched city.
+ */
+const MORE_EUROPE = {
+    BG: { nationalLengths: [8, 9] }, HR: { nationalLengths: [8, 9] }, CY: {}, CZ: { districtTowns: true }, EE: {}, FI: {}, GR: {},
+    HU: { nationalLengths: [8, 9] }, LV: {}, LT: { nationalLengths: [8] }, LU: {}, MT: {}, PL: {}, RO: { nationalLengths: [9] },
+    SK: { nationalLengths: [9], districtTowns: true }, SI: { nationalLengths: [8] }, IS: {}, LI: {}, AD: {}, SM: {},
+    RS: { nationalLengths: [8, 9] }, BA: { nationalLengths: [8, 9] }, ME: { nationalLengths: [8] }, MK: { nationalLengths: [8] },
+    AL: { nationalLengths: [8, 9] }, XK: { nationalLengths: [8] }, MD: { nationalLengths: [8] }, UA: { nationalLengths: [9] }, TR: {},
+};
 
 export const WORLD_MARKETS = {
     // Europe: the sushi run's entries ("UK", not GB, so addresses get the UK post-town reader).
@@ -50,6 +71,49 @@ export const WORLD_MARKETS = {
     CO: { name: 'Colombia', gl: 'co', phoneCode: '57', trunks: [] },
     // Africa: 021 123 4567 (9 after the 0).
     ZA: { name: 'South Africa', gl: 'za', phoneCode: '27', nationalLengths: [9] },
+
+    // The rest of Europe but Russia and Belarus (see the top of this file).
+    ...Object.fromEntries(Object.entries(MORE_EUROPE).map(([c, extra]) => [c, { ...EUROPE_MARKETS[c], ...extra }])),
+
+    // The Gulf and the Levant. Qatar and Kuwait have no trunk prefix (8-digit
+    // numbers). Saudi Arabia drops a 0: 011 234 5678 and 05x xxx xxxx are 9
+    // digits after it. Lebanon drops a 0 before its landlines and the old
+    // 03 mobiles (01 234 567: 7 digits after it); the newer mobiles are
+    // written without one (70 123 456: 8).
+    QA: { name: 'Qatar', gl: 'qa', phoneCode: '974', trunks: [] },
+    SA: { name: 'Saudi Arabia', gl: 'sa', phoneCode: '966', nationalLengths: [9] },
+    KW: { name: 'Kuwait', gl: 'kw', phoneCode: '965', trunks: [] },
+    LB: { name: 'Lebanon', gl: 'lb', phoneCode: '961', nationalLengths: [7, 8] },
+    // South America. Chile's numbers are 9 digits (2 2345 6789, 9 8765 4321);
+    // old listings still write a 0 before them. Peru: (01) 234 5678 in Lima
+    // is 8 digits after the 0, a mobile 9 (987 654 321) and written without
+    // one. Uruguay: 8 digits (2915 1234), a mobile 099 123 456. Punta del Este
+    // and José Ignacio are where Uruguay's collectors buy in summer. Lima's
+    // and Santiago's addresses name the district or commune (Miraflores,
+    // Barranco, Vitacura, Las Condes), so the searched city stays there.
+    CL: { name: 'Chile', gl: 'cl', phoneCode: '56', nationalLengths: [9], districtTowns: true },
+    PE: { name: 'Peru', gl: 'pe', phoneCode: '51', nationalLengths: [8, 9], districtTowns: true },
+    UY: { name: 'Uruguay', gl: 'uy', phoneCode: '598', nationalLengths: [8] },
+    // Southeast Asia, every one with a trunk 0. Thailand: 02 123 4567 (8 after
+    // it), 081 234 5678 (9). Indonesia: (021) 1234 5678 (10), 0812 3456 7890
+    // (11), Bali's (0361) 123 456 (9). The Philippines: (02) 8123 4567 (9),
+    // 0917 123 4567 (10). Malaysia: 03-1234 5678 (9), 012-345 6789 (9),
+    // 011-1234 5678 (10), 04-123 4567 in Penang (8). Vietnam: 028 1234 5678
+    // (10), 090 123 4567 (9).
+    TH: { name: 'Thailand', gl: 'th', phoneCode: '66', nationalLengths: [8, 9] },
+    ID: { name: 'Indonesia', gl: 'id', phoneCode: '62', nationalLengths: [9, 10, 11] },
+    PH: { name: 'Philippines', gl: 'ph', phoneCode: '63', nationalLengths: [9, 10] },
+    MY: { name: 'Malaysia', gl: 'my', phoneCode: '60', nationalLengths: [8, 9, 10] },
+    VN: { name: 'Vietnam', gl: 'vn', phoneCode: '84', nationalLengths: [9, 10], names: ['Vietnam', 'Viet Nam'] },
+    // Africa, every one with a trunk 0. Nigeria: 01 234 5678 in Lagos (8 after
+    // it), 0803 123 4567 (10). Kenya: 020 123 4567 and 0712 345 678 (9).
+    // Egypt: 02 2345 6789 in Cairo (9), 010 1234 5678 (10). Morocco and Ghana:
+    // 9 digits after the 0 (0522 12 34 56, 0612 34 56 78; 030 123 4567).
+    NG: { name: 'Nigeria', gl: 'ng', phoneCode: '234', nationalLengths: [8, 10] },
+    KE: { name: 'Kenya', gl: 'ke', phoneCode: '254', nationalLengths: [9] },
+    EG: { name: 'Egypt', gl: 'eg', phoneCode: '20', nationalLengths: [9, 10] },
+    MA: { name: 'Morocco', gl: 'ma', phoneCode: '212', nationalLengths: [9] },
+    GH: { name: 'Ghana', gl: 'gh', phoneCode: '233', nationalLengths: [9] },
 };
 
 /**
@@ -89,6 +153,57 @@ export const WORLD_ART_CITIES = {
     AR: ['Buenos Aires'],
     CO: ['Bogotá', 'Medellín'],
     ZA: ['Cape Town', 'Johannesburg', 'Durban'],
+    // The rest of Europe: each capital and the cities with an art trade of
+    // their own (from the sushi run's list), plus Szentendre, Hungary's
+    // artists' town (as Saint-Paul-de-Vence is France's).
+    BG: ['Sofia', 'Plovdiv'],
+    HR: ['Zagreb', 'Split', 'Dubrovnik'],
+    CY: ['Nicosia', 'Limassol'],
+    CZ: ['Prague', 'Brno'],
+    EE: ['Tallinn', 'Tartu'],
+    FI: ['Helsinki', 'Turku'],
+    GR: ['Athens', 'Thessaloniki', 'Mykonos'],
+    HU: ['Budapest', 'Szentendre', 'Debrecen', 'Szeged', 'Pécs'],
+    LV: ['Riga'],
+    LT: ['Vilnius', 'Kaunas'],
+    LU: ['Luxembourg'],
+    MT: ['Valletta'],
+    PL: ['Warsaw', 'Kraków', 'Wrocław', 'Poznań', 'Gdańsk', 'Łódź'],
+    RO: ['Bucharest', 'Cluj-Napoca', 'Timișoara'],
+    SK: ['Bratislava', 'Košice'],
+    SI: ['Ljubljana'],
+    IS: ['Reykjavík'],
+    LI: ['Vaduz'],
+    AD: ['Andorra la Vella'],
+    SM: ['San Marino'],
+    RS: ['Belgrade', 'Novi Sad'],
+    BA: ['Sarajevo'],
+    ME: ['Podgorica'],
+    MK: ['Skopje'],
+    AL: ['Tirana'],
+    XK: ['Pristina'],
+    MD: ['Chișinău'],
+    UA: ['Kyiv', 'Lviv', 'Odesa'],
+    // Istanbul, and Türkiye's other art cities beyond Europe.
+    TR: ['Istanbul', 'Ankara', 'Izmir'],
+    // The Gulf, the Levant, South America, Southeast Asia and Africa.
+    QA: ['Doha'],
+    SA: ['Riyadh', 'Jeddah'],
+    KW: ['Kuwait City'],
+    LB: ['Beirut'],
+    CL: ['Santiago', 'Valparaíso'],
+    PE: ['Lima', 'Cusco'],
+    UY: ['Montevideo', 'Punta del Este', 'José Ignacio'],
+    TH: ['Bangkok', 'Chiang Mai'],
+    ID: ['Jakarta', 'Yogyakarta', 'Bandung', 'Ubud', 'Denpasar'],
+    PH: ['Manila', 'Makati', 'Quezon City'],
+    MY: ['Kuala Lumpur', 'Penang'],
+    VN: ['Ho Chi Minh City', 'Hanoi'],
+    NG: ['Lagos', 'Abuja'],
+    KE: ['Nairobi'],
+    EG: ['Cairo', 'Alexandria'],
+    MA: ['Marrakesh', 'Casablanca', 'Rabat', 'Tangier'],
+    GH: ['Accra'],
 };
 
 /**
@@ -131,13 +246,34 @@ export const WORLD_ART_DISTRICTS = {
     Bogotá: ['San Felipe', 'Chapinero'],
     'Cape Town': ['Woodstock', 'City Bowl'],
     Johannesburg: ['Rosebank', 'Parkwood', 'Maboneng'],
+    // Budapest's galleries cluster in district V around Falk Miksa utca (by
+    // Parliament) and in districts VI and VII.
+    Budapest: ['District V', 'Falk Miksa utca', 'District VI', 'District VII'],
+    Istanbul: ['Beyoğlu', 'Karaköy', 'Nişantaşı', 'Kadıköy'],
+    Prague: ['Prague 1', 'Prague 7'],
+    Warsaw: ['Śródmieście', 'Praga', 'Wola'],
+    Kraków: ['Stare Miasto', 'Kazimierz'],
+    Athens: ['Kolonaki', 'Psyrri', 'Metaxourgeio'],
+    Kyiv: ['Podil', 'Pecherskyi', 'Shevchenkivskyi'],
+    Beirut: ['Mar Mikhael', 'Gemmayzeh', 'Achrafieh'],
+    Santiago: ['Vitacura', 'Providencia', 'Lastarria'],
+    Lima: ['Miraflores', 'Barranco', 'San Isidro'],
+    Bangkok: ['Bang Rak', 'Sathorn', 'Sukhumvit', 'Pathum Wan'],
+    Jakarta: ['Kemang', 'Menteng', 'Kebayoran Baru'],
+    'Ho Chi Minh City': ['District 1', 'Thao Dien'],
+    Hanoi: ['Hoan Kiem'],
+    Lagos: ['Victoria Island', 'Ikoyi', 'Lekki'],
+    Cairo: ['Zamalek', 'Downtown', 'Garden City'],
 };
 
 /**
  * Results outside the run's countries: the US (its own run) for a Vancouver
- * or Toronto search, Macau and Shenzhen for Hong Kong, Johor for Singapore,
- * Israel (its own run), and Europe's other countries. Abroad, Maps names the
+ * or Toronto search, Macau and Shenzhen for Hong Kong, Israel (its own run),
+ * Russia and Belarus (sanctions; see the top of this file), and the
+ * neighbours of the run's countries (Brunei for Malaysia, Laos, Cambodia and
+ * Myanmar for Thailand and Vietnam, Jordan and Syria for Lebanon, Algeria
+ * for Morocco, Togo and Côte d'Ivoire for Ghana…). Abroad, Maps names the
  * country at the end of the address; UAE addresses separate their parts
  * with " - " instead of commas. "Hong Kong SAR, China" is Hong Kong.
  */
-export const WORLD_FOREIGN = /(?:,|\s[-–])\s*(United States|USA|Israel|Palestine|Macau|Macao|Malaysia|Indonesia|Thailand|Philippines|Vietnam|Cambodia|Pakistan|Bangladesh|Sri Lanka|Nepal|Saudi Arabia|Qatar|Oman|Bahrain|Kuwait|Iran|Lebanon|Jordan|Egypt|Morocco|Tunisia|Nigeria|Kenya|Namibia|Botswana|Zimbabwe|Lesotho|Eswatini|Mozambique|Uruguay|Paraguay|Chile|Peru|Bolivia|Ecuador|Venezuela|Panama|Costa Rica|Guatemala|Cuba|Puerto Rico|Dominican Republic|Luxembourg|Liechtenstein|Andorra|San Marino|Poland|Czechia|Czech Republic|Slovakia|Hungary|Slovenia|Croatia|Greece|Cyprus|Malta|Romania|Bulgaria|Serbia|Finland|Estonia|Latvia|Lithuania|Iceland|Ukraine|Russia|Türkiye|Turkey|Georgia|Armenia)\s*$|(?<!Hong Kong(?: SAR)?)\s*,\s*China\s*$|,\s*[A-Z]{2}\s+\d{5}(-\d{4})?\s*$/;
+export const WORLD_FOREIGN = /(?:,|\s[-–])\s*(United States|USA|Israel|Palestine|Palestinian Territories|Macau|Macao|Cambodia|Laos|Myanmar|Myanmar \(Burma\)|Brunei|Timor-Leste|Papua New Guinea|Pakistan|Bangladesh|Sri Lanka|Nepal|Oman|Bahrain|Iran|Iraq|Syria|Jordan|Yemen|Tunisia|Algeria|Libya|Sudan|South Sudan|Ethiopia|Somalia|Uganda|Tanzania|Rwanda|Togo|Benin|Burkina Faso|Côte d'Ivoire|Cote d'Ivoire|Niger|Cameroon|Chad|Namibia|Botswana|Zimbabwe|Lesotho|Eswatini|Mozambique|Paraguay|Bolivia|Ecuador|Venezuela|Panama|Costa Rica|Guatemala|Cuba|Puerto Rico|Dominican Republic|Russia|Belarus|Georgia|Armenia|Azerbaijan|Kazakhstan)\s*$|(?<!Hong Kong(?: SAR)?)\s*,\s*China\s*$|,\s*[A-Z]{2}\s+\d{5}(-\d{4})?\s*$/;

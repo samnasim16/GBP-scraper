@@ -404,8 +404,13 @@ export function extractContactRole(text) {
 
 // Hebrew: צור קשר / צרו קשר / יצירת קשר (contact), אודות (about); %d7%a6%d7%95%d7%a8 is צור in a URL.
 // The art campaign's world run: contatti (Italian), contato (Portuguese),
-// お問い合わせ (Japanese), 연락처 / 문의 (Korean), 聯絡 / 联系 (Chinese).
-const CONTACT_LINK = /(impressum|imprint|legal[-_ ]?notice|kontakt|contact|about|ueber[-_]?uns|über[-_]?uns|uber[-_]?uns|wir|team|anbieterkennzeichnung|צור קשר|צרו קשר|יצירת קשר|אודות|%d7%a6%d7%95%d7%a8|%d7%90%d7%95%d7%93%d7%95%d7%aa|contatti|contato|お問い合わせ|問い合わせ|연락처|문의|聯絡|联系)/i;
+// お問い合わせ (Japanese), 연락처 / 문의 (Korean), 聯絡 / 联系 (Chinese);
+// kapcsolat / elérhetőség (Hungarian), iletişim (Turkish, "iletisim" in an
+// address), επικοινωνία (Greek), yhteystiedot (Finnish), контакт
+// (Cyrillic), اتصل بنا / تواصل (Arabic), ติดต่อ (Thai), kontak / hubungi
+// (Indonesian, Malay), liên hệ (Vietnamese). "kontakt" covers Polish, Czech,
+// Slovak, the Balkan and Baltic languages.
+const CONTACT_LINK = /(impressum|imprint|legal[-_ ]?notice|kontakt|contact|about|ueber[-_]?uns|über[-_]?uns|uber[-_]?uns|wir|team|anbieterkennzeichnung|צור קשר|צרו קשר|יצירת קשר|אודות|%d7%a6%d7%95%d7%a8|%d7%90%d7%95%d7%93%d7%95%d7%aa|contatti|contato|お問い合わせ|問い合わせ|연락처|문의|聯絡|联系|kapcsolat|el[ée]rhet[őo]s[ée]g|[iİı]leti[şs]im|επικοινων[ιί]α|ΕΠΙΚΟΙΝΩΝΙΑ|yhteystiedot|контакт|Контакт|اتصل|تواصل|ติดต่อ|kontak|hubungi|li[êe]n[-_ ]h[ệe])/i;
 
 /** Same-site links to the Impressum, Kontakt and About pages, best first. */
 export function findContactLinks(html, baseUrl, { max = 4 } = {}) {
