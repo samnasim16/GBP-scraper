@@ -9,6 +9,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { EUROPE_MARKETS, EUROPE_SUSHI_CITIES, EUROPE_SUSHI_DISTRICTS } from './europe.js';
+import { WORLD_MARKETS, WORLD_ART_CITIES, WORLD_ART_DISTRICTS, WORLD_FOREIGN } from './world.js';
 import { ART_LINKS, ART_TIERS } from './art.js';
 
 const TEMPLATES = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'templates');
@@ -606,6 +607,29 @@ export const COUNTRIES = {
         // Results outside Europe: a "Sushi Valencia" in Venezuela, a Paris in Texas.
         foreign: /,\s*(United States|USA|Canada|Mexico|Brazil|Argentina|Chile|Colombia|Venezuela|Peru|Australia|New Zealand|South Africa|Israel|Japan|China|India|Egypt|Morocco|Tunisia|Algeria|United Arab Emirates|Saudi Arabia|Qatar|Lebanon|Jordan|Georgia|Armenia|Azerbaijan|Kazakhstan|Thailand|Singapore|Philippines|Indonesia|Malaysia|Vietnam|South Korea)\s*$|,\s*[A-Z]{2}\s+\d{5}(-\d{4})?\s*$/,
     },
+    // The world's art markets in one run, for the art campaign only (the US
+    // and Israel have their own runs). As in Europe, each search runs as
+    // its own country: markets[query.state] (world.js).
+    WORLD: {
+        name: 'Worldwide',
+        campaignOnly: true,
+        gl: 'gb',
+        phoneCode: '44',
+        regionLabel: 'country',
+        markets: WORLD_MARKETS,
+        regions: WORLD_ART_CITIES,
+        districts: WORLD_ART_DISTRICTS,
+        categories: [],
+        highYield: [],
+        // English pages where a site has them: the art words read every
+        // language, but English is the one most galleries offer.
+        acceptLanguage: 'en-GB,en;q=0.9',
+        contactKeyPage: 'contact|kontakt|impressum|mentions|contatti|contacto|contato|visit|info',
+        contactPaths: ['/contact', '/kontakt', '/contatti', '/contacto', '/contato', '/visit', '/info', '/about', '/impressum'],
+        outputDir: 'output-world',
+        addressTownWins: true,
+        foreign: WORLD_FOREIGN,
+    },
 };
 
 /** What every art-campaign market shares: the tiers, the feed drop, the links followed, the columns. */
@@ -684,7 +708,7 @@ export const CAMPAIGNS = {
     },
     // Varnish AI's directory of art buyers: galleries, auction houses, art
     // dealers and art advisors (the scoring and the leads.json fields are in
-    // art.js). The US and Israel.
+    // art.js). The US, Israel, and the world's other art markets.
     art: {
         US: {
             ...ART_CAMPAIGN,
@@ -720,10 +744,28 @@ export const CAMPAIGNS = {
             whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-he.txt'),
             script: 'art:il',
         },
+        // The world's other art markets, ~90 cities in 30 countries
+        // (world.js); every search runs as its own country. English terms:
+        // Maps maps them onto its categories in every language.
+        WORLD: {
+            ...ART_CAMPAIGN,
+            categories: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor', 'Contemporary art gallery', 'Fine art gallery'],
+            highYield: ['Art gallery', 'Auction house', 'Art dealer', 'Art advisor'],
+            outputDir: 'output-world-art',
+            // The state, province or emirate where the address names one
+            // (Australia, Canada, Brazil, Mexico, India, the UAE, Japan,
+            // Colombia); empty elsewhere, never the country code.
+            regionInAddress: true,
+            // The English art templates: a neutral opt-out line and a
+            // [Postal address] for the user, nothing US-only.
+            emailTemplate: path.join(TEMPLATES, 'art-email-en.txt'),
+            whatsappTemplate: path.join(TEMPLATES, 'art-whatsapp-en.txt'),
+            script: 'art:world',
+        },
     },
 };
 
-/** "DE", "UK", "GB", "England", "USA", "Israel" → a COUNTRIES entry (default Germany). */
+/** "DE", "UK", "GB", "England", "USA", "Israel", "World" → a COUNTRIES entry (default Germany). */
 export function resolveCountry(input = {}) {
     const raw = String(input.country || 'DE').trim().toUpperCase();
     const code = {
@@ -732,9 +774,14 @@ export function resolveCountry(input = {}) {
         USA: 'US', 'UNITED STATES': 'US', AMERICA: 'US', 'U.S.': 'US', 'U.S.A.': 'US',
         ISRAEL: 'IL', 'ISRAËL': 'IL', ISR: 'IL',
         EUROPE: 'EU',
+        WORLDWIDE: 'WORLD', GLOBAL: 'WORLD', INTERNATIONAL: 'WORLD',
     }[raw] || raw;
     const c = COUNTRIES[code];
-    if (!c) throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}`);
+    if (!c) {
+        // "JP" is one of the world art run's countries, not a market of its own.
+        const hint = WORLD_MARKETS[code] ? ` (for the art campaign in ${WORLD_MARKETS[code].name}: "country": "WORLD", "states": ["${code}"])` : '';
+        throw new Error(`Unknown country "${input.country}". Use one of: ${Object.keys(COUNTRIES).join(', ')}${hint}`);
+    }
     const campaign = String(input.campaign || '').trim().toLowerCase();
     if (!campaign || campaign === 'judaica') {
         if (c.campaignOnly) throw new Error(`${c.name} is set up for a campaign only: add "campaign": "${Object.keys(CAMPAIGNS).find(k => CAMPAIGNS[k][code])}"`);
@@ -743,7 +790,10 @@ export function resolveCountry(input = {}) {
     const markets = CAMPAIGNS[campaign];
     if (!markets) throw new Error(`Unknown campaign "${input.campaign}". Use one of: ${Object.keys(CAMPAIGNS).join(', ')}`);
     if (!markets[code]) {
-        throw new Error(`The ${campaign} campaign is set up for ${Object.keys(markets).map(k => COUNTRIES[k].name).join(', ')} only, not ${c.name}`);
+        // Germany is one of the world art run's countries: say how to run it alone.
+        const many = Object.keys(markets).find(k => COUNTRIES[k].markets && COUNTRIES[k].markets[code]);
+        const hint = many ? ` — for ${c.name} alone use "country": "${many}", "states": ["${code}"]` : '';
+        throw new Error(`The ${campaign} campaign is set up for ${Object.keys(markets).map(k => COUNTRIES[k].name).join(', ')} only, not ${c.name}${hint}`);
     }
     return { code, ...c, ...markets[code], campaign };
 }

@@ -1,0 +1,25 @@
+{
+    "country": "WORLD",
+    "campaign": "art",
+    "states": [
+        "UK"
+    ],
+    "cities": [
+        "London"
+    ],
+    "districts": false,
+    "searchCategories": [
+        "Art gallery",
+        "Auction house"
+    ],
+    "maxLeads": 10,
+    "outputDir": "output-world-art-smoke",
+    "browser": {
+        "mode": "local",
+        "headless": false
+    },
+    "contacts": {
+        "enabled": true,
+        "concurrency": 2
+    }
+}

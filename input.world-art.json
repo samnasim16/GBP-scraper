@@ -1,0 +1,35 @@
+{
+    "country": "WORLD",
+    "campaign": "art",
+    "sender": {
+        "name": "",
+        "title": ""
+    },
+    "states_comment": "Leave empty for every country, or pick some, e.g. [\"UK\", \"FR\", \"JP\"]. Codes: UK FR DE CH IT ES NL BE AT SE DK NO IE PT MC HK SG JP KR TW IN AE AU NZ CA MX BR AR CO ZA",
+    "states": [],
+    "cities": [],
+    "districts": true,
+    "searchCategories": [],
+    "includeTiers": [
+        "Gallery",
+        "Auction house",
+        "Art dealer",
+        "Art advisor"
+    ],
+    "maxLeads": 30000,
+    "maxResultsPerQuery": 120,
+    "maxScrolls": 20,
+    "delayBetweenQueries": 4000,
+    "delayBetweenListings": 1800,
+    "browser": {
+        "mode": "local",
+        "headless": false,
+        "userDataDir": ".cache/chrome-profile"
+    },
+    "contacts": {
+        "enabled": true,
+        "afterSearch": true,
+        "concurrency": 3,
+        "maxPagesPerSite": 4
+    }
+}

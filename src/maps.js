@@ -45,10 +45,12 @@ const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
  *   FR  "10 Rue des Rosiers, 75004 Paris"             → Paris
  *   BE  "Lange Kievitstraat 1, 2018 Antwerpen"        → Antwerpen (4-digit postcode)
  *   US  "4920 13th Ave, Brooklyn, NY 11219"           → Brooklyn (town before "ST 12345")
+ * and the art campaign's markets beyond Europe (see worldPlace).
  */
 export function cityFromAddress(address, countryCode = 'DE') {
     const parts = addressParts(address);
     if (!parts.length) return '';
+    if (WORLD_PLACE.has(countryCode)) return worldPlace(address, countryCode).city;
     if (countryCode === 'IL') {
         // "King George St 20, Jerusalem, 9414205" / "HaMelacha St 39, Holon":
         // the town is the last part once the 7-digit postcode is gone.
@@ -88,7 +90,8 @@ export function cityFromAddress(address, countryCode = 'DE') {
     // "L-1724 Luxembourg", "20121 Milano MI", "110 00 Praha 1". After it:
     // "Athina 105 63". Alone after the town: "Budapest, 1052",
     // "Dublin 2, D02 X285". A house number ("23 Dawson St") is not a postcode.
-    const tidy = (t) => t.replace(/\s+([A-Z]{2}|\d{1,2})$/, '').trim();
+    // "Milano MI", "Praha 1", "København K".
+    const tidy = (t) => t.replace(/\s+([A-Z]{2}|\d{1,2}|[A-ZÆØÅ])$/u, '').trim();
     for (let i = parts.length - 1; i >= 0; i--) {
         const p = parts[i];
         const before = p.match(/^(?:[A-Z]{1,2}-)?(?:\d{4,6}|\d{3} \d{2}|\d{2}-\d{3}|\d{4}-\d{3})(?:\s+[A-Z]{2}(?=\s))?\s+(\p{L}[\p{L}\s.'’-]*?(?:\s+[A-Z]{2}|\s+\d{1,2})?)$/u);
@@ -105,9 +108,157 @@ export function cityFromAddress(address, countryCode = 'DE') {
 
 const US_STATE_ZIP = /^[A-Z]{2}(\s+\d{5}(-\d{4})?)?$/;
 
+/** Country names at the end of an address (not the city-states: "Singapore 018989", "Monaco", "Hong Kong" are towns too). */
+const COUNTRY_PART = /^(germany|deutschland|united kingdom|uk|england|france|belgium|belgique|belgië|belgie|united states|usa|us|israel|ישראל|switzerland|schweiz|suisse|italy|italia|spain|españa|netherlands|the netherlands|nederland|austria|österreich|sweden|sverige|denmark|danmark|norway|norge|ireland|portugal|japan|south korea|korea|republic of korea|taiwan|india|united arab emirates|uae|australia|new zealand|canada|mexico|méxico|brazil|brasil|argentina|colombia|south africa)$/i;
+
 function addressParts(address) {
-    return String(address || '').split(',').map(p => p.trim()).filter(Boolean)
-        .filter(p => !/^(germany|deutschland|united kingdom|uk|england|france|belgium|belgique|belgië|belgie|united states|usa|us|israel|ישראל)$/i.test(p));
+    return String(address || '').split(',').map(p => p.trim()).filter(Boolean).filter(p => !COUNTRY_PART.test(p));
+}
+
+/**
+ * Town and region beyond Europe and the US, for the art campaign's world run
+ * (Maps' English UI):
+ *   JP  "6 Chome-10-1 Roppongi, Minato City, Tokyo 106-6108"  → Tokyo, Tokyo
+ *       (Tokyo's wards are "… City"; "Kita Ward, Osaka, 530-0001" → Osaka;
+ *       "Naka Ward, Yokohama, Kanagawa 231-0023" → Yokohama, Kanagawa)
+ *   KR  "54 Samcheong-ro, Jongno-gu, Seoul 03053"             → Seoul
+ *   HK  "G/F, 50 Connaught Rd Central, Central, Hong Kong"    → Hong Kong (no postcode)
+ *   SG  "1 Fullerton Rd, #02-01, Singapore 049213"            → Singapore
+ *   TW  "No. 1號, Zhongzheng District, Taipei City, 100"       → Taipei
+ *   IN  "Kala Ghoda, Fort, Mumbai, Maharashtra 400001"        → Mumbai, Maharashtra
+ *   AE  "Al Quoz - Al Quoz Industrial Area 1 - Dubai"         → Dubai, Dubai (" - " between parts)
+ *   AU  "2 Danks St, Waterloo NSW 2017"                       → Waterloo, NSW (a suburb: pickCity keeps Sydney)
+ *   CA  "1 Spadina Ave, Toronto, ON M5V 2T6"                  → Toronto, ON
+ *   MX  "Colima 196, Roma Nte., Cuauhtémoc, 06700 Ciudad de México, CDMX" → Ciudad de México, CDMX
+ *   BR  "R. Oscar Freire, 379 - Jardins, São Paulo - SP, 01426-001"      → São Paulo, SP
+ *   AR  "Av. Alvear 1891, C1129 CABA"                         → Buenos Aires
+ *   CO  "Cl. 10 #5-51, La Candelaria, Bogotá, Cundinamarca"   → Bogotá, Cundinamarca
+ * New Zealand ("Auckland 1010") and South Africa ("Cape Town, 8001") read as Europe does.
+ */
+const WORLD_PLACE = new Set(['JP', 'KR', 'HK', 'SG', 'TW', 'IN', 'AE', 'AU', 'CA', 'MX', 'BR', 'AR', 'CO']);
+const AU_TOWN = /^(\p{L}[\p{L} .'’-]*?)\s+(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)(?:\s+\d{4})?$/u;
+const CA_PROVINCE = /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?$/;
+/** Each emirate's town as Maps writes it, and the emirate (Al Ain is in Abu Dhabi). */
+const UAE_TOWNS = { dubai: ['Dubai', 'Dubai'], 'abu dhabi': ['Abu Dhabi', 'Abu Dhabi'], 'al ain': ['Al Ain', 'Abu Dhabi'], sharjah: ['Sharjah', 'Sharjah'],
+    ajman: ['Ajman', 'Ajman'], 'ras al khaimah': ['Ras Al Khaimah', 'Ras Al Khaimah'], fujairah: ['Fujairah', 'Fujairah'], 'umm al quwain': ['Umm Al Quwain', 'Umm Al Quwain'] };
+const KR_CITY = /^(Seoul|Busan|Incheon|Daegu|Daejeon|Gwangju|Ulsan|Sejong)(?:-si|\s+City)?$/i;
+const CO_DEPARTMENT = /^(Amazonas|Antioquia|Arauca|Atlántico|Bolívar|Boyacá|Caldas|Caquetá|Casanare|Cauca|Cesar|Chocó|Córdoba|Cundinamarca|Guainía|Guaviare|Huila|La Guajira|Magdalena|Meta|Nariño|Norte de Santander|Putumayo|Quindío|Risaralda|San Andrés|Santander|Sucre|Tolima|Valle del Cauca|Vaupés|Vichada)$/i;
+
+export function worldPlace(address, countryCode) {
+    const parts = addressParts(address);
+    const place = (city = '', region = '') => ({ city: clean(city), region: clean(region) });
+    if (!parts.length) return place();
+    switch (countryCode) {
+    case 'HK': return place('Hong Kong');
+    case 'SG': return place('Singapore');
+    case 'AU':
+        for (let i = parts.length - 1; i >= 0; i--) {
+            const m = parts[i].match(AU_TOWN);
+            if (m) return place(m[1], m[2]);
+        }
+        return place();
+    case 'CA':
+        for (let i = parts.length - 1; i > 0; i--) {
+            const m = parts[i].match(CA_PROVINCE);
+            if (m && !/\d/.test(parts[i - 1])) return place(parts[i - 1], m[1]);
+        }
+        return place();
+    case 'BR':
+        // "São Paulo - SP" (or "- State of São Paulo"); "379 - Jardins" is the street.
+        for (let i = parts.length - 1; i >= 0; i--) {
+            const m = parts[i].match(/^(\p{L}[^\d]*?)\s+-\s+(?:State of\s+)?([A-Z]{2}|\p{Lu}[\p{L} ]+)$/u);
+            if (m) return place(m[1], m[2]);
+        }
+        return place();
+    case 'IN':
+        // "Mumbai, Maharashtra 400001": the state before the 6-digit PIN, the town before it.
+        for (let i = parts.length - 1; i >= 0; i--) {
+            const m = parts[i].match(/^(\p{L}[\p{L} .&-]*?)\s+\d{6}$/u);
+            if (m) return place(i > 0 && !/\d/.test(parts[i - 1]) ? parts[i - 1] : '', m[1]);
+        }
+        return place();
+    case 'AE': {
+        const segs = String(address || '').split(/,|\s[-–]\s/).map(p => p.trim()).filter(Boolean);
+        for (let i = segs.length - 1; i >= 0; i--) {
+            const t = UAE_TOWNS[segs[i].toLowerCase()];
+            if (t) return place(t[0], t[1]);
+        }
+        return place();
+    }
+    case 'JP': {
+        let i = parts.findLastIndex(p => /\b\d{3}-\d{4}\b/.test(p));
+        if (i === -1) return place();
+        let pref = parts[i].replace(/\b\d{3}-\d{4}\b/, '').trim();
+        // "Kyoto, 605-0074": the postcode stands alone after the prefecture.
+        if (!pref && i > 0) pref = parts[--i];
+        pref = String(pref || '').replace(/\s+Prefecture$/i, '');
+        if (!pref || /\d/.test(pref)) return place();
+        let j = i - 1;
+        // A district (gun) between the town and the prefecture: "3419 Naoshima, Kagawa District, Kagawa".
+        const gun = j >= 0 && /\sDistrict$|-gun$/i.test(parts[j]);
+        if (gun) j--;
+        const prev = j >= 0 ? parts[j] : '';
+        const village = gun && prev.replace(/^(?:[\d-]+\s+)+/, '').trim();
+        if (village && !/\d/.test(village)) return place(village, pref);
+        // Tokyo's wards are "… City"; the big cities' wards "… Ward" before the city.
+        if (!prev || /\d|ch[oō]me/i.test(prev) || /\s(?:City|Ward)$|-ku$/i.test(prev)) return place(pref, pref);
+        return place(prev, pref);
+    }
+    case 'KR': {
+        let region = '';
+        const ps = parts.map(p => p.replace(/\s+\d{5}$/, '')).filter(p => !/^\d{5}$/.test(p));
+        for (let i = ps.length - 1; i >= 0; i--) {
+            const p = ps[i];
+            if (/-do$|\sProvince$/i.test(p)) { region = p; continue; }
+            if (/\d|-(?:gu|gun|dong|ro|gil|eup|myeon)$|\sDistrict$/i.test(p)) break;
+            return place(p.replace(/-si$|\s+City$/i, ''), region);
+        }
+        // "Seoul, Jongno-gu, Samcheong-ro, 54": the city first.
+        const city = ps.find(p => KR_CITY.test(p));
+        return place(city ? city.replace(/-si$|\s+City$/i, '') : '', region);
+    }
+    case 'TW': {
+        // "…, Taipei City, 100", "…, Taipei, Taiwan 110": the postcode (and country) last.
+        const ps = parts.filter(p => !/^(?:Taiwan\s+)?\d{3,6}$/i.test(p)).map(p => p.replace(/\s+\d{3,6}$/, ''));
+        for (let i = ps.length - 1; i >= 0; i--) {
+            const m = ps[i].match(/^(\p{L}[\p{L} '’-]*?)\s+(?:City|County)$/u);
+            if (m) return place(m[1]);
+            if (/\d|\sDistrict$/i.test(ps[i])) break;
+            return place(ps[i]);
+        }
+        return place();
+    }
+    case 'MX':
+        // "06700 Ciudad de México, CDMX": the town after its postcode, the state after it.
+        for (let i = parts.length - 1; i >= 0; i--) {
+            const m = parts[i].match(/^\d{5}\s+(\p{L}.*)$/u);
+            if (m) return place(m[1], parts[i + 1] && !/\d/.test(parts[i + 1]) ? parts[i + 1] : '');
+        }
+        return place();
+    case 'AR': {
+        // "C1129 CABA", "C1005AAU Cdad. Autónoma de Buenos Aires", "B1640 Martínez".
+        const town = (t) => (/^(?:CABA|C\.A\.B\.A\.|Cdad\.? Autónoma de Buenos Aires|Ciudad Autónoma de Buenos Aires)$/i.test(t) ? 'Buenos Aires' : t);
+        for (let i = parts.length - 1; i >= 0; i--) {
+            const m = parts[i].match(/^[A-Z]?\d{4}(?:[A-Z]{3})?\s+(\p{L}.*)$/u);
+            if (m) return place(town(m[1].trim()));
+        }
+        const last = parts[parts.length - 1];
+        return place(/\d/.test(last) ? '' : town(last));
+    }
+    case 'CO': {
+        let region = '';
+        const ps = parts.map(p => p.replace(/\s+\d{6}$/, '')).filter(p => !/^\d{6}$/.test(p));
+        for (let i = ps.length - 1; i >= 0; i--) {
+            const p = ps[i];
+            if (/^D\.?\s?C\.?$/i.test(p)) continue;
+            if (CO_DEPARTMENT.test(p) && i > 0) { region = p; continue; }
+            if (/\d|#/.test(p)) break;
+            return place(p.replace(/,?\s*D\.?\s?C\.?$/i, ''), region);
+        }
+        return place('', region);
+    }
+    default: return place();
+    }
 }
 
 /** "…, Brooklyn, NY 11219" → "NY". Only US addresses carry the state. */
@@ -128,6 +279,7 @@ export function stateFromAddress(address) {
  */
 export function regionFromAddress(address, countryCode) {
     if (countryCode === 'US') return stateFromAddress(address);
+    if (WORLD_PLACE.has(countryCode)) return worldPlace(address, countryCode).region;
     return '';
 }
 
@@ -144,8 +296,10 @@ export function pickCity(address, queryCity, country = {}) {
     const town = cityFromAddress(address, country.code);
     if (!town) return searched;
     if (country.markets) {
-        // "1368 Ville-Haute Luxembourg": a quarter before a city we search.
-        const city = Object.values(country.regions || {}).flat().find(c => town.endsWith(` ${c}`));
+        // "1368 Ville-Haute Luxembourg": a quarter before a city we search
+        // (but New Taipei is not Taipei, nor East London London).
+        const city = !/^(?:New|East|West|North|South|Little|Upper|Lower|Greater|Old|Port)\s/i.test(town)
+            && Object.values(country.regions || {}).flat().find(c => town.endsWith(` ${c}`));
         if (city) return city;
     }
     // UK and US addresses carry the real post town.
@@ -194,7 +348,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
     // its Google region and its phone trunk code.
     const market = base.markets && base.markets[query.state];
     const country = market
-        ? { ...base, code: query.state, gl: market.gl, phoneCode: market.phoneCode, trunks: market.trunks || ['0'], districtTowns: !!market.districtTowns }
+        ? { ...base, code: query.state, gl: market.gl, phoneCode: market.phoneCode, trunks: market.trunks || ['0'], nationalLengths: market.nationalLengths, districtTowns: !!market.districtTowns }
         : base;
     log(`\n🔍 ${query.text}`);
 
@@ -321,7 +475,7 @@ export async function scrapeQuery(page, query, ctx, opts) {
             }
             try { await page.waitForSelector('h1.DUwDvf', { timeout: 8000 }); } catch { /* panel may render late */ }
 
-            const d = await page.evaluate(extractDetail, country.phoneCode, country.trunks || ['0']);
+            const d = await page.evaluate(extractDetail, country.phoneCode, country.trunks || ['0'], country.nationalLengths || [10]);
             const name = clean(d.name) || c.name;
             if (!name) continue;
             const address = clean(d.address);

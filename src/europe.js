@@ -159,9 +159,13 @@ export const EUROPE_SUSHI_DISTRICTS = {
     Istanbul: ['Beşiktaş', 'Kadıköy', 'Şişli', 'Beyoğlu', 'Ataşehir'],
 };
 
-/** Every name an address may end with, for the Country column: "Germany" → DE. */
+/**
+ * Every name an address may end with, for the Country column: "Germany" → DE.
+ * UAE addresses separate their parts with " - " ("Al Quoz - Dubai - United
+ * Arab Emirates").
+ */
 export function marketOfAddress(address, markets = EUROPE_MARKETS) {
-    const last = String(address || '').split(',').map(p => p.trim()).filter(Boolean).pop() || '';
+    const last = String(address || '').split(/,|\s[-–]\s/).map(p => p.trim()).filter(Boolean).pop() || '';
     for (const [code, m] of Object.entries(markets)) {
         if ((m.names || [m.name]).some(n => n.toLowerCase() === last.toLowerCase())) return code;
     }

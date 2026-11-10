@@ -141,9 +141,13 @@ export const RETAIL_CATEGORY = /\b(store|shop|boutique|gallery|galerie|market|su
 /**
  * Websites and inboxes of public bodies: stadt-koeln.de, speyer.de,
  * stadt-oldenburg.de, *.rlp.de. A city library or municipal gallery is not a
- * customer, even when Maps files it as an "Art Gallery".
+ * customer, even when Maps files it as an "Art Gallery". Beyond Europe and
+ * the US (the art campaign's world run): government and university domains
+ * under a country code (.gov.au, .govt.nz, .gc.ca, .gob.mx, .go.jp,
+ * .lg.jp, .nic.in, .ac.jp, .edu.au…), Austria's .gv.at, Switzerland's
+ * admin.ch.
  */
-const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$|\.gouv\.fr$|(^|\.)(ville|mairie|commune|agglo|metropole)-[a-z-]+\.fr$|(^|\.)[a-z-]+-(ville|mairie)\.fr$|(^|\.)(belgium|fgov|vlaanderen|wallonie|irisnet)\.be$|(^|\.)(stad|gemeente|commune|ville)-?[a-z-]*\.be$|\.(gov|mil)$|\.[a-z]{2}\.us$|(^|\.)(gov|muni|ac|k12|idf)\.il$/;
+const GOV_DOMAIN = /(^|\.)(stadt-[a-z-]+|[a-z-]+-stadt|landkreis-[a-z-]+|kreis-[a-z-]+|lra-[a-z-]+)\.de$|\.(bund|nrw|bayern|rlp|niedersachsen|sachsen|thueringen|hessen|saarland|brandenburg|sachsen-anhalt|schleswig-holstein|mv-regierung|bwl|baden-wuerttemberg)\.de$|\.(gov|nhs|ac|sch|police|parliament)\.uk$|\.gouv\.fr$|(^|\.)(ville|mairie|commune|agglo|metropole)-[a-z-]+\.fr$|(^|\.)[a-z-]+-(ville|mairie)\.fr$|(^|\.)(belgium|fgov|vlaanderen|wallonie|irisnet)\.be$|(^|\.)(stad|gemeente|commune|ville)-?[a-z-]*\.be$|\.(gov|mil)$|\.[a-z]{2}\.us$|(^|\.)(gov|muni|ac|k12|idf)\.il$|\.(gov|govt|gob|go|gc|lg|nic|ac|edu|mil)\.[a-z]{2}$|\.gv\.at$|\.admin\.ch$/;
 
 const slug = (s) => clean(s).toLowerCase()
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')

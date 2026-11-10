@@ -38,6 +38,28 @@ const MOBILE = [
     /^417[5-9]/,         // Switzerland
     /^436[5-9]/,         // Austria
     /^9725/,             // Israel 05…
+    // The art campaign's world run. Whole numbers (length checked), so a
+    // site's number missing its code is read as a mobile only when it is one.
+    /^393\d{8,9}$/,      // Italy 3…
+    /^34[67]\d{8}$/,     // Spain 6… / 7…
+    /^3519[1236]\d{7}$/, // Portugal 91/92/93/96
+    /^467[02369]\d{7}$/, // Sweden 070/072/073/076/079
+    /^47[49]\d{7}$/,     // Norway 4… / 9…
+    /^3538[35-9]\d{7}$/, // Ireland 083, 085–089
+    /^3776\d{8}$/,       // Monaco 6…
+    /^852[4569]\d{7}$/,  // Hong Kong 4/5/6/9
+    /^65[89]\d{7}$/,     // Singapore 8/9
+    /^81[789]0\d{8}$/,   // Japan 070/080/090
+    /^8210\d{7,8}$/,     // South Korea 010
+    /^8869\d{8}$/,       // Taiwan 09
+    /^91[6-9]\d{9}$/,    // India 6–9
+    /^9715[0-8]\d{7}$/,  // UAE 05x
+    /^614\d{8}$/,        // Australia 04
+    /^642\d{7,9}$/,      // New Zealand 02x
+    /^55\d{2}9\d{8}$/,   // Brazil: a 9 after the area code
+    /^549\d{10}$/,       // Argentina: +54 9 before the area code
+    /^573\d{9}$/,        // Colombia 3…
+    /^27(?:6\d|7[1-9]|8[1-4])\d{7}$/, // South Africa 06x, 071–079, 081–084
 ];
 
 /**
@@ -83,7 +105,8 @@ export function normaliseNumber(raw, phoneCode = '49') {
 const LINK_RE = /(?:wa\.me\/|api\.whatsapp\.com\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=|web\.whatsapp\.com\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=|whatsapp:\/\/send\/?\?(?:[^"'\s<>]*?&(?:amp;)?)?phone=)(\+?[\d%\s().-]{7,20})/gi;
 
 /** Countries whose numbers never start with 0 after the country code. */
-const NO_ZERO_AFTER_CODE = ['972', '49', '44', '33', '32', '31', '43', '41', '46', '45', '47', '358', '353', '34', '351', '30', '48', '36', '420', '40', '90', '1'];
+const NO_ZERO_AFTER_CODE = ['972', '49', '44', '33', '32', '31', '43', '41', '46', '45', '47', '358', '353', '34', '351', '30', '48', '36', '420', '40', '90', '1',
+    '81', '82', '886', '852', '65', '91', '971', '61', '64', '27', '52', '54', '55', '57'];
 
 /**
  * Numbers sites write wrongly into WhatsApp links, from the Israel and
@@ -97,6 +120,9 @@ const NO_ZERO_AFTER_CODE = ['972', '49', '44', '33', '32', '31', '43', '41', '46
 export function fixMissingCode(e164, phoneCode) {
     let d = String(e164 || '').replace(/\D/g, '');
     if (!d) return e164;
+    // One of the market's own mobiles first: a Colombian "wa.me/3101234567"
+    // is +57 310…, not the Netherlands with its trunk 0 kept (+31 0…).
+    if (phoneCode && !d.startsWith(phoneCode) && d.length <= 11 && isMobile(phoneCode + d)) return `+${phoneCode}${d}`;
     const code = NO_ZERO_AFTER_CODE.find(c => d.startsWith(c + '0'));
     if (code) return `+${code}${d.slice(code.length + 1)}`;
     if (!phoneCode || d.startsWith(phoneCode) || d.length > 11) return e164;

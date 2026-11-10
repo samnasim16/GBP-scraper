@@ -403,7 +403,9 @@ export function extractContactRole(text) {
 // ─── Link discovery ───────────────────────────────────────────────────────
 
 // Hebrew: צור קשר / צרו קשר / יצירת קשר (contact), אודות (about); %d7%a6%d7%95%d7%a8 is צור in a URL.
-const CONTACT_LINK = /(impressum|imprint|legal[-_ ]?notice|kontakt|contact|about|ueber[-_]?uns|über[-_]?uns|uber[-_]?uns|wir|team|anbieterkennzeichnung|צור קשר|צרו קשר|יצירת קשר|אודות|%d7%a6%d7%95%d7%a8|%d7%90%d7%95%d7%93%d7%95%d7%aa)/i;
+// The art campaign's world run: contatti (Italian), contato (Portuguese),
+// お問い合わせ (Japanese), 연락처 / 문의 (Korean), 聯絡 / 联系 (Chinese).
+const CONTACT_LINK = /(impressum|imprint|legal[-_ ]?notice|kontakt|contact|about|ueber[-_]?uns|über[-_]?uns|uber[-_]?uns|wir|team|anbieterkennzeichnung|צור קשר|צרו קשר|יצירת קשר|אודות|%d7%a6%d7%95%d7%a8|%d7%90%d7%95%d7%93%d7%95%d7%aa|contatti|contato|お問い合わせ|問い合わせ|연락처|문의|聯絡|联系)/i;
 
 /** Same-site links to the Impressum, Kontakt and About pages, best first. */
 export function findContactLinks(html, baseUrl, { max = 4 } = {}) {
